@@ -22,11 +22,9 @@ class ComponentMatcher:
         self._include: dict[str, pathspec.PathSpec] = {}
         self._exclude: dict[str, pathspec.PathSpec] = {}
         for name, comp in components.items():
-            self._include[name] = pathspec.PathSpec.from_lines(
-                "gitwildmatch", comp.paths
-            )
+            self._include[name] = pathspec.PathSpec.from_lines("gitignore", comp.paths)
             self._exclude[name] = pathspec.PathSpec.from_lines(
-                "gitwildmatch", comp.exclude_paths
+                "gitignore", comp.exclude_paths
             )
 
     def match(self, path: str) -> str | None:
