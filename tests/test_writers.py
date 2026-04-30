@@ -37,6 +37,36 @@ def test_yaml_preserves_quotes(tmp_path: Path):
     assert "version: 0.2.0" in text
 
 
+def test_json_preserves_indent_and_order(tmp_path: Path):
+    p = tmp_path / "package.json"
+    p.write_text(
+        '{\n'
+        '    "name": "myapp",\n'
+        '    "version": "0.1.0",\n'
+        '    "scripts": {\n'
+        '        "build": "vite build"\n'
+        '    }\n'
+        '}\n'
+    )
+    write_value(p, "version", "1.2.3")
+    text = p.read_text()
+    # 4-space indent preserved
+    assert '    "name"' in text
+    assert '    "version": "1.2.3"' in text
+    # key order preserved (name before version before scripts)
+    assert text.index('"name"') < text.index('"version"') < text.index('"scripts"')
+    # nested mapping preserved
+    assert '"build": "vite build"' in text
+    assert read_value(p, "version") == "1.2.3"
+
+
+def test_json_nested_key(tmp_path: Path):
+    p = tmp_path / "manifest.json"
+    p.write_text('{\n  "image": {\n    "tag": "1.0.0"\n  }\n}\n')
+    write_value(p, "image.tag", "2.0.0")
+    assert read_value(p, "image.tag") == "2.0.0"
+
+
 def test_plain_file_round_trip(tmp_path: Path):
     p = tmp_path / "VERSION"
     p.write_text("0.1.0\n")

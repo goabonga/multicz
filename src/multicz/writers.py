@@ -1,9 +1,10 @@
 """Read and write versions inside structured config files.
 
-Supports three formats, dispatched by file extension:
+Supports four formats, dispatched by file extension:
 
 * ``.toml`` via :mod:`tomlkit` — preserves comments, key order, whitespace.
 * ``.yaml`` / ``.yml`` via :mod:`ruamel.yaml` — preserves comments and style.
+* ``.json`` via :mod:`json` — preserves key order and detected indentation.
 * anything else — treated as a plain text file holding only the version.
 
 A ``key`` is a dotted path (``project.version``, ``image.tag``). Passing
@@ -13,6 +14,7 @@ A ``key`` is a dotted path (``project.version``, ``image.tag``). Passing
 from __future__ import annotations
 
 import io
+import json
 from pathlib import Path
 
 import tomlkit
@@ -50,11 +52,24 @@ def _is_yaml(file: Path) -> bool:
     return file.suffix.lower() in {".yaml", ".yml"}
 
 
+def _is_json(file: Path) -> bool:
+    return file.suffix.lower() == ".json"
+
+
 def _yaml() -> YAML:
     yaml = YAML(typ="rt")
     yaml.preserve_quotes = True
     yaml.indent(mapping=2, sequence=4, offset=2)
     return yaml
+
+
+def _detect_json_indent(text: str) -> int:
+    """Best-effort indent detection: width of the first indented line."""
+    for line in text.splitlines():
+        stripped = line.lstrip(" ")
+        if stripped and stripped != line:
+            return len(line) - len(stripped)
+    return 2
 
 
 def read_value(file: Path, key: str | None) -> str:
@@ -70,6 +85,12 @@ def read_value(file: Path, key: str | None) -> str:
         return str(cursor[last])
     if _is_yaml(file):
         data = _yaml().load(io.StringIO(text)) or {}
+        cursor, last = _navigate(data, parts, create=False)
+        if last not in cursor:
+            raise WriterError(f"key {key!r} not found in {file}")
+        return str(cursor[last])
+    if _is_json(file):
+        data = json.loads(text or "{}")
         cursor, last = _navigate(data, parts, create=False)
         if last not in cursor:
             raise WriterError(f"key {key!r} not found in {file}")
@@ -101,6 +122,15 @@ def write_value(file: Path, key: str | None, value: str) -> None:
         buffer = io.StringIO()
         yaml.dump(data, buffer)
         file.write_text(buffer.getvalue(), encoding="utf-8")
+        return
+    if _is_json(file):
+        text = file.read_text(encoding="utf-8")
+        indent = _detect_json_indent(text)
+        data = json.loads(text or "{}")
+        cursor, last = _navigate(data, parts, create=True)
+        cursor[last] = value
+        rendered = json.dumps(data, indent=indent, ensure_ascii=False)
+        file.write_text(rendered + "\n", encoding="utf-8")
         return
     raise WriterError(
         f"plain-file values cannot have a key (got {key!r} for {file.name})"
