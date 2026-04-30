@@ -1,0 +1,37 @@
+# multicz config for a FastAPI service shipped with a Helm chart.
+#
+# Layout:
+#   src/                  -> Python sources
+#   pyproject.toml        -> python package manifest (canonical api version)
+#   Dockerfile            -> container build (artifact of api)
+#   charts/myapp/         -> Helm chart packaged separately
+#     Chart.yaml          -> chart metadata (chart version + appVersion)
+#     templates/          -> kubernetes manifests (template-only changes)
+#     values.yaml         -> defaults
+#
+# Behavior:
+#   - any change under src/ or to Dockerfile -> bumps `api`
+#   - api bumps mirror into Chart.yaml:appVersion (image tag = api version)
+#   - because the mirror writes inside chart's paths, chart cascades a patch
+#     so each released chart pins exactly one appVersion
+#   - changes only under charts/myapp/templates/ bump `chart` alone
+
+[project]
+commit_convention = "conventional"
+tag_format = "{component}-v{version}"
+initial_version = "0.1.0"
+
+[components.api]
+paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile", ".dockerignore"]
+bump_files = [
+  { file = "pyproject.toml", key = "project.version" },
+]
+mirrors = [
+  { file = "charts/myapp/Chart.yaml", key = "appVersion" },
+]
+
+[components.chart]
+paths = ["charts/myapp/**"]
+bump_files = [
+  { file = "charts/myapp/Chart.yaml", key = "version" },
+]
