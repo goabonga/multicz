@@ -17,10 +17,12 @@ CONFIG = """
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+changelog = "CHANGELOG.md"
 
 [components.chart]
 paths = ["charts/**"]
 bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+changelog = "charts/myapp/CHANGELOG.md"
 """
 
 INITIAL = {
@@ -153,6 +155,40 @@ def test_changelog_markdown_no_changes(repo: Path, runner: CliRunner):
     result = runner.invoke(app, ["changelog", "--output", "md", "--component", "api"])
     assert result.exit_code == 0
     assert "_No changes._" in result.stdout
+
+
+def test_bump_writes_changelogs(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: null token")
+
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 0, result.stdout
+
+    api_log = (repo / "CHANGELOG.md").read_text()
+    assert "## [1.3.0]" in api_log
+    assert "### Features" in api_log
+    assert "**api**: login" in api_log
+
+    chart_log = (repo / "charts/myapp/CHANGELOG.md").read_text()
+    assert "## [0.4.1]" in chart_log
+    # cascade-only bump => no commits to enumerate, but the section still exists
+    assert "_No notable changes._" in chart_log or "### " in chart_log
+
+
+def test_bump_no_changelog_flag(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
+    result = runner.invoke(app, ["bump", "--no-changelog"])
+    assert result.exit_code == 0
+    assert not (repo / "CHANGELOG.md").exists()
+
+
+def test_bump_commit_includes_changelog(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    files = _git(repo, "show", "--name-only", "--format=", "HEAD").split()
+    assert "CHANGELOG.md" in files
+    assert "charts/myapp/CHANGELOG.md" in files
 
 
 def test_check_accepts_conventional(tmp_path: Path, runner: CliRunner):

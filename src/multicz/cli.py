@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
+from .changelog import update_changelog_file
 from .commits import (
     DEFAULT_TYPES,
     commits_since,
@@ -171,6 +172,10 @@ def bump(
         False, "--push",
         help="Push the release commit and tags to origin (--follow-tags).",
     ),
+    no_changelog: bool = typer.Option(
+        False, "--no-changelog",
+        help="Skip CHANGELOG.md updates even if components declare one.",
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
     repo, config = _load()
@@ -186,8 +191,10 @@ def bump(
             console.print("[dim]no bumps pending[/]")
         return
 
+    matcher = ComponentMatcher(config.components)
     applied: dict[str, dict[str, str]] = {}
     written: list[Path] = []
+    changelogs_updated: list[str] = []
     for planned in plan:
         comp = config.components[planned.component]
         new_version = str(planned.next)
@@ -202,6 +209,22 @@ def bump(
                 write_value(file, key, new_version)
                 if file not in written:
                     written.append(file)
+
+        if comp.changelog and not no_changelog and not dry_run:
+            prefix = tag_prefix(config.project.tag_format, planned.component)
+            since = latest_tag(repo, prefix)
+            relevant = [
+                c
+                for c in commits_since(repo, since)
+                if c.is_conventional
+                and any(matcher.match(f) == planned.component for f in c.files)
+            ]
+            changelog_path = repo / comp.changelog
+            update_changelog_file(changelog_path, new_version, relevant)
+            if changelog_path not in written:
+                written.append(changelog_path)
+            changelogs_updated.append(str(comp.changelog))
+
         applied[planned.component] = {
             "current": str(planned.current),
             "next": new_version,
@@ -231,7 +254,14 @@ def bump(
         git_summary["pushed"] = "yes"
 
     if output == "json":
-        console.print_json(data={"bumps": applied, "dry_run": dry_run, "git": git_summary})
+        console.print_json(
+            data={
+                "bumps": applied,
+                "dry_run": dry_run,
+                "git": git_summary,
+                "changelogs": changelogs_updated,
+            }
+        )
         return
 
     verb = "would bump" if dry_run else "bumped"
@@ -240,6 +270,8 @@ def bump(
             f"[green]{verb}[/] [bold]{name}[/] {info['current']} → {info['next']} "
             f"([cyan]{info['kind']}[/])"
         )
+    if changelogs_updated:
+        console.print(f"[green]updated changelog[/] {', '.join(changelogs_updated)}")
     if git_summary.get("commit"):
         console.print(f"[green]committed[/] {git_summary['commit'][:7]}")
     if tags_created:
