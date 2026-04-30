@@ -17,13 +17,11 @@ upgraded (e.g. patch → minor) but never downgraded.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
-from packaging.version import Version
-
-from packaging.version import InvalidVersion
+from packaging.version import InvalidVersion, Version
 
 from .commits import (
     BumpKind,

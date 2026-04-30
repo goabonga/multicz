@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import sys
 from pathlib import Path
 
 import typer
@@ -72,13 +70,13 @@ def main(
 @app.command()
 def init(
     path: Path = typer.Option(
-        Path.cwd(), "--path", "-p", help="Directory to write multicz.toml into.",
+        None, "--path", "-p", help="Directory to write multicz.toml into.",
         file_okay=False, dir_okay=True, resolve_path=True,
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing config."),
 ) -> None:
     """Bootstrap a starter multicz.toml in the given directory."""
-    target = path / CONFIG_FILENAME
+    target = (path or Path.cwd()) / CONFIG_FILENAME
     if target.exists() and not force:
         err.print(f"[red]{target} already exists.[/] Use --force to overwrite.")
         raise typer.Exit(code=1)
@@ -86,7 +84,7 @@ def init(
     console.print(f"[green]wrote[/] {target}")
 
 
-def _load() -> tuple[Path, "object"]:
+def _load() -> tuple[Path, object]:
     try:
         config_path = find_config()
     except FileNotFoundError as exc:
@@ -231,7 +229,10 @@ def changelog(
         for commit in relevant:
             scope = f"({commit.scope})" if commit.scope else ""
             bang = "!" if commit.breaking else ""
-            console.print(f"  - {commit.type}{scope}{bang}: {commit.subject}  [dim]({commit.sha[:7]})[/]")
+            console.print(
+                f"  - {commit.type}{scope}{bang}: {commit.subject}"
+                f"  [dim]({commit.sha[:7]})[/]"
+            )
 
 
 if __name__ == "__main__":  # pragma: no cover

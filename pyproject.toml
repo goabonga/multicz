@@ -54,6 +54,12 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "N", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# typer's recommended pattern is to call typer.Option() / typer.Argument()
+# directly in argument defaults. B008 forbids that across the board, so we
+# disable it just for the CLI module.
+"src/multicz/cli.py" = ["B008"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
