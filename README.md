@@ -98,9 +98,41 @@ helm package charts/myapp
 | `multicz status` | print pending bumps with reasons |
 | `multicz bump` | apply bumps to all configured files |
 | `multicz bump --dry-run` | plan without writing |
-| `multicz bump --output json` | emit `{"bumps": {...}}` for CI |
+| `multicz bump --commit --tag` | release in one shot: write, commit, tag |
+| `multicz bump --commit --tag --push` | …and push commit + tags with `--follow-tags` |
+| `multicz bump --output json` | emit `{"bumps": {...}, "git": {...}}` for CI |
 | `multicz get <component>` | read the current version from the primary bump file |
 | `multicz changelog [-c name]` | per-component conventional-commit log since the last tag |
+| `multicz changelog --output md` | the same, grouped into Breaking / Features / Fixes / Perf / Other |
+| `multicz check <file>` | validate a commit message — wire as a `commit-msg` hook |
+
+### Commit-msg hook
+
+```sh
+# .git/hooks/commit-msg
+#!/bin/sh
+exec multicz check "$1"
+```
+
+### One-shot CI release
+
+```yaml
+- run: |
+    multicz bump --commit --tag --push
+    TAG=$(multicz get api)
+    docker build -t registry/myapp:$TAG .
+    docker push registry/myapp:$TAG
+    helm package charts/myapp
+```
+
+### Supported file formats
+
+`bump_files` and `mirrors` can point at:
+
+* `.toml` — comments and key order preserved (tomlkit)
+* `.yaml` / `.yml` — comments and quote style preserved (ruamel.yaml)
+* `.json` — indent and key order preserved (e.g. `package.json`)
+* anything else — treated as a one-line `VERSION` file (`key = ` omitted)
 
 ## Configuration reference
 
