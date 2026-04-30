@@ -42,6 +42,7 @@ class Component(BaseModel):
     bump_files: list[FileKey] = Field(default_factory=list)
     mirrors: list[FileKey] = Field(default_factory=list)
     triggers: list[str] = Field(default_factory=list)
+    changelog: Path | None = None
 
     @field_validator("paths", "exclude_paths")
     @classmethod
