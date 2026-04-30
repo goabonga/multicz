@@ -23,6 +23,8 @@ from typing import Iterable
 
 from packaging.version import Version
 
+from packaging.version import InvalidVersion
+
 from .commits import (
     BumpKind,
     Commit,
@@ -33,6 +35,7 @@ from .commits import (
 )
 from .components import ComponentMatcher
 from .config import Config
+from .writers import WriterError, read_value
 
 _KIND_ORDER: dict[BumpKind, int] = {"patch": 1, "minor": 2, "major": 3}
 
@@ -116,8 +119,26 @@ def _promote(
 
 
 def _current_version(repo: Path, config: Config, name: str) -> Version:
+    """Resolve the component's current version.
+
+    Priority:
+      1. the highest matching git tag (authoritative release state),
+      2. the value stored in the primary bump_file (in-tree state),
+      3. ``initial_version`` from the project settings (bootstrap).
+    """
     prefix = tag_prefix(config.project.tag_format, name)
-    return latest_version(repo, prefix) or Version(config.project.initial_version)
+    tagged = latest_version(repo, prefix)
+    if tagged is not None:
+        return tagged
+
+    comp = config.components[name]
+    if comp.bump_files:
+        primary = comp.bump_files[0]
+        try:
+            return Version(read_value(repo / primary.file, primary.key))
+        except (WriterError, InvalidVersion, FileNotFoundError):
+            pass
+    return Version(config.project.initial_version)
 
 
 def _direct_pass(
