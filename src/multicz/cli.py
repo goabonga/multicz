@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import typer
@@ -121,6 +122,29 @@ def status() -> None:
     console.print(table)
 
 
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        err.print(
+            f"[red]git {' '.join(args)} failed ({result.returncode}):[/] "
+            f"{result.stderr.strip()}"
+        )
+        raise typer.Exit(code=1)
+    return result.stdout
+
+
+def _release_commit_message(applied: dict[str, dict[str, str]]) -> str:
+    parts = [f"{name} {info['current']} -> {info['next']}" for name, info in applied.items()]
+    summary = ", ".join(parts)
+    body_lines = [
+        f"- {name}: {info['current']} -> {info['next']} ({info['kind']})"
+        for name, info in applied.items()
+    ]
+    return f"chore(release): bump {summary}\n\n" + "\n".join(body_lines) + "\n"
+
+
 @app.command()
 def bump(
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Plan only, do not write."),
@@ -128,6 +152,18 @@ def bump(
         None, "--component", "-c", help="Restrict to these components (repeatable).",
     ),
     output: str = typer.Option("text", "--output", "-o", help="text | json"),
+    commit: bool = typer.Option(
+        False, "--commit", "-C",
+        help="Stage written files and create a chore(release) commit.",
+    ),
+    tag: bool = typer.Option(
+        False, "--tag", "-t",
+        help="Create one annotated git tag per bumped component.",
+    ),
+    push: bool = typer.Option(
+        False, "--push",
+        help="Push the release commit and tags to origin (--follow-tags).",
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
     repo, config = _load()
@@ -144,6 +180,7 @@ def bump(
         return
 
     applied: dict[str, dict[str, str]] = {}
+    written: list[Path] = []
     for planned in plan:
         comp = config.components[planned.component]
         new_version = str(planned.next)
@@ -156,14 +193,38 @@ def bump(
         for file, key in targets:
             if not dry_run:
                 write_value(file, key, new_version)
+                if file not in written:
+                    written.append(file)
         applied[planned.component] = {
             "current": str(planned.current),
             "next": new_version,
             "kind": planned.kind,
         }
 
+    git_summary: dict[str, str | list[str]] = {}
+    if not dry_run and commit and written:
+        rel_paths = [str(p.relative_to(repo)) for p in written]
+        _git(repo, "add", "--", *rel_paths)
+        _git(repo, "commit", "-m", _release_commit_message(applied))
+        sha = _git(repo, "rev-parse", "HEAD").strip()
+        git_summary["commit"] = sha
+
+    tags_created: list[str] = []
+    if not dry_run and tag:
+        for name, info in applied.items():
+            tag_name = config.project.tag_format.format(
+                component=name, version=info["next"]
+            )
+            _git(repo, "tag", "-m", f"{name} {info['next']}", tag_name)
+            tags_created.append(tag_name)
+        git_summary["tags"] = tags_created
+
+    if not dry_run and push:
+        _git(repo, "push", "--follow-tags")
+        git_summary["pushed"] = "yes"
+
     if output == "json":
-        console.print_json(data={"bumps": applied, "dry_run": dry_run})
+        console.print_json(data={"bumps": applied, "dry_run": dry_run, "git": git_summary})
         return
 
     verb = "would bump" if dry_run else "bumped"
@@ -172,6 +233,12 @@ def bump(
             f"[green]{verb}[/] [bold]{name}[/] {info['current']} → {info['next']} "
             f"([cyan]{info['kind']}[/])"
         )
+    if git_summary.get("commit"):
+        console.print(f"[green]committed[/] {git_summary['commit'][:7]}")
+    if tags_created:
+        console.print(f"[green]tagged[/] {', '.join(tags_created)}")
+    if git_summary.get("pushed"):
+        console.print("[green]pushed[/]")
 
 
 @app.command(name="get")
