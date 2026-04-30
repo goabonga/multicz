@@ -155,6 +155,34 @@ def test_changelog_markdown_no_changes(repo: Path, runner: CliRunner):
     assert "_No changes._" in result.stdout
 
 
+def test_check_accepts_conventional(tmp_path: Path, runner: CliRunner):
+    msg = tmp_path / "msg"
+    msg.write_text("feat(api): add login\n")
+    result = runner.invoke(app, ["check", str(msg)])
+    assert result.exit_code == 0
+
+
+def test_check_rejects_non_conventional(tmp_path: Path, runner: CliRunner):
+    msg = tmp_path / "msg"
+    msg.write_text("oopsie no convention here\n")
+    result = runner.invoke(app, ["check", str(msg)])
+    assert result.exit_code == 1
+    # error printed to stderr (mixed with stdout in CliRunner default)
+    assert "invalid commit message" in result.output or "invalid" in result.output
+
+
+def test_check_rejects_unknown_type_when_restricted(tmp_path: Path, runner: CliRunner):
+    msg = tmp_path / "msg"
+    msg.write_text("chore: tweak\n")
+    result = runner.invoke(app, ["check", str(msg), "--type", "feat", "--type", "fix"])
+    assert result.exit_code == 1
+
+
+def test_check_missing_file(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["check", "/no/such/file"])
+    assert result.exit_code == 1
+
+
 def test_init_writes_starter_config(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()

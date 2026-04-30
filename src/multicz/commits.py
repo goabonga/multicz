@@ -25,6 +25,42 @@ _HEADER_RE = re.compile(
 )
 _BREAKING_FOOTER_RE = re.compile(r"^BREAKING(?:[ -]CHANGE)?:", re.MULTILINE)
 
+DEFAULT_TYPES: tuple[str, ...] = (
+    "feat", "fix", "perf", "refactor", "docs", "test",
+    "build", "ci", "chore", "style", "revert",
+)
+_AUTO_PREFIXES: tuple[str, ...] = (
+    "Merge ", "Revert ", "fixup!", "squash!", "amend!",
+)
+
+
+def validate_message(message: str, allowed_types: tuple[str, ...] = DEFAULT_TYPES) -> str | None:
+    """Return a human-readable error if ``message`` is not a valid conventional commit.
+
+    Lines that git tooling generates automatically (Merge/Revert/fixup!/squash!/amend!)
+    are accepted unconditionally. ``None`` means the message is valid.
+    """
+    stripped = message.lstrip("﻿").strip()
+    if not stripped:
+        return "empty commit message"
+
+    first = stripped.splitlines()[0]
+    if first.startswith(_AUTO_PREFIXES):
+        return None
+
+    match = _HEADER_RE.match(first)
+    if match is None:
+        return (
+            "header does not match '<type>(<scope>)?: <subject>'. "
+            f"Allowed types: {', '.join(allowed_types)}."
+        )
+    if match.group("type").lower() not in allowed_types:
+        return (
+            f"unknown type {match.group('type')!r}. "
+            f"Allowed types: {', '.join(allowed_types)}."
+        )
+    return None
+
 
 class GitError(RuntimeError):
     """Raised when a git invocation fails."""

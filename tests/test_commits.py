@@ -1,4 +1,4 @@
-from multicz.commits import parse_commit
+from multicz.commits import parse_commit, validate_message
 
 
 def test_feat_is_minor():
@@ -41,3 +41,38 @@ def test_non_conventional_is_ignored():
     commit = parse_commit("a", "random message", ())
     assert not commit.is_conventional
     assert commit.bump_kind is None
+
+
+def test_validate_accepts_conventional():
+    assert validate_message("feat(api): add login") is None
+    assert validate_message("fix: broken thing\n\nbody") is None
+    assert validate_message("feat!: drop py 3.11") is None
+
+
+def test_validate_rejects_non_conventional():
+    error = validate_message("just some text")
+    assert error is not None
+    assert "conventional" in error.lower() or "header" in error.lower()
+
+
+def test_validate_rejects_empty():
+    assert validate_message("") is not None
+    assert validate_message("   \n\n") is not None
+
+
+def test_validate_rejects_unknown_type():
+    error = validate_message("wibble: something")
+    assert error is not None
+    assert "wibble" in error
+
+
+def test_validate_skips_merge_and_fixup():
+    assert validate_message("Merge branch 'main' into dev") is None
+    assert validate_message("fixup! feat: x") is None
+    assert validate_message("Revert \"feat: x\"") is None
+
+
+def test_validate_custom_types():
+    assert validate_message("custom: x", allowed_types=("custom", "feat")) is None
+    error = validate_message("feat: x", allowed_types=("custom",))
+    assert error is not None
