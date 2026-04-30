@@ -29,9 +29,11 @@ bump_files = [
 mirrors = [
   { file = "charts/myapp/Chart.yaml", key = "appVersion" },
 ]
+changelog = "CHANGELOG.md"
 
 [components.chart]
 paths = ["charts/myapp/**"]
 bump_files = [
   { file = "charts/myapp/Chart.yaml", key = "version" },
 ]
+changelog = "charts/myapp/CHANGELOG.md"

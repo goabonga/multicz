@@ -47,7 +47,8 @@ Each component declares:
 * `bump_files` — where the canonical version is written;
 * `mirrors` — files that should reflect this component's version (e.g. a
   Helm chart's `appVersion` mirroring the app version);
-* `triggers` — other components whose bumps should trigger this one.
+* `triggers` — other components whose bumps should trigger this one;
+* `changelog` — path to a `CHANGELOG.md` the planner should keep in sync.
 
 The planner runs three passes:
 
@@ -66,10 +67,12 @@ The planner runs three passes:
 paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile", ".dockerignore"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 mirrors    = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+changelog  = "CHANGELOG.md"
 
 [components.chart]
 paths      = ["charts/myapp/**"]
 bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+changelog  = "charts/myapp/CHANGELOG.md"
 ```
 
 Behavior:
@@ -104,7 +107,30 @@ helm package charts/myapp
 | `multicz get <component>` | read the current version from the primary bump file |
 | `multicz changelog [-c name]` | per-component conventional-commit log since the last tag |
 | `multicz changelog --output md` | the same, grouped into Breaking / Features / Fixes / Perf / Other |
+| `multicz bump --no-changelog` | bump versions without touching declared `CHANGELOG.md` files |
 | `multicz check <file>` | validate a commit message — wire as a `commit-msg` hook |
+
+### Per-component CHANGELOG.md
+
+When a component declares `changelog = "path/to/CHANGELOG.md"`, every
+`multicz bump` automatically prepends a new keep-a-changelog section to
+that file:
+
+```markdown
+## [1.3.0] - 2026-04-30
+
+### Features
+
+- **api**: add login (`abc1234`)
+
+### Fixes
+
+- null token (`def5678`)
+```
+
+The file is created with a small preamble on first use, and subsequent
+runs insert the new section directly above the latest existing release.
+Pass `--no-changelog` to opt out for a single bump.
 
 ### Commit-msg hook
 
