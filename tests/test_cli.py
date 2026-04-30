@@ -132,6 +132,29 @@ def test_get_returns_current_version(repo: Path, runner: CliRunner):
     assert result.stdout.strip() == "1.2.0"
 
 
+def test_changelog_markdown_groups_by_section(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix(api): null token")
+    _commit(repo, {"src/main.py": "x = 4\n"}, "feat!: rewrite client")
+
+    result = runner.invoke(app, ["changelog", "--output", "md", "--component", "api"])
+    assert result.exit_code == 0, result.stdout
+    out = result.stdout
+    assert "## api" in out
+    assert "### Breaking changes" in out
+    assert "### Features" in out
+    assert "### Fixes" in out
+    # breaking comes first per _MD_SECTIONS order
+    assert out.index("Breaking changes") < out.index("Features")
+    assert out.index("Features") < out.index("Fixes")
+
+
+def test_changelog_markdown_no_changes(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["changelog", "--output", "md", "--component", "api"])
+    assert result.exit_code == 0
+    assert "_No changes._" in result.stdout
+
+
 def test_init_writes_starter_config(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()

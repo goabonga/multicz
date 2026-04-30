@@ -267,39 +267,100 @@ def get_value(target: str = typer.Argument(..., help="component[.field]")) -> No
     print(read_value(repo / primary.file, primary.key))
 
 
+_MD_SECTIONS: list[tuple[str, set[str]]] = [
+    ("Breaking changes", set()),  # special-cased: any commit with breaking=True
+    ("Features", {"feat"}),
+    ("Fixes", {"fix"}),
+    ("Performance", {"perf"}),
+    ("Other", set()),  # special-cased: anything else conventional
+]
+
+
+def _bucket(commit) -> str:
+    if commit.breaking:
+        return "Breaking changes"
+    t = commit.type.lower()
+    if t == "feat":
+        return "Features"
+    if t == "fix":
+        return "Fixes"
+    if t == "perf":
+        return "Performance"
+    return "Other"
+
+
 @app.command()
 def changelog(
     component: str = typer.Option(None, "--component", "-c"),
+    output: str = typer.Option("text", "--output", "-o", help="text | md"),
 ) -> None:
     """Print a per-component log of conventional commits since the last tag."""
     repo, config = _load()
     matcher = ComponentMatcher(config.components)
     names = [component] if component else list(config.components)
+    plan = build_plan(repo, config)
+
+    md_lines: list[str] = []
+
     for name in names:
         if name not in config.components:
             err.print(f"[red]unknown component:[/] {name}")
             raise typer.Exit(code=1)
         prefix = tag_prefix(config.project.tag_format, name)
         since = latest_tag(repo, prefix)
-        header = f"## {name}"
-        if since:
-            header += f"  (since {since})"
-        console.print(f"\n[bold]{header}[/]")
         relevant = [
             c
             for c in commits_since(repo, since)
             if c.is_conventional and any(matcher.match(f) == name for f in c.files)
         ]
-        if not relevant:
-            console.print("  [dim]no changes[/]")
-            continue
-        for commit in relevant:
-            scope = f"({commit.scope})" if commit.scope else ""
-            bang = "!" if commit.breaking else ""
-            console.print(
-                f"  - {commit.type}{scope}{bang}: {commit.subject}"
-                f"  [dim]({commit.sha[:7]})[/]"
-            )
+
+        if output == "md":
+            planned = plan.bumps.get(name)
+            heading = f"## {name}"
+            if planned:
+                heading += f" {planned.current} → {planned.next}"
+            elif since:
+                heading += f" (since {since})"
+            md_lines.append(heading)
+            md_lines.append("")
+            if not relevant:
+                md_lines.append("_No changes._")
+                md_lines.append("")
+                continue
+            buckets: dict[str, list] = {title: [] for title, _ in _MD_SECTIONS}
+            for commit in relevant:
+                buckets[_bucket(commit)].append(commit)
+            for section, _ in _MD_SECTIONS:
+                items = buckets[section]
+                if not items:
+                    continue
+                md_lines.append(f"### {section}")
+                md_lines.append("")
+                for commit in items:
+                    scope = f"**{commit.scope}**: " if commit.scope else ""
+                    md_lines.append(
+                        f"- {scope}{commit.subject} (`{commit.sha[:7]}`)"
+                    )
+                md_lines.append("")
+        else:
+            header = f"## {name}"
+            if since:
+                header += f"  (since {since})"
+            console.print(f"\n[bold]{header}[/]")
+            if not relevant:
+                console.print("  [dim]no changes[/]")
+                continue
+            for commit in relevant:
+                scope = f"({commit.scope})" if commit.scope else ""
+                bang = "!" if commit.breaking else ""
+                console.print(
+                    f"  - {commit.type}{scope}{bang}: {commit.subject}"
+                    f"  [dim]({commit.sha[:7]})[/]"
+                )
+
+    if output == "md":
+        # plain print so the output is pipeable into a CHANGELOG.md
+        print("\n".join(md_lines).rstrip() + "\n")
 
 
 if __name__ == "__main__":  # pragma: no cover
