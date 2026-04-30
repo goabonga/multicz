@@ -1,0 +1,59 @@
+[project]
+name = "multicz"
+version = "0.1.0"
+description = "Multi-component versioning for monorepos: bump apps, charts, and images independently from conventional commits."
+readme = "README.md"
+authors = [
+    { name = "Chris", email = "goabonga@pm.me" },
+]
+license = { text = "MIT" }
+requires-python = ">=3.12"
+keywords = ["semver", "monorepo", "helm", "conventional-commits", "release", "versioning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Version Control",
+]
+dependencies = [
+    "typer>=0.12",
+    "pydantic>=2.7",
+    "tomlkit>=0.13",
+    "ruamel-yaml>=0.18",
+    "pathspec>=0.12",
+    "packaging>=24.0",
+]
+
+[project.scripts]
+multicz = "multicz.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/goabonga/multicz"
+Repository = "https://github.com/goabonga/multicz"
+Issues = "https://github.com/goabonga/multicz/issues"
+
+[build-system]
+requires = ["uv_build>=0.11.1,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "N", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
