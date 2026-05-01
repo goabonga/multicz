@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -1006,6 +1007,50 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout
 
 
+def _porcelain_paths(repo: Path) -> set[str]:
+    """Repo-relative paths currently dirty in the working tree.
+
+    Used to diff working-tree state before vs. after running ``post_bump``
+    hooks: anything that wasn't dirty before but is dirty after came from
+    a hook, and gets pulled into the release commit.
+    """
+    out = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    if out.returncode != 0:
+        return set()
+    paths: set[str] = set()
+    for line in out.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        rest = line[3:]
+        # Renames render as "OLD -> NEW"; we care about the new path only.
+        if " -> " in rest:
+            rest = rest.split(" -> ", 1)[1]
+        paths.add(rest)
+    return paths
+
+
+def _run_post_bump_hook(repo: Path, command: str) -> None:
+    """Execute a single ``post_bump`` shell command in ``repo``."""
+    args = shlex.split(command)
+    if not args:
+        return
+    console.print(f"  [dim]post_bump:[/] {command}")
+    result = subprocess.run(
+        args, cwd=repo, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        err.print(
+            f"[red]post_bump hook failed[/] (exit {result.returncode}): "
+            f"{command}"
+        )
+        if result.stderr.strip():
+            err.print(result.stderr.strip())
+        raise typer.Exit(code=1)
+
+
 def _resolve_maintainer(repo: Path, configured: str | None) -> str:
     """Pick a Debian-format maintainer string ``Name <email>``.
 
@@ -1374,6 +1419,29 @@ def bump(
 
     sign_commits_flag = sign or config.project.sign_commits
     sign_tags_flag = sign or config.project.sign_tags
+
+    # post_bump hooks: run after every file write (bump_files, mirrors,
+    # changelog, state) so commands like `uv lock`, `npm install
+    # --package-lock-only`, `cargo update --workspace`, `helm dependency
+    # update` see the new pyproject.toml / package.json / Chart.yaml /
+    # Cargo.toml. Files modified by hooks are auto-detected via the git
+    # status diff and folded into ``written`` so they ride the release
+    # commit. Hooks only run when ``not dry_run`` — same gate as the
+    # writes themselves.
+    if not dry_run and applied:
+        hook_components = [
+            n for n in applied if config.components[n].post_bump
+        ]
+        if hook_components:
+            before_dirty = _porcelain_paths(repo)
+            for name in hook_components:
+                for command in config.components[name].post_bump:
+                    _run_post_bump_hook(repo, command)
+            after_dirty = _porcelain_paths(repo)
+            for relpath in sorted(after_dirty - before_dirty):
+                path = (repo / relpath).resolve()
+                if path.is_file() and path not in written:
+                    written.append(path)
 
     if not dry_run and commit and written:
         rel_paths = [str(p.relative_to(repo)) for p in written]

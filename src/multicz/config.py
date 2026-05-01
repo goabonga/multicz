@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from pathlib import Path
 from typing import Any, Literal
 
@@ -116,11 +117,34 @@ class Component(BaseModel):
     ignored_types: list[str] = Field(default_factory=list)
     version_scheme: Literal["semver", "pep440"] = "semver"
     artifacts: list[Artifact] = Field(default_factory=list)
+    # Shell commands run after multicz has rewritten this component's
+    # bump_files but before it stages them for the release commit. The
+    # canonical use-case is regenerating lockfiles that depend on the
+    # version multicz just wrote (uv.lock, package-lock.json, Cargo.lock,
+    # Chart.lock, …). Each entry is parsed via shlex.split and executed
+    # in the repo root. Files modified by these hooks are auto-detected
+    # and joined to the release commit.
+    post_bump: list[str] = Field(default_factory=list)
 
-    @field_validator("paths", "exclude_paths")
+    @field_validator("paths", "exclude_paths", "post_bump")
     @classmethod
     def _strip_globs(cls, value: list[str]) -> list[str]:
         return [v.strip() for v in value if v.strip()]
+
+    @field_validator("post_bump")
+    @classmethod
+    def _validate_post_bump_shellable(cls, value: list[str]) -> list[str]:
+        """Surface bad quoting at config-load time (i.e. via
+        ``multicz validate``) instead of at bump-run time."""
+        for entry in value:
+            try:
+                shlex.split(entry)
+            except ValueError as exc:
+                raise ValueError(
+                    f"post_bump entry {entry!r} is not a valid shell "
+                    f"command: {exc}"
+                ) from exc
+        return value
 
     @model_validator(mode="after")
     def _merge_triggers_alias(self) -> Component:

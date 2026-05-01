@@ -1536,3 +1536,84 @@ def test_init_force_overwrites(tmp_path: Path, runner: CliRunner):
     result = runner.invoke(app, ["init", "--force"])
     assert result.exit_code == 0
     assert "[components.auto-app]" in (target / "multicz.toml").read_text()
+
+
+def test_post_bump_runs_command_and_includes_modified_file(
+    repo: Path, runner: CliRunner
+):
+    """post_bump runs after writes and pulls modified files into the
+    release commit (simulates `uv lock` regenerating uv.lock)."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["sh -c 'echo regenerated > generated.lock'"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    result = runner.invoke(app, ["bump", "--commit"])
+    assert result.exit_code == 0, result.stdout
+
+    # The lockfile produced by the hook is committed alongside pyproject.
+    head_files = _git(repo, "show", "--name-only", "--format=", "HEAD").split()
+    assert "generated.lock" in head_files
+    assert "pyproject.toml" in head_files
+    assert (repo / "generated.lock").read_text().strip() == "regenerated"
+
+
+def test_post_bump_failure_aborts_bump(
+    repo: Path, runner: CliRunner
+):
+    """A non-zero post_bump exit aborts the bump pipeline before
+    committing or tagging — the working tree may have been written to,
+    but no release commit is created."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["false"]
+""")
+    head_before = _git(repo, "rev-parse", "HEAD").strip()
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    result = runner.invoke(app, ["bump", "--commit", "--tag"])
+    assert result.exit_code != 0
+    head_after_feat = _git(repo, "rev-parse", "HEAD").strip()
+    # No `chore(release)` commit landed on top of the feat commit.
+    assert head_after_feat != head_before  # the feat commit did land
+    assert "chore(release)" not in _git(repo, "log", "-1", "--format=%s")
+
+
+def test_post_bump_skipped_in_dry_run(
+    repo: Path, runner: CliRunner
+):
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["sh -c 'echo nope > should_not_exist.lock'"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    runner.invoke(app, ["bump", "--dry-run"])
+    assert not (repo / "should_not_exist.lock").exists()
+
+
+def test_post_bump_runs_only_for_bumped_components(
+    repo: Path, runner: CliRunner
+):
+    """Hooks fire only for components that actually got bumped — a
+    component with `post_bump` that didn't change must stay quiet."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[components.untouched]
+paths = ["docs/**"]
+bump_files = [{ file = "docs/version.txt", key = "" }]
+post_bump = ["sh -c 'echo ran > untouched.lock'"]
+""")
+    (repo / "docs").mkdir()
+    (repo / "docs/version.txt").write_text("0.0.1\n")
+    _commit(repo, {"docs/.gitkeep": ""}, "chore: keep")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    runner.invoke(app, ["bump"])
+    assert not (repo / "untouched.lock").exists()

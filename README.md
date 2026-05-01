@@ -265,7 +265,14 @@ Each component declares:
 * `mirrors` — files that should reflect this component's version (e.g. a
   Helm chart's `appVersion` mirroring the app version);
 * `triggers` — other components whose bumps should trigger this one;
-* `changelog` — path to a `CHANGELOG.md` the planner should keep in sync.
+* `changelog` — path to a `CHANGELOG.md` the planner should keep in sync;
+* `post_bump` — shell commands run after the writes to regenerate
+  lockfiles (`uv lock`, `npm install --package-lock-only`,
+  `cargo update --workspace`, `helm dependency update charts/foo`,
+  `bundle lock`, `composer update --lock`, `go mod tidy`, …). Files
+  modified by these commands are auto-detected and folded into the
+  release commit, so the lockfile and the version it pins land
+  atomically.
 
 The planner runs three passes:
 
