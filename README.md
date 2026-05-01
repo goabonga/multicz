@@ -281,12 +281,12 @@ Common noise dirs (`.git`, `node_modules`, `.venv`, `target`, `build`,
 See [`examples/fastapi-helm/multicz.toml`](examples/fastapi-helm/multicz.toml)
 for a fully commented example.
 
-## Why "option A" (mirror cascades chart bump)?
+## Helm chart immutability
 
 Helm charts are content-addressed by `name-version.tgz`. If `chart-0.5.0`
 references `appVersion: 1.2.0` in some pulls and `appVersion: 1.3.0` in
 others, you've effectively shipped two different artifacts under the same
-name. multicz refuses that: any time the mirrored `appVersion` changes,
+name. `multicz` refuses that: any time the mirrored `appVersion` changes,
 the chart version moves with it.
 
 ## License
