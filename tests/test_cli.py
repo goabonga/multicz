@@ -260,6 +260,55 @@ def test_check_missing_file(repo: Path, runner: CliRunner):
     assert result.exit_code == 1
 
 
+def test_bump_pre_rc_enters_cycle(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    result = runner.invoke(app, ["bump", "--pre", "rc"])
+    assert result.exit_code == 0, result.stdout
+    assert 'version = "1.3.0-rc.1"' in (repo / "pyproject.toml").read_text()
+
+
+def test_bump_pre_rc_increments_counter(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: bug")
+    result = runner.invoke(app, ["bump", "--pre", "rc"])
+    assert result.exit_code == 0, result.stdout
+    assert 'version = "1.3.0-rc.2"' in (repo / "pyproject.toml").read_text()
+
+
+def test_bump_finalize_drops_suffix(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    # No new commits -> --finalize still works
+    result = runner.invoke(app, ["bump", "--finalize"])
+    assert result.exit_code == 0, result.stdout
+    assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
+
+
+def test_bump_no_flags_after_rc_auto_finalizes(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: bug")
+    result = runner.invoke(app, ["bump"])  # no --pre, no --finalize
+    assert result.exit_code == 0, result.stdout
+    # Auto-finalize: drop the suffix even though there were new commits
+    assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
+
+
+def test_bump_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    result = runner.invoke(app, ["bump", "--pre", "rc", "--finalize"])
+    assert result.exit_code == 1
+    assert "mutually exclusive" in result.output.lower()
+
+
+def test_bump_pre_creates_tag_with_rc_suffix(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    tags = _git(repo, "tag").split()
+    assert "api-v1.3.0-rc.1" in tags
+
+
 def test_bump_debian_format_prepends_stanza(tmp_path: Path, runner: CliRunner):
     _git(tmp_path, "init", "-q", "-b", "main")
     _git(tmp_path, "config", "user.email", "deb@test.com")

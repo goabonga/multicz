@@ -4,10 +4,12 @@ from multicz.commits import parse_commit
 from multicz.debian import (
     DebianStanza,
     format_debian_version,
+    from_debian_pre,
     parse_top_stanza,
     parse_top_version,
     prepend_stanza,
     render_stanza,
+    to_debian_pre,
     upstream_version,
 )
 
@@ -61,6 +63,28 @@ def test_upstream_version_strips_revision():
 def test_upstream_version_strips_epoch():
     assert upstream_version("2:1.2.3") == "1.2.3"
     assert upstream_version("2:1.2.3-5") == "1.2.3"
+
+
+def test_to_debian_pre_converts_semver_to_tilde():
+    assert to_debian_pre("1.3.0") == "1.3.0"
+    assert to_debian_pre("1.3.0-rc.1") == "1.3.0~rc1"
+    assert to_debian_pre("2.0.0-alpha.4") == "2.0.0~alpha4"
+
+
+def test_from_debian_pre_converts_tilde_back_to_semver():
+    assert from_debian_pre("1.3.0") == "1.3.0"
+    assert from_debian_pre("1.3.0~rc1") == "1.3.0-rc.1"
+    assert from_debian_pre("2.0.0~alpha4") == "2.0.0-alpha.4"
+
+
+def test_debian_pre_round_trip():
+    for sv in ("1.3.0", "1.3.0-rc.1", "2.0.0-beta.7"):
+        assert from_debian_pre(to_debian_pre(sv)) == sv
+
+
+def test_format_debian_version_with_prerelease():
+    assert format_debian_version("1.3.0-rc.1") == "1.3.0~rc1-1"
+    assert format_debian_version("2.0.0-alpha.4", debian_revision=2) == "2.0.0~alpha4-2"
 
 
 def test_format_debian_version():

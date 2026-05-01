@@ -62,16 +62,95 @@ def bump_version(version: Version, kind: BumpKind) -> Version:
     return Version(f"{major}.{minor}.{patch + 1}")
 
 
+# PEP 440 normalises 'a'/'b'/'c' into 'alpha'/'beta'/'rc' shapes; we keep a
+# dictionary of common aliases so 1.3.0-rc.1 and 1.3.0-c.1 collapse to the
+# same cycle.
+_PRE_ALIASES = {"a": "alpha", "b": "beta", "c": "rc", "pre": "rc", "preview": "rc"}
+
+
+def _norm_pre_label(label: str) -> str:
+    label = label.lower()
+    return _PRE_ALIASES.get(label, label)
+
+
+def compute_next(
+    current: Version,
+    kind: BumpKind,
+    *,
+    pre: str | None = None,
+    finalize: bool = False,
+) -> str:
+    """Compute the next version string given ``kind`` and optional pre-release flags.
+
+    The result is rendered in a *semver-friendly* form (``1.3.0-rc.1``) so
+    it lands cleanly into ``pyproject.toml``, ``package.json`` and
+    ``Cargo.toml`` alike — :class:`packaging.version.Version` parses both
+    semver and PEP 440 spellings, so ordering is preserved.
+
+    Behavior matrix:
+
+    +-------------+----------+-----------+------------------+----------------------+
+    | current     | --pre    | --finalize| result           | meaning              |
+    +-------------+----------+-----------+------------------+----------------------+
+    | 1.2.3       | None     | False     | 1.3.0            | regular bump (feat)  |
+    | 1.2.3       | rc       | False     | 1.3.0-rc.1       | enter RC cycle       |
+    | 1.3.0-rc.1  | None     | False     | 1.3.0            | auto-finalize        |
+    | 1.3.0-rc.1  | None     | True      | 1.3.0            | explicit finalize    |
+    | 1.3.0-rc.1  | rc       | False     | 1.3.0-rc.2       | next RC              |
+    | 1.3.0-rc.1  | beta     | False     | 1.3.0-beta.1     | switch label         |
+    +-------------+----------+-----------+------------------+----------------------+
+    """
+    base = f"{current.major}.{current.minor}.{current.micro}"
+
+    if finalize:
+        if current.is_prerelease:
+            return base
+        # Already final: explicit --finalize is a no-op except for kind progression
+        bumped = bump_version(current, kind)
+        return f"{bumped.major}.{bumped.minor}.{bumped.micro}"
+
+    if pre is None:
+        if current.is_prerelease:
+            # Auto-finalize: shipping the in-progress pre-release as the release
+            return base
+        bumped = bump_version(current, kind)
+        return f"{bumped.major}.{bumped.minor}.{bumped.micro}"
+
+    # pre is set: entering or continuing a pre-release cycle
+    if current.is_prerelease and current.pre is not None:
+        existing = _norm_pre_label(current.pre[0])
+        wanted = _norm_pre_label(pre)
+        if existing == wanted:
+            counter = (current.pre[1] or 0) + 1
+            return f"{base}-{pre}.{counter}"
+        # Different label, same target version
+        return f"{base}-{pre}.1"
+
+    # Currently a final release: bump first, then enter the pre cycle
+    target = bump_version(current, kind)
+    return f"{target.major}.{target.minor}.{target.micro}-{pre}.1"
+
+
 @dataclass
 class PlannedBump:
     component: str
     current: Version
     kind: BumpKind
     reasons: list[str] = field(default_factory=list)
+    pre: str | None = None
+    finalize: bool = False
 
     @property
-    def next(self) -> Version:
-        return bump_version(self.current, self.kind)
+    def next(self) -> str:
+        """The new version, rendered as a semver-friendly string."""
+        return compute_next(
+            self.current, self.kind, pre=self.pre, finalize=self.finalize
+        )
+
+    @property
+    def next_version(self) -> Version:
+        """Parsed Version of :attr:`next` (for ordering)."""
+        return Version(self.next)
 
 
 @dataclass
@@ -133,7 +212,7 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
 
     comp = config.components[name]
     if comp.format == "debian" and comp.debian is not None:
-        from .debian import parse_top_version, upstream_version
+        from .debian import from_debian_pre, parse_top_version, upstream_version
 
         changelog_path = repo / comp.debian.changelog
         if changelog_path.is_file():
@@ -142,7 +221,7 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
                     changelog_path.read_text(encoding="utf-8")
                 )
                 if top:
-                    return Version(upstream_version(top))
+                    return Version(from_debian_pre(upstream_version(top)))
             except (InvalidVersion, OSError):
                 pass
         return Version(config.project.initial_version)
@@ -230,7 +309,19 @@ def _mirror_pass(
                     changed = True
 
 
-def build_plan(repo: Path, config: Config) -> Plan:
+def build_plan(
+    repo: Path,
+    config: Config,
+    *,
+    pre: str | None = None,
+    finalize: bool = False,
+) -> Plan:
+    """Compute the bump plan for ``repo`` against ``config``.
+
+    Pass ``pre="rc"`` (or ``"alpha"``, ``"beta"``, …) to drive a release
+    candidate cycle, or ``finalize=True`` to drop a pre-release suffix.
+    Both flags apply to *every* bumping component in the plan.
+    """
     matcher = ComponentMatcher(config.components)
     plan = Plan()
     versions = {name: _current_version(repo, config, name) for name in config.components}
@@ -238,4 +329,24 @@ def build_plan(repo: Path, config: Config) -> Plan:
     _direct_pass(repo, config, matcher, plan, versions)
     _triggers_pass(config, plan, versions)
     _mirror_pass(config, matcher, plan, versions)
+
+    if pre is not None or finalize:
+        for bump in plan.bumps.values():
+            bump.pre = pre
+            bump.finalize = finalize
+
+    # `--finalize` is a release event in its own right — allow finalising a
+    # pre-release component even when no new commits landed since the rc tag.
+    if finalize:
+        for name in config.components:
+            current = versions[name]
+            if current.is_prerelease and name not in plan.bumps:
+                plan.bumps[name] = PlannedBump(
+                    component=name,
+                    current=current,
+                    kind="patch",
+                    reasons=["explicit --finalize"],
+                    finalize=True,
+                )
+
     return plan

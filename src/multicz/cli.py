@@ -193,6 +193,34 @@ def _resolve_maintainer(repo: Path, configured: str | None) -> str:
     return "Unknown <unknown@example.com>"
 
 
+def _component_relevant_commits(
+    name: str,
+    config,  # Config
+    repo: Path,
+    matcher: ComponentMatcher,
+):
+    """Conventional commits since the component's last tag, with release
+    commits filtered out so they don't pollute the changelog body."""
+    import re
+
+    prefix = tag_prefix(config.project.tag_format, name)
+    since = latest_tag(repo, prefix)
+    release_re = re.compile(config.project.release_commit_pattern)
+    return [
+        c
+        for c in commits_since(repo, since)
+        if c.is_conventional
+        and not release_re.match(_commit_header(c))
+        and any(matcher.match(f) == name for f in c.files)
+    ]
+
+
+def _commit_header(commit) -> str:
+    if commit.scope:
+        return f"{commit.type}({commit.scope}): {commit.subject}"
+    return f"{commit.type}: {commit.subject}"
+
+
 def _bump_debian(
     name: str,
     comp,  # Component
@@ -204,33 +232,27 @@ def _bump_debian(
     dry_run: bool,
     written: list[Path],
     changelogs_updated: list[str],
-) -> str:
+) -> None:
     """Apply a debian-format bump: render and prepend a fresh stanza.
 
-    Returns the full Debian version string (with revision/epoch) to surface
-    in the bump summary.
+    The git tag uses the semver form (``mypkg-v1.3.0-rc.1``) so multicz can
+    re-read it later via :class:`packaging.version.Version`; only the
+    *changelog file* gets the Debian-style ``~rc1`` rendering.
     """
     settings = comp.debian
-    full_version = format_debian_version(
+    if dry_run:
+        return
+
+    relevant = _component_relevant_commits(name, config, repo, matcher)
+    debian_version = format_debian_version(
         new_version,
         debian_revision=settings.debian_revision,
         epoch=settings.epoch,
     )
-    if dry_run:
-        return full_version
-
-    prefix = tag_prefix(config.project.tag_format, name)
-    since = latest_tag(repo, prefix)
-    relevant = [
-        c
-        for c in commits_since(repo, since)
-        if c.is_conventional
-        and any(matcher.match(f) == name for f in c.files)
-    ]
     maintainer = _resolve_maintainer(repo, settings.maintainer)
     stanza = render_stanza(
         package=name,
-        version=full_version,
+        version=debian_version,
         distribution=settings.distribution,
         urgency=settings.urgency,
         commits=relevant,
@@ -248,7 +270,6 @@ def _bump_debian(
     if changelog_path not in written:
         written.append(changelog_path)
     changelogs_updated.append(str(settings.changelog))
-    return full_version
 
 
 def _release_commit_message(applied: dict[str, dict[str, str]]) -> str:
@@ -284,10 +305,25 @@ def bump(
         False, "--no-changelog",
         help="Skip CHANGELOG.md updates even if components declare one.",
     ),
+    pre: str = typer.Option(
+        None, "--pre",
+        help="Enter or continue a pre-release cycle with this label "
+             "(e.g. 'rc', 'alpha', 'beta'). Increments the counter when "
+             "the current version is already in the same cycle.",
+    ),
+    finalize: bool = typer.Option(
+        False, "--finalize",
+        help="Drop a pre-release suffix and ship the final version. Works "
+             "even when there are no new commits since the rc tag.",
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
+    if pre is not None and finalize:
+        err.print("[red]--pre and --finalize are mutually exclusive[/]")
+        raise typer.Exit(code=1)
+
     repo, config = _load()
-    plan = build_plan(repo, config)
+    plan = build_plan(repo, config, pre=pre, finalize=finalize)
 
     if component:
         plan.bumps = {n: b for n, b in plan.bumps.items() if n in set(component)}
@@ -308,7 +344,7 @@ def bump(
         new_version = str(planned.next)
 
         if comp.format == "debian":
-            display_version = _bump_debian(
+            _bump_debian(
                 planned.component,
                 comp,
                 config,
@@ -320,7 +356,6 @@ def bump(
                 changelogs_updated=changelogs_updated,
             )
         else:
-            display_version = new_version
             targets: list[tuple[Path, str | None]] = []
             for bump_file in comp.bump_files:
                 targets.append((repo / bump_file.file, bump_file.key))
@@ -334,14 +369,9 @@ def bump(
                         written.append(file)
 
             if comp.changelog and not no_changelog and not dry_run:
-                prefix = tag_prefix(config.project.tag_format, planned.component)
-                since = latest_tag(repo, prefix)
-                relevant = [
-                    c
-                    for c in commits_since(repo, since)
-                    if c.is_conventional
-                    and any(matcher.match(f) == planned.component for f in c.files)
-                ]
+                relevant = _component_relevant_commits(
+                    planned.component, config, repo, matcher
+                )
                 changelog_path = repo / comp.changelog
                 update_changelog_file(
                     changelog_path,
@@ -357,7 +387,7 @@ def bump(
 
         applied[planned.component] = {
             "current": str(planned.current),
-            "next": display_version,
+            "next": new_version,
             "kind": planned.kind,
         }
 

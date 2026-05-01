@@ -96,6 +96,49 @@ def upstream_version(debian_version: str) -> str:
     return debian_version
 
 
+_SEMVER_PRE_RE = re.compile(r"^(?P<base>\d+(?:\.\d+){0,2})-(?P<label>[A-Za-z]+)\.(?P<num>\d+)$")
+
+
+_DEBIAN_PRE_RE = re.compile(
+    r"^(?P<base>\d+(?:\.\d+){0,2})~(?P<label>[A-Za-z]+)(?P<num>\d+)$"
+)
+
+
+def to_debian_pre(upstream: str) -> str:
+    """Convert a semver-style pre-release suffix to Debian's tilde form.
+
+    Debian sorts ``~`` before nothing, so ``1.3.0~rc1 < 1.3.0`` in dpkg
+    ordering — exactly what you want for a release candidate. semver's
+    ``1.3.0-rc.1`` would sort *after* ``1.3.0`` in dpkg, which is wrong.
+
+    >>> to_debian_pre("1.3.0")
+    '1.3.0'
+    >>> to_debian_pre("1.3.0-rc.1")
+    '1.3.0~rc1'
+    >>> to_debian_pre("2.0.0-alpha.4")
+    '2.0.0~alpha4'
+    """
+    match = _SEMVER_PRE_RE.match(upstream)
+    if not match:
+        return upstream
+    return f"{match.group('base')}~{match.group('label')}{match.group('num')}"
+
+
+def from_debian_pre(debian_upstream: str) -> str:
+    """Inverse of :func:`to_debian_pre`. Converts ``1.3.0~rc1`` back to
+    ``1.3.0-rc.1`` so :class:`packaging.version.Version` can parse it.
+
+    >>> from_debian_pre("1.3.0")
+    '1.3.0'
+    >>> from_debian_pre("1.3.0~rc1")
+    '1.3.0-rc.1'
+    """
+    match = _DEBIAN_PRE_RE.match(debian_upstream)
+    if not match:
+        return debian_upstream
+    return f"{match.group('base')}-{match.group('label')}.{match.group('num')}"
+
+
 def format_debian_version(
     upstream: str,
     *,
@@ -104,17 +147,23 @@ def format_debian_version(
 ) -> str:
     """Compose a full Debian version from its parts.
 
+    Pre-release suffixes in semver form (``-rc.1``) are converted to
+    Debian's ``~rc1`` form so that ``apt`` orders RCs *before* the
+    final release.
+
     >>> format_debian_version("1.2.3")
     '1.2.3-1'
     >>> format_debian_version("1.2.3", debian_revision=3)
     '1.2.3-3'
     >>> format_debian_version("1.2.3", epoch=2)
     '2:1.2.3-1'
+    >>> format_debian_version("1.3.0-rc.1")
+    '1.3.0~rc1-1'
     """
     parts: list[str] = []
     if epoch is not None:
         parts.append(f"{epoch}:")
-    parts.append(upstream)
+    parts.append(to_debian_pre(upstream))
     parts.append(f"-{debian_revision}")
     return "".join(parts)
 
