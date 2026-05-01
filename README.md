@@ -607,6 +607,39 @@ A `feat:` commit touching `src/common.py` now bumps both `api` and
 `worker`. With `error` (the default) that same commit refuses to plan
 until you tighten the paths or add `exclude_paths`.
 
+## Ignoring commit types
+
+Some commit types should never appear in any bump or changelog —
+typically `chore(deps):` updates that incidentally touch `src/`, or
+`ci: tweak workflow.yml` against a `.github/**` path owned by a
+component. `ignored_types` makes that explicit:
+
+```toml
+[project]
+ignored_types = ["chore", "ci", "docs", "test", "style"]
+```
+
+You can also opt-in per-component (the effective set is the union):
+
+```toml
+[components.api]
+ignored_types = ["fix"]   # api ignores 'fix' on top of project-wide rules
+```
+
+A commit whose type is in the effective set is fully filtered:
+
+| | with `ignored_types = ["chore", "ci"]` |
+|---|---|
+| `feat: real change` | ✓ bumps, in changelog |
+| `fix: bug` | ✓ bumps, in changelog |
+| `chore(deps): bump typer` | ✗ ignored |
+| `ci: tweak release workflow` | ✗ ignored |
+
+The filter is stricter than `release_commit_pattern` (which targets
+one specific message shape): `ignored_types` short-circuits before
+the bump kind is even consulted, so `feat!: ...` is also dropped
+if `feat` is in the list. That's the explicit cost of the choice.
+
 ## Per-component bump policy
 
 When a single commit touches multiple components, each component
