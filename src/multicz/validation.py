@@ -189,7 +189,7 @@ def _check_trigger_cycles(config: Config) -> Iterator[Finding]:
     # Edge: upstream -> downstream (downstream lists upstream in triggers)
     graph: dict[str, list[str]] = {n: [] for n in config.components}
     for name, comp in config.components.items():
-        for upstream in comp.triggers:
+        for upstream in comp.depends_on:
             if upstream in graph:
                 graph[upstream].append(name)
 

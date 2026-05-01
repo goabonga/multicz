@@ -302,6 +302,66 @@ bump_policy = "scoped"
     assert plan.bumps["chart"].kind == "minor"  # scope matches chart
 
 
+def test_depends_on_cascades_match_upstream_by_default(repo: Path):
+    """depends_on with default trigger_policy=match-upstream → chart inherits api's kind."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+depends_on = ["api"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    plan = build_plan(repo, load_config(cfg))
+    # api goes minor (feat) -> chart cascades minor (match-upstream default)
+    assert plan.bumps["api"].kind == "minor"
+    assert plan.bumps["chart"].kind == "minor"
+
+
+def test_trigger_policy_patch_overrides_upstream_kind(repo: Path):
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project]
+trigger_policy = "patch"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+depends_on = ["api"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    plan = build_plan(repo, load_config(cfg))
+    # api goes minor (feat) -> chart only patches under trigger_policy=patch
+    assert plan.bumps["api"].kind == "minor"
+    assert plan.bumps["chart"].kind == "patch"
+
+
+def test_triggers_alias_still_works(repo: Path):
+    """Backwards compat: 'triggers' is accepted as an alias for depends_on."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+triggers = ["api"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["chart"].kind == "minor"
+
+
 def test_unknown_commit_default_is_ignore(repo: Path):
     """Default policy: non-conventional commits are silently skipped."""
     _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")

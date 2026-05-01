@@ -103,7 +103,11 @@ class Component(BaseModel):
     exclude_paths: list[str] = Field(default_factory=list)
     bump_files: list[FileKey] = Field(default_factory=list)
     mirrors: list[FileKey] = Field(default_factory=list)
-    triggers: list[str] = Field(default_factory=list)
+    # depends_on lists upstream components whose bump should cascade into
+    # this one. ``triggers`` is kept as a parse-time alias for users who
+    # already wrote it that way; both names normalise to ``depends_on``.
+    depends_on: list[str] = Field(default_factory=list)
+    triggers: list[str] = Field(default_factory=list)  # alias, post-merged
     changelog: Path | None = None
     format: Literal["default", "debian"] = "default"
     debian: DebianSettings | None = None
@@ -117,6 +121,20 @@ class Component(BaseModel):
     @classmethod
     def _strip_globs(cls, value: list[str]) -> list[str]:
         return [v.strip() for v in value if v.strip()]
+
+    @model_validator(mode="after")
+    def _merge_triggers_alias(self) -> Component:
+        """Fold ``triggers`` (legacy name) into ``depends_on`` (canonical).
+
+        Both fields are accepted; the union is what the planner reads.
+        After the merge ``triggers`` is left empty so the rest of the
+        codebase only needs to look at ``depends_on``.
+        """
+        if self.triggers:
+            merged = list(dict.fromkeys([*self.depends_on, *self.triggers]))
+            self.depends_on = merged
+            self.triggers = []
+        return self
 
     @model_validator(mode="after")
     def _validate_format(self) -> Component:
@@ -196,6 +214,7 @@ class ProjectSettings(BaseModel):
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
     sign_commits: bool = False  # gpg-sign release commits (git commit -S)
     sign_tags: bool = False     # gpg-sign tags (git tag -s)
+    trigger_policy: Literal["match-upstream", "patch"] = "match-upstream"
 
 
 class Config(BaseModel):
@@ -277,7 +296,7 @@ class Config(BaseModel):
         """Cross-component validation: triggers and tag-prefix uniqueness."""
         names = set(self.components)
         for name, comp in self.components.items():
-            unknown = set(comp.triggers) - names
+            unknown = set(comp.depends_on) - names
             if unknown:
                 raise ValueError(
                     f"component {name!r} triggers unknown component(s): "

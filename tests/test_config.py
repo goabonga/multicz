@@ -138,7 +138,10 @@ def test_array_form_with_triggers_resolves(tmp_path: Path):
     )
     config = load_config(target)
     config.validate_references()  # must not raise
-    assert config.components["downstream"].triggers == ["base"]
+    # 'triggers' is the legacy alias — it is merged into depends_on
+    # post-load, so the canonical field is what we assert against.
+    assert config.components["downstream"].depends_on == ["base"]
+    assert config.components["downstream"].triggers == []
 
 
 def test_dict_and_array_produce_identical_models():

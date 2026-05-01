@@ -502,14 +502,29 @@ def _direct_pass(
 def _triggers_pass(
     config: Config, plan: Plan, versions: dict[str, Version]
 ) -> None:
+    """Cascade bumps along ``depends_on`` edges.
+
+    The cascade kind is governed by ``project.trigger_policy``:
+
+    * ``match-upstream`` (default): the dependent inherits the upstream's
+      bump kind. ``api`` going minor → ``chart`` also goes minor.
+    * ``patch``: the dependent always patches when its upstream bumps,
+      regardless of the upstream's level. Useful when a dependent isn't
+      really gaining a feature when its dependency does, just needs a
+      fresh build.
+    """
+    policy = config.project.trigger_policy
     changed = True
     while changed:
         changed = False
         for name, comp in config.components.items():
-            for upstream in comp.triggers:
+            for upstream in comp.depends_on:
                 upstream_bump = plan.bumps.get(upstream)
                 if upstream_bump is None:
                     continue
+                cascade_kind: BumpKind = (
+                    "patch" if policy == "patch" else upstream_bump.kind
+                )
                 reason = TriggerReason(
                     upstream=upstream,
                     upstream_kind=upstream_bump.kind,
@@ -517,7 +532,7 @@ def _triggers_pass(
                 if _promote(
                     plan,
                     name,
-                    upstream_bump.kind,
+                    cascade_kind,
                     versions[name],
                     reason,
                 ):

@@ -613,8 +613,8 @@ def render_config(
             section["bump_files"] = _filekey_array(comp.bump_files)
         if comp.mirrors:
             section["mirrors"] = _filekey_array(comp.mirrors)
-        if comp.triggers:
-            section["triggers"] = list(comp.triggers)
+        if comp.depends_on:
+            section["depends_on"] = list(comp.depends_on)
         if comp.changelog is not None:
             section["changelog"] = str(comp.changelog)
         if comp.format != "default":
