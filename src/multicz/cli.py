@@ -21,6 +21,7 @@ from .commits import (
 )
 from .components import ComponentMatcher
 from .config import CONFIG_FILENAME, find_config, load_config
+from .discovery import discover_components, render_config
 from .planner import build_plan
 from .writers import read_value, write_value
 
@@ -34,29 +35,22 @@ console = Console()
 err = Console(stderr=True)
 
 
-_DEFAULT_CONFIG = """\
-# multicz.toml — multi-component versioning config
-# https://github.com/goabonga/multicz
+_BARE_CONFIG = """\
+# multicz.toml — generic stub. Edit paths and bump_files to match your repo.
+# Run `multicz init` (without --bare) to scan the working tree and generate
+# a config tailored to the manifests it actually contains.
 
 [project]
 commit_convention = "conventional"
 tag_format = "{component}-v{version}"
 initial_version = "0.1.0"
 
-[components.api]
-paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile", ".dockerignore"]
+[components.app]
+paths = ["src/**", "pyproject.toml"]
 bump_files = [
   { file = "pyproject.toml", key = "project.version" },
 ]
-mirrors = [
-  { file = "charts/myapp/Chart.yaml", key = "appVersion" },
-]
-
-[components.chart]
-paths = ["charts/myapp/**"]
-bump_files = [
-  { file = "charts/myapp/Chart.yaml", key = "version" },
-]
+changelog = "CHANGELOG.md"
 """
 
 
@@ -83,14 +77,41 @@ def init(
         file_okay=False, dir_okay=True, resolve_path=True,
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing config."),
+    bare: bool = typer.Option(
+        False, "--bare",
+        help="Skip auto-discovery and write a generic single-component stub.",
+    ),
 ) -> None:
-    """Bootstrap a starter multicz.toml in the given directory."""
-    target = (path or Path.cwd()) / CONFIG_FILENAME
+    """Generate a multicz.toml tailored to the working tree.
+
+    By default the working tree is scanned for ``pyproject.toml``,
+    ``charts/*/Chart.yaml`` and ``package.json``; one component is emitted per
+    detected manifest. ``--bare`` writes a generic single-component stub
+    instead — useful when bootstrapping a brand new repo.
+    """
+    target_dir = path or Path.cwd()
+    target = target_dir / CONFIG_FILENAME
     if target.exists() and not force:
         err.print(f"[red]{target} already exists.[/] Use --force to overwrite.")
         raise typer.Exit(code=1)
-    target.write_text(_DEFAULT_CONFIG, encoding="utf-8")
+
+    if bare:
+        target.write_text(_BARE_CONFIG, encoding="utf-8")
+        console.print(f"[green]wrote[/] {target} [dim](bare stub)[/]")
+        return
+
+    components = discover_components(target_dir)
+    if not components:
+        err.print(
+            "[yellow]no manifests detected[/] under "
+            f"{target_dir} (looked for pyproject.toml, charts/*/Chart.yaml, "
+            "package.json). Use [bold]--bare[/] to write a generic stub."
+        )
+        raise typer.Exit(code=1)
+
+    target.write_text(render_config(components), encoding="utf-8")
     console.print(f"[green]wrote[/] {target}")
+    console.print(f"[dim]detected:[/] {', '.join(components)}")
 
 
 def _load() -> tuple[Path, object]:

@@ -219,10 +219,52 @@ def test_check_missing_file(repo: Path, runner: CliRunner):
     assert result.exit_code == 1
 
 
-def test_init_writes_starter_config(tmp_path: Path, runner: CliRunner):
+def test_init_auto_detects_pyproject(tmp_path: Path, runner: CliRunner):
+    target = tmp_path / "fresh"
+    target.mkdir()
+    (target / "pyproject.toml").write_text(
+        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
+    )
+    (target / "src").mkdir()
+    os.chdir(target)
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code == 0, result.stdout
+    text = (target / "multicz.toml").read_text()
+    assert "[components.auto-app]" in text
+    assert "Dockerfile" not in text
+    assert ".dockerignore" not in text
+
+
+def test_init_bare_writes_generic_stub(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
     os.chdir(target)
-    result = runner.invoke(app, ["init"])
+    result = runner.invoke(app, ["init", "--bare"])
     assert result.exit_code == 0
-    assert (target / "multicz.toml").exists()
+    text = (target / "multicz.toml").read_text()
+    assert "[components.app]" in text
+
+
+def test_init_fails_when_no_manifests(tmp_path: Path, runner: CliRunner):
+    target = tmp_path / "empty"
+    target.mkdir()
+    os.chdir(target)
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code != 0
+    assert not (target / "multicz.toml").exists()
+
+
+def test_init_force_overwrites(tmp_path: Path, runner: CliRunner):
+    target = tmp_path / "fresh"
+    target.mkdir()
+    (target / "pyproject.toml").write_text(
+        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
+    )
+    (target / "multicz.toml").write_text("# old\n")
+    os.chdir(target)
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code != 0  # no --force
+
+    result = runner.invoke(app, ["init", "--force"])
+    assert result.exit_code == 0
+    assert "[components.auto-app]" in (target / "multicz.toml").read_text()
