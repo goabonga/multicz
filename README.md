@@ -1116,6 +1116,39 @@ Common noise dirs (`.git`, `node_modules`, `.venv`, `target`, `build`,
 See [`examples/fastapi-helm/multicz.toml`](examples/fastapi-helm/multicz.toml)
 for a fully commented example.
 
+## Component naming
+
+Component names land in many places — git tags, file paths
+(`CHANGELOG.md` location), JSON output, release-notes headings, the
+`--force NAME:KIND` CLI syntax. They're locked to a safe alphabet:
+
+| accepts | examples |
+|---|---|
+| `^[a-zA-Z0-9](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9])?$` (≤ 64 chars) | `api`, `api-v1`, `api.v1`, `api_v1`, `myapp-chart`, `API`, `a` |
+
+Rejected with a clear error at config-load time:
+
+| input | reason |
+|---|---|
+| `api/v1` | slash → file-path injection in `CHANGELOG.md` location |
+| `../api` | path traversal |
+| `chart:prod` | conflicts with `--force NAME:KIND` |
+| `my app` | whitespace breaks shell tools |
+| `-foo`, `foo-`, `.hidden`, `foo.` | leading/trailing special chars |
+| `''` (empty) | empty key |
+| anything > 64 chars | excessive length |
+
+```
+$ multicz status
+invalid /path/to/multicz.toml:
+  components: invalid component name 'api/v1': must match
+  ^[a-zA-Z0-9](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9])?$ — no slashes, colons,
+  spaces, or path-like characters; must start and end with a letter
+  or digit. Component names land in git tags, file paths, JSON
+  output, and release notes; keeping them simple avoids escaping
+  issues downstream.
+```
+
 ## Tagging strategy
 
 Each component gets its own git tag whose name is built from
