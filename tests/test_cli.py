@@ -260,6 +260,90 @@ def test_check_missing_file(repo: Path, runner: CliRunner):
     assert result.exit_code == 1
 
 
+def test_plan_text_lists_reasons_per_component(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["plan"])
+    assert result.exit_code == 0, result.stdout
+
+    assert "api: 1.2.0 → 1.3.0 (minor)" in result.stdout
+    assert "feat(api): add login" in result.stdout
+    # Mirror cascade reason for chart
+    assert "chart: 0.4.0 → 0.4.1 (patch)" in result.stdout
+    assert "mirror cascade from api" in result.stdout
+
+
+def test_plan_json_emits_structured_reasons(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["plan", "--output", "json"])
+    assert result.exit_code == 0, result.stdout
+
+    payload = json.loads(result.stdout)
+    api = payload["bumps"]["api"]
+    assert api["current"] == "1.2.0"
+    assert api["next"] == "1.3.0"
+    assert api["kind"] == "minor"
+    [reason] = api["reasons"]
+    assert reason["kind"] == "commit"
+    assert reason["type"] == "feat"
+    assert reason["scope"] == "api"
+    assert reason["breaking"] is False
+    assert "src/main.py" in reason["files"]
+
+    chart = payload["bumps"]["chart"]
+    [mirror_reason] = chart["reasons"]
+    assert mirror_reason["kind"] == "mirror"
+    assert mirror_reason["upstream"] == "api"
+    assert mirror_reason["key"] == "appVersion"
+
+
+def test_plan_no_bumps(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["plan"])
+    assert result.exit_code == 0
+    assert "no bumps pending" in result.stdout
+
+
+def test_plan_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["plan", "--pre", "rc", "--finalize"])
+    assert result.exit_code == 1
+
+
+def test_explain_lists_files_per_commit(repo: Path, runner: CliRunner):
+    _commit(repo, {
+        "src/main.py": "x = 2\n",
+        "src/auth.py": "x = 1\n",
+    }, "feat(api): add login flow")
+
+    result = runner.invoke(app, ["explain", "api"])
+    assert result.exit_code == 0, result.stdout
+    assert "Component: api" in result.stdout
+    assert "Current version: 1.2.0" in result.stdout
+    assert "Next version:    1.3.0" in result.stdout
+    assert "feat(api): add login flow" in result.stdout
+    assert "src/main.py" in result.stdout
+    assert "src/auth.py" in result.stdout
+
+
+def test_explain_for_mirror_cascade(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add stuff")
+    result = runner.invoke(app, ["explain", "chart"])
+    assert result.exit_code == 0
+    assert "mirror cascade from api" in result.stdout
+    assert "charts/myapp/Chart.yaml" in result.stdout
+
+
+def test_explain_unknown_component(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["explain", "nonexistent"])
+    assert result.exit_code == 1
+    assert "unknown component" in result.output
+
+
+def test_explain_idle_component(repo: Path, runner: CliRunner):
+    # No commits since init -> nothing to explain
+    result = runner.invoke(app, ["explain", "api"])
+    assert result.exit_code == 0
+    assert "no bump pending" in result.stdout
+
+
 def test_bump_pre_rc_enters_cycle(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
     result = runner.invoke(app, ["bump", "--pre", "rc"])

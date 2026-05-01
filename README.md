@@ -174,7 +174,10 @@ helm package charts/myapp
 | command | what it does |
 |---|---|
 | `multicz init` | write a starter `multicz.toml` |
-| `multicz status` | print pending bumps with reasons |
+| `multicz status` | brief table of pending bumps with reason summaries |
+| `multicz plan` | per-component plan with explicit reasons (commit / trigger / mirror) |
+| `multicz plan --output json` | machine-readable shape for CI |
+| `multicz explain <component>` | full breakdown — every commit, the matched files, every cascade |
 | `multicz bump` | apply bumps to all configured files |
 | `multicz bump --dry-run` | plan without writing |
 | `multicz bump --commit --tag` | release in one shot: write, commit, tag |
@@ -222,6 +225,81 @@ after `--finalize`:
 | `consolidate` (default) | the finalize section/stanza lists every commit since the previous *stable* tag, so the new entry contains the cumulative change list. RC sections stay below as history. |
 | `promote` | same commit selection as `consolidate`, plus the now-superseded `## [1.3.0-rc.*]` markdown sections (and `mypkg (1.3.0~rc*-*)` Debian stanzas) are removed from the file. The final entry stands alone. |
 | `annotate` | the section enumerates only commits since the last *tag* (rc included), so the finalize section may be `_No notable changes._` when no commits landed between the last rc and finalize. Each tag keeps its own dedicated section. |
+
+### `plan` and `explain`
+
+`multicz plan` is the canonical way to inspect what a release would do
+before running it. The text form is grouped per component:
+
+```
+api: 1.2.0 → 1.3.0 (minor)
+  • abc1234 feat(api): add login flow
+
+chart: 0.4.0 → 0.4.1 (patch)
+  • mirror cascade from api (charts/myapp/Chart.yaml:appVersion)
+```
+
+`multicz plan --output json` emits a structured payload — exactly what a
+CI step needs to gate releases or post a comment on a PR:
+
+```json
+{
+  "bumps": {
+    "api": {
+      "current": "1.2.0",
+      "next": "1.3.0",
+      "kind": "minor",
+      "reasons": [
+        {
+          "kind": "commit",
+          "sha": "abc1234...",
+          "type": "feat",
+          "scope": "api",
+          "breaking": false,
+          "subject": "add login flow",
+          "files": ["src/auth.py", "src/main.py"],
+          "bump_kind": "minor"
+        }
+      ]
+    },
+    "chart": {
+      "current": "0.4.0",
+      "next": "0.4.1",
+      "kind": "patch",
+      "reasons": [
+        {
+          "kind": "mirror",
+          "upstream": "api",
+          "file": "charts/myapp/Chart.yaml",
+          "key": "appVersion"
+        }
+      ]
+    }
+  }
+}
+```
+
+Reason kinds: `commit`, `trigger`, `mirror`, `manual` (e.g. an explicit
+`--finalize`). Each carries its own structured fields.
+
+`multicz explain <component>` zooms in on a single component with the
+full per-commit breakdown — useful when the plan looks unexpected and
+you want to see *which files* of a commit actually mapped to the
+component:
+
+```
+Component: api
+  Current version: 1.2.0
+  Next version:    1.3.0 (minor)
+
+Reasons:
+  1. abc1234 feat(api): add login flow
+      SHA:   abc1234...
+      Type:  feat(api) → minor
+      Files matched in this component:
+        - src/auth.py
+        - src/main.py
+```
 
 ### Per-component CHANGELOG.md
 

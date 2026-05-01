@@ -29,7 +29,12 @@ from .debian import (
     render_stanza,
 )
 from .discovery import discover_components, render_config
-from .planner import build_plan
+from .planner import (
+    CommitReason,
+    MirrorReason,
+    TriggerReason,
+    build_plan,
+)
 from .writers import read_value, write_value
 
 app = typer.Typer(
@@ -132,10 +137,10 @@ def _load() -> tuple[Path, object]:
 
 @app.command()
 def status() -> None:
-    """Show which components would be bumped if you ran ``bump`` now."""
+    """Brief summary of pending bumps (alias of ``plan`` without reasons)."""
     repo, config = _load()
-    plan = build_plan(repo, config)
-    if not plan:
+    plan_obj = build_plan(repo, config)
+    if not plan_obj:
         console.print("[dim]no bumps pending[/]")
         return
 
@@ -146,7 +151,7 @@ def status() -> None:
     table.add_column("next")
     table.add_column("kind")
     table.add_column("reasons", overflow="fold")
-    for bump in plan:
+    for bump in plan_obj:
         table.add_row(
             bump.component,
             str(bump.current),
@@ -156,6 +161,140 @@ def status() -> None:
             "\n".join(bump.reason_summaries()),
         )
     console.print(table)
+
+
+@app.command(name="plan")
+def plan_cmd(
+    output: str = typer.Option("text", "--output", "-o", help="text | json"),
+    pre: str = typer.Option(
+        None, "--pre",
+        help="Plan as if invoked with `bump --pre <label>`.",
+    ),
+    finalize: bool = typer.Option(
+        False, "--finalize",
+        help="Plan as if invoked with `bump --finalize`.",
+    ),
+) -> None:
+    """Print the bump plan: every component that would change, the new
+    version, and the *reasons* (conventional commits, trigger cascades,
+    mirror cascades) that drove each decision.
+
+    The text form is grouped per component for visual scanning; the JSON
+    form (``--output json``) is the machine-readable shape suited for CI:
+
+    \b
+    {
+      "bumps": {
+        "api": {
+          "current": "1.2.0",
+          "next": "1.3.0",
+          "kind": "minor",
+          "reasons": [
+            {"kind": "commit", "sha": "abc1234", "type": "feat",
+             "subject": "add login", "files": ["src/auth.py"], ...}
+          ]
+        }
+      }
+    }
+    """
+    if pre is not None and finalize:
+        err.print("[red]--pre and --finalize are mutually exclusive[/]")
+        raise typer.Exit(code=1)
+
+    repo, config = _load()
+    plan_obj = build_plan(repo, config, pre=pre, finalize=finalize)
+
+    if output == "json":
+        payload = {
+            "bumps": {
+                bump.component: {
+                    "current": str(bump.current),
+                    "next": bump.next,
+                    "kind": bump.kind,
+                    "reasons": [r.to_dict() for r in bump.reasons],
+                }
+                for bump in plan_obj
+            }
+        }
+        console.print_json(data=payload)
+        return
+
+    if not plan_obj:
+        console.print("[dim]no bumps pending[/]")
+        return
+
+    for bump in plan_obj:
+        header = (
+            f"[bold]{bump.component}[/]: "
+            f"{bump.current} → {bump.next} "
+            f"[cyan]({bump.kind})[/]"
+        )
+        console.print(header)
+        for reason in bump.reasons:
+            console.print(f"  • {reason.summary()}")
+        console.print()
+
+
+@app.command()
+def explain(
+    component: str = typer.Argument(..., help="Component to explain."),
+) -> None:
+    """Detailed breakdown of why ``component`` is in the bump plan.
+
+    Lists every reason with the structured fields: for commits, the SHA,
+    type, scope, breaking marker, subject, and the changed files that
+    actually matched the component's paths; for trigger/mirror cascades,
+    the upstream component and the file/key that propagated.
+    """
+    repo, config = _load()
+    if component not in config.components:
+        err.print(f"[red]unknown component:[/] {component}")
+        raise typer.Exit(code=1)
+
+    plan_obj = build_plan(repo, config)
+    bump = plan_obj.bumps.get(component)
+    if bump is None:
+        console.print(
+            f"[bold]{component}[/]: [dim]no bump pending — "
+            "no relevant commits since the last tag[/]"
+        )
+        return
+
+    console.print(f"[bold]Component:[/] {component}")
+    console.print(f"  Current version: {bump.current}")
+    console.print(
+        f"  Next version:    {bump.next} [cyan]({bump.kind})[/]"
+    )
+    if bump.pre:
+        console.print(f"  Pre-release:     {bump.pre}")
+    if bump.finalize:
+        console.print("  Finalize:        yes")
+    console.print()
+    console.print("[bold]Reasons:[/]")
+    for index, reason in enumerate(bump.reasons, start=1):
+        if isinstance(reason, CommitReason):
+            console.print(f"  {index}. {reason.summary()}")
+            console.print(f"      SHA:   {reason.sha}")
+            scope = f"({reason.scope})" if reason.scope else ""
+            console.print(f"      Type:  {reason.type}{scope} → {reason.bump_kind}")
+            if reason.breaking:
+                console.print("      Breaking: yes")
+            console.print("      Files matched in this component:")
+            for path in reason.files:
+                console.print(f"        - {path}")
+        elif isinstance(reason, TriggerReason):
+            console.print(f"  {index}. {reason.summary()}")
+            console.print(f"      Upstream:      {reason.upstream}")
+            console.print(f"      Upstream kind: {reason.upstream_kind}")
+        elif isinstance(reason, MirrorReason):
+            console.print(f"  {index}. {reason.summary()}")
+            console.print(f"      Upstream: {reason.upstream}")
+            target = reason.file
+            if reason.key:
+                target += f":{reason.key}"
+            console.print(f"      Wrote:    {target}")
+        else:  # ManualReason
+            console.print(f"  {index}. {reason.summary()}")
 
 
 def _git(repo: Path, *args: str) -> str:
