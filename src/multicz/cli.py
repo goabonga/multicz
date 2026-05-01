@@ -270,6 +270,99 @@ def _parse_force_specs(specs: list[str], config) -> dict[str, str]:
     return parsed
 
 
+def _append_step_summary(path: Path, lines: list[str]) -> None:
+    """Append a markdown block to ``path``.
+
+    Mirrors GitHub Actions' ``$GITHUB_STEP_SUMMARY`` semantics: each
+    step's content is appended; the runner concatenates everything into
+    the workflow's run-page summary. Safe to call from local shells —
+    the file is just a text file.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+        fh.write("\n")
+
+
+def _append_plan_summary(path: Path, plan_obj, *, header: str) -> None:
+    """Render a plan as a markdown summary and append it."""
+    lines = [f"## {header}", ""]
+    if not plan_obj:
+        lines.append("_No bumps pending._")
+        _append_step_summary(path, lines)
+        return
+
+    lines.extend([
+        "| component | current | next | kind |",
+        "|---|---|---|---|",
+    ])
+    for bump in plan_obj:
+        lines.append(
+            f"| `{bump.component}` | `{bump.current}` | "
+            f"`{bump.next}` | {bump.kind} |"
+        )
+    lines.append("")
+    for bump in plan_obj:
+        lines.append(
+            f"### `{bump.component}` — {bump.current} → {bump.next} "
+            f"({bump.kind})"
+        )
+        lines.append("")
+        for reason in bump.reasons:
+            lines.append(f"- {reason.summary()}")
+        lines.append("")
+    _append_step_summary(path, lines)
+
+
+def _append_bump_summary(
+    path: Path,
+    applied: dict,
+    config,
+    git_summary: dict,
+    *,
+    dry_run: bool,
+) -> None:
+    """Render the applied bump (post-write) as a markdown summary."""
+    header = "Released" if not dry_run else "Would release"
+    lines = [f"## {header}", ""]
+    if not applied:
+        lines.append("_No bumps pending._")
+        _append_step_summary(path, lines)
+        return
+
+    lines.extend([
+        "| component | current | next | kind | tag |",
+        "|---|---|---|---|---|",
+    ])
+    tags = git_summary.get("tags") or []
+    tag_index = {t.split("-v", 1)[0] if "-v" in t else None: t for t in tags}
+    # Fall back to format string lookup when tag_format isn't `<comp>-v<ver>`.
+    for name, info in applied.items():
+        tag = tag_index.get(name) or "—"
+        for t in tags:
+            if config.tag_format_for(name).format(
+                component=name, version=info["next"]
+            ) == t:
+                tag = t
+                break
+        lines.append(
+            f"| `{name}` | `{info['current']}` | `{info['next']}` | "
+            f"{info['kind']} | `{tag}` |"
+        )
+    lines.append("")
+    if git_summary.get("commit"):
+        lines.append(f"**Release commit:** `{git_summary['commit'][:12]}`")
+    if tags:
+        lines.append(f"**Tags created:** {', '.join(f'`{t}`' for t in tags)}")
+    if git_summary.get("pushed"):
+        lines.append("**Pushed:** yes")
+    if git_summary.get("signed_commit"):
+        lines.append("**Signed commit:** yes")
+    if git_summary.get("signed_tags"):
+        lines.append("**Signed tags:** yes")
+    _append_step_summary(path, lines)
+
+
 def _build_plan_or_exit(repo, config, **kwargs):
     """Wrap build_plan() and surface NonConventionalCommitsError as a clean
     typer.Exit instead of a raw traceback."""
@@ -350,6 +443,13 @@ def plan_cmd(
              "detection — use for manual rebuilds (CVE base image refresh, "
              "weekly artefact rebuild, …).",
     ),
+    summary: Path = typer.Option(
+        None, "--summary",
+        help="Append a markdown summary of the plan to this file. "
+             "Wire to $GITHUB_STEP_SUMMARY in CI to get a release "
+             "preview at the top of the workflow run page.",
+        dir_okay=False,
+    ),
 ) -> None:
     """Print the bump plan: every component that would change, the new
     version, and the *reasons* (conventional commits, trigger cascades,
@@ -382,6 +482,9 @@ def plan_cmd(
     plan_obj = _build_plan_or_exit(
         repo, config, pre=pre, finalize=finalize, since=since, force=forced or None
     )
+
+    if summary is not None:
+        _append_plan_summary(summary, plan_obj, header="Release plan")
 
     if output == "json":
         payload = {
@@ -1139,6 +1242,13 @@ def bump(
              "[project].sign_commits=true and [project].sign_tags=true. "
              "Either source enables signing; the CLI flag never disables.",
     ),
+    summary: Path = typer.Option(
+        None, "--summary",
+        help="Append a markdown summary of what was released to this file. "
+             "Wire to $GITHUB_STEP_SUMMARY in CI to surface the release on "
+             "the workflow run page.",
+        dir_okay=False,
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
     if pre is not None and finalize:
@@ -1303,6 +1413,14 @@ def bump(
     if not dry_run and push:
         _git(repo, "push", "--follow-tags")
         git_summary["pushed"] = "yes"
+
+    # Write the markdown summary for both --output json and --output text
+    # so a CI step can simultaneously capture JSON for jq AND populate
+    # $GITHUB_STEP_SUMMARY in the same invocation.
+    if summary is not None:
+        _append_bump_summary(
+            summary, applied, config, git_summary, dry_run=dry_run
+        )
 
     if output == "json":
         bumps_payload = {

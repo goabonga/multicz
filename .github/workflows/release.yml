@@ -54,7 +54,8 @@ jobs:
       - name: Plan
         id: plan
         run: |
-          uv run multicz plan --output json | tee /tmp/plan.json
+          uv run multicz plan --summary "$GITHUB_STEP_SUMMARY" \
+            --output json | tee /tmp/plan.json
           if [ "$(jq '.bumps | length' /tmp/plan.json)" = "0" ]; then
             echo "release=false" >> "$GITHUB_OUTPUT"
             echo "no release pending"
@@ -65,7 +66,8 @@ jobs:
       - name: Bump, commit, tag, push
         if: steps.plan.outputs.release == 'true'
         run: |
-          uv run multicz bump --commit --tag --push --output json \
+          uv run multicz bump --commit --tag --push \
+            --summary "$GITHUB_STEP_SUMMARY" --output json \
             | tee /tmp/release.json
 
       - name: Reinstall (pick up the new version)

@@ -342,6 +342,81 @@ def test_check_missing_file(repo: Path, runner: CliRunner):
     assert result.exit_code == 1
 
 
+def test_plan_summary_appends_markdown_table(repo: Path, runner: CliRunner, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+
+    result = runner.invoke(app, ["plan", "--summary", str(summary)])
+    assert result.exit_code == 0, result.stdout
+    text = summary.read_text()
+    assert "## Release plan" in text
+    assert "| component |" in text
+    assert "| `api` |" in text
+    assert "| `1.2.0` |" in text
+    assert "| `1.3.0` |" in text
+    assert "feat(api): add login" in text
+
+
+def test_plan_summary_empty_plan(repo: Path, runner: CliRunner, tmp_path: Path):
+    """With no commits since the last tag, the summary still gets written."""
+    summary = tmp_path / "summary.md"
+    result = runner.invoke(app, ["plan", "--summary", str(summary)])
+    assert result.exit_code == 0
+    assert "_No bumps pending._" in summary.read_text()
+
+
+def test_bump_summary_appends_release_block(repo: Path, runner: CliRunner, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+
+    result = runner.invoke(
+        app, ["bump", "--commit", "--tag", "--summary", str(summary)]
+    )
+    assert result.exit_code == 0, result.stdout
+    text = summary.read_text()
+    assert "## Released" in text
+    assert "api-v1.3.0" in text
+    assert "Release commit:" in text
+
+
+def test_summary_appends_when_plan_then_bump(
+    repo: Path, runner: CliRunner, tmp_path: Path
+):
+    """Plan and bump can write to the same summary file in sequence."""
+    summary = tmp_path / "summary.md"
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+
+    runner.invoke(app, ["plan", "--summary", str(summary)])
+    runner.invoke(app, ["bump", "--commit", "--tag", "--summary", str(summary)])
+
+    text = summary.read_text()
+    assert "## Release plan" in text
+    assert "## Released" in text
+    # Order preserved
+    assert text.index("## Release plan") < text.index("## Released")
+
+
+def test_bump_summary_works_with_json_output(
+    repo: Path, runner: CliRunner, tmp_path: Path
+):
+    """--summary and --output json compose: JSON to stdout, markdown to file."""
+    summary = tmp_path / "summary.md"
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+
+    result = runner.invoke(
+        app,
+        [
+            "bump", "--commit", "--tag",
+            "--summary", str(summary),
+            "--output", "json",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["bumps"]["api"]["next_version"] == "1.3.0"
+    assert "## Released" in summary.read_text()
+
+
 def test_plan_text_lists_reasons_per_component(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     result = runner.invoke(app, ["plan"])
