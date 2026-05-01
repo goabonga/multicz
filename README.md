@@ -175,9 +175,12 @@ helm package charts/myapp
 |---|---|
 | `multicz init` | write a starter `multicz.toml` |
 | `multicz status` | brief table of pending bumps with reason summaries |
+| `multicz status --since origin/main` | preview the bump plan for a PR (vs main) |
 | `multicz changed` | components with files changed since their last tag (CI matrix) |
 | `multicz changed --since origin/main` | what changed in this branch vs main |
 | `multicz plan` | per-component plan with explicit reasons (commit / trigger / mirror) |
+| `multicz plan --since <ref>` | recompute the plan against a custom baseline |
+| `multicz explain <comp> --since <ref>` | scope explain to a specific window |
 | `multicz plan --output json` | machine-readable shape for CI |
 | `multicz explain <component>` | full breakdown — every commit, the matched files, every cascade |
 | `multicz bump` | apply bumps to all configured files |
@@ -314,6 +317,43 @@ The check identifier in parentheses (`bump_files_exist`,
 `mirror_cycle`, …) is stable so CI logs and PR comments can grep on
 it. `--output json` emits the same data as a structured payload with
 a counts summary.
+
+### Choosing the commit window (`--since`)
+
+By default, every component compares against **its own** latest tag:
+the planner picks `api-v1.2.0` for `api` and `chart-v0.5.0` for `chart`,
+each scoped to that component's tag prefix. That's the right behaviour
+when you're cutting a release from `main`.
+
+For other workflows, override the reference globally with `--since`:
+
+| use case | command |
+|---|---|
+| PR preview ("what would bump if I merge this branch?") | `multicz plan --since origin/main` |
+| What changed in this branch (for CI matrix) | `multicz changed --since origin/main` |
+| Inspect commits from a specific point | `multicz status --since HEAD~10` |
+| Migrate from a legacy global tag scheme | `multicz plan --since v1.0.0` |
+| Recover from removed/recreated tags | `multicz plan --since <known sha>` |
+
+`--since` accepts anything `git rev-parse` accepts: tags, branches,
+SHAs, `HEAD~N`, etc.
+
+The override only moves the **commit window** used to compute bump
+kinds. The "current version" resolution (latest tag → primary
+`bump_file` → `initial_version`) is unaffected — so even with
+`--since origin/main`, the planner still bumps from the latest
+released version, not from main. That's deliberate: PRs preview the
+"if merged" version without re-deriving history.
+
+`bump` intentionally does **not** take `--since`. Combining a custom
+window with a write+tag is a footgun (you can create tags that
+contradict the actual history). Workflow:
+
+```sh
+multicz plan --since origin/main          # preview
+# … inspect, decide …
+multicz bump --commit --tag --push        # run the regular bump
+```
 
 ### `changed` (CI matrix gating)
 
