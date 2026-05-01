@@ -1,0 +1,43 @@
+{
+  "name": "monorepo",
+  "version": "1.0.0",
+  "description": "JS-first monorepo with multicz config inlined under \"multicz\"",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "multicz": {
+    "project": {
+      "commit_convention": "conventional",
+      "tag_format": "{component}-v{version}",
+      "initial_version": "0.1.0",
+      "finalize_strategy": "consolidate"
+    },
+    "components": [
+      {
+        "name": "web",
+        "paths": ["packages/web/**"],
+        "bump_files": [
+          { "file": "packages/web/package.json", "key": "version" }
+        ],
+        "changelog": "packages/web/CHANGELOG.md"
+      },
+      {
+        "name": "mobile",
+        "paths": ["packages/mobile/**"],
+        "bump_files": [
+          { "file": "packages/mobile/package.json", "key": "version" }
+        ],
+        "changelog": "packages/mobile/CHANGELOG.md"
+      },
+      {
+        "name": "shared",
+        "paths": ["packages/shared/**"],
+        "bump_files": [
+          { "file": "packages/shared/package.json", "key": "version" }
+        ],
+        "changelog": "packages/shared/CHANGELOG.md"
+      }
+    ]
+  }
+}

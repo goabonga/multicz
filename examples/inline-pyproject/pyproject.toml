@@ -1,0 +1,47 @@
+# Example: multicz config inlined under [tool.multicz] inside an existing
+# pyproject.toml. No separate multicz.toml needed.
+#
+# Layout assumed:
+#   pyproject.toml        -> Python package manifest + multicz config
+#   src/                  -> Python sources
+#   tests/                -> Test suite
+#   Dockerfile            -> Container build
+#   frontend/             -> React SPA
+#     package.json        -> name + version of the SPA
+#
+# Behavior:
+#   - changes under src/ or to Dockerfile -> bump api
+#   - changes under frontend/ -> bump web
+#   - the two components are independent (different tags, different
+#     CHANGELOG.md files)
+
+[project]
+name = "api"
+version = "1.0.0"
+description = "FastAPI backend with a sibling React SPA"
+requires-python = ">=3.12"
+dependencies = ["fastapi"]
+
+# multicz config lives here — discovered automatically when there's no
+# multicz.toml at the repo root.
+[tool.multicz.project]
+commit_convention = "conventional"
+tag_format = "{component}-v{version}"
+initial_version = "0.1.0"
+finalize_strategy = "consolidate"
+
+# Python backend
+[tool.multicz.components.api]
+paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile"]
+bump_files = [
+  { file = "pyproject.toml", key = "project.version" },
+]
+changelog = "CHANGELOG.md"
+
+# React frontend (lives in its own subdirectory)
+[tool.multicz.components.web]
+paths = ["frontend/**"]
+bump_files = [
+  { file = "frontend/package.json", key = "version" },
+]
+changelog = "frontend/CHANGELOG.md"
