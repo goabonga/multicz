@@ -1499,6 +1499,55 @@ one specific message shape): `ignored_types` short-circuits before
 the bump kind is even consulted, so `feat!: ...` is also dropped
 if `feat` is in the list. That's the explicit cost of the choice.
 
+## Component dependencies
+
+Sometimes a component should bump *because another component bumps* —
+typically a Helm chart that ships a Python service: when the service
+bumps, the chart needs a fresh build with the new app version.
+
+```toml
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[components.chart]
+paths = ["charts/myapp/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+depends_on = ["api"]      # chart bumps whenever api does
+```
+
+When `api` goes from `1.2.0` to `1.3.0` (minor), `chart` cascades a
+bump too. The kind is governed by `project.trigger_policy`:
+
+| value | behaviour | when to use |
+|---|---|---|
+| `match-upstream` (default) | dependent inherits the upstream's kind — `api` minor → `chart` minor | the dependent is conceptually "the same release" as the upstream |
+| `patch` | dependent always patches when its upstream bumps — `api` minor → `chart` patch | the dependent isn't really gaining a feature when its dependency does (typical for a chart that just needs a rebuild) |
+
+```toml
+[project]
+trigger_policy = "patch"   # chart always patches when api bumps
+```
+
+> **Mirrors vs. `depends_on`** — both create cascades, but they're
+> different concepts:
+>
+> * `mirrors` writes a component's *version* into another component's
+>   *file* (e.g. api version → `Chart.yaml:appVersion`). The receiving
+>   component cascades a patch *because the file inside its paths
+>   changed*. Use it when the file content needs to track a sibling.
+> * `depends_on` is the explicit "X depends on Y" relationship.
+>   No file is written; the cascade is purely logical. Use it when
+>   you want the relationship without the version mirror.
+>
+> A chart with `appVersion` typically declares **both** — the mirror
+> for the field, and `depends_on = ["api"]` is then redundant
+> (the cascade fires either way).
+
+> **Backwards compatibility** — the old name `triggers = [...]` still
+> parses. It's silently merged into `depends_on`. New configs should
+> use `depends_on`.
+
 ## Per-component bump policy
 
 When a single commit touches multiple components, each component
