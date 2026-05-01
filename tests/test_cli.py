@@ -451,6 +451,33 @@ state_file = ".multicz/state.json"
     assert result.exit_code == 0
 
 
+def test_unknown_commit_error_policy_clean_cli_message(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+unknown_commit_policy = "error"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "wip")
+
+    result = runner.invoke(app, ["plan"])
+    assert result.exit_code == 1
+    assert "non-conventional commit" in result.output
+    assert "update stuff" in result.output
+    assert "unknown_commit_policy" in result.output
+
+
+def test_unknown_commit_error_policy_blocks_bump(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+unknown_commit_policy = "error"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 1
+    # File untouched
+    assert 'version = "1.2.0"' in (repo / "pyproject.toml").read_text()
+
+
 def test_status_since_overrides_commit_window(repo: Path, runner: CliRunner):
     # First commit lives "before" the override; second is "after" it.
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: pre-baseline change")

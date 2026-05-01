@@ -36,6 +36,7 @@ from .discovery import discover_components, render_config
 from .planner import (
     CommitReason,
     MirrorReason,
+    NonConventionalCommitsError,
     TriggerReason,
     build_plan,
 )
@@ -229,6 +230,27 @@ def _load() -> tuple[Path, object]:
     return config_path.parent, load_config(config_path)
 
 
+def _build_plan_or_exit(repo, config, **kwargs):
+    """Wrap build_plan() and surface NonConventionalCommitsError as a clean
+    typer.Exit instead of a raw traceback."""
+    try:
+        return build_plan(repo, config, **kwargs)
+    except NonConventionalCommitsError as exc:
+        err.print(
+            f"[red]✗ {len(exc.offenders)} non-conventional commit(s) "
+            "blocking the plan[/] [dim](unknown_commit_policy='error')[/]"
+        )
+        for sha, subject in exc.offenders:
+            err.print(f"  - {sha[:7]}: {subject}")
+        err.print(
+            "\n[dim]Either rewrite their headers as conventional commits "
+            "(`git rebase -i`), or set "
+            "[bold]unknown_commit_policy = \"ignore\"[/] (or "
+            "[bold]\"patch\"[/]) in [project].[/]"
+        )
+        raise typer.Exit(code=1) from exc
+
+
 @app.command()
 def status(
     since: str = typer.Option(
@@ -240,7 +262,7 @@ def status(
 ) -> None:
     """Brief summary of pending bumps (alias of ``plan`` without reasons)."""
     repo, config = _load()
-    plan_obj = build_plan(repo, config, since=since)
+    plan_obj = _build_plan_or_exit(repo, config, since=since)
     if not plan_obj:
         console.print("[dim]no bumps pending[/]")
         return
@@ -310,7 +332,7 @@ def plan_cmd(
         raise typer.Exit(code=1)
 
     repo, config = _load()
-    plan_obj = build_plan(repo, config, pre=pre, finalize=finalize, since=since)
+    plan_obj = _build_plan_or_exit(repo, config, pre=pre, finalize=finalize, since=since)
 
     if output == "json":
         payload = {
@@ -619,7 +641,7 @@ def release_notes_cmd(
             "commits": commits,
         })
     else:
-        plan_obj = build_plan(repo, config)
+        plan_obj = _build_plan_or_exit(repo, config)
         if all_:
             targets = list(plan_obj.bumps)
         else:
@@ -767,7 +789,7 @@ def explain(
         err.print(f"[red]unknown component:[/] {component}")
         raise typer.Exit(code=1)
 
-    plan_obj = build_plan(repo, config, since=since)
+    plan_obj = _build_plan_or_exit(repo, config, since=since)
     bump = plan_obj.bumps.get(component)
     if bump is None:
         console.print(
@@ -1029,7 +1051,7 @@ def bump(
         raise typer.Exit(code=1)
 
     repo, config = _load()
-    plan = build_plan(repo, config, pre=pre, finalize=finalize)
+    plan = _build_plan_or_exit(repo, config, pre=pre, finalize=finalize)
 
     if component:
         plan.bumps = {n: b for n, b in plan.bumps.items() if n in set(component)}
@@ -1229,7 +1251,7 @@ def changelog(
     repo, config = _load()
     matcher = ComponentMatcher(config.components)
     names = [component] if component else list(config.components)
-    plan = build_plan(repo, config)
+    plan = _build_plan_or_exit(repo, config)
 
     md_chunks: list[str] = []
 

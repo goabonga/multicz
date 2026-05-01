@@ -183,6 +183,7 @@ class ProjectSettings(BaseModel):
     overlap_policy: Literal["error", "first-match", "allow", "all"] = "error"
     ignored_types: list[str] = Field(default_factory=list)
     state_file: Path | None = None  # opt-in JSON snapshot, written on bump
+    unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
 
 
 class Config(BaseModel):

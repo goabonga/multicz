@@ -302,6 +302,69 @@ bump_policy = "scoped"
     assert plan.bumps["chart"].kind == "minor"  # scope matches chart
 
 
+def test_unknown_commit_default_is_ignore(repo: Path):
+    """Default policy: non-conventional commits are silently skipped."""
+    _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")
+    plan = build_plan(repo, load_config(repo / "multicz.toml"))
+    assert "api" not in plan.bumps  # no bump from a non-conv commit
+
+
+def test_unknown_commit_policy_patch_bumps_patch(repo: Path):
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project]
+unknown_commit_policy = "patch"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["api"].kind == "patch"
+    [reason] = plan.bumps["api"].reasons
+    assert reason.__class__.__name__ == "NonConventionalReason"
+    assert reason.subject == "update stuff"
+
+
+def test_unknown_commit_policy_error_raises(repo: Path):
+    from multicz.planner import NonConventionalCommitsError
+
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project]
+unknown_commit_policy = "error"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "more changes")
+
+    with pytest.raises(NonConventionalCommitsError) as exc:
+        build_plan(repo, load_config(cfg))
+    assert len(exc.value.offenders) == 2
+
+
+def test_unknown_commit_policy_patch_keeps_conventional_commits_too(repo: Path):
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project]
+unknown_commit_policy = "patch"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: real feature")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "update stuff")
+    plan = build_plan(repo, load_config(cfg))
+    # feat (minor) wins over patch (non-conv)
+    assert plan.bumps["api"].kind == "minor"
+    assert len(plan.bumps["api"].reasons) == 2
+
+
 def test_per_component_tag_format_is_honored(repo: Path):
     # Re-write the config with a tag_format override on api only
     cfg = repo / "multicz.toml"

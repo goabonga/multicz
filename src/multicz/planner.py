@@ -244,7 +244,47 @@ class ManualReason:
         return {"kind": "manual", "note": self.note}
 
 
-Reason = CommitReason | TriggerReason | MirrorReason | ManualReason
+@dataclass(frozen=True)
+class NonConventionalReason:
+    """A planned bump driven by a commit that did NOT match the conventional
+    commit grammar. Only produced when
+    ``project.unknown_commit_policy = "patch"``.
+    """
+
+    sha: str
+    subject: str  # the commit's first line, verbatim
+    files: tuple[str, ...]
+    bump_kind: BumpKind = "patch"
+
+    def summary(self) -> str:
+        return f"{self.sha[:7]} (non-conventional): {self.subject}"
+
+    def to_dict(self) -> dict:
+        return {
+            "kind": "non_conventional",
+            "sha": self.sha,
+            "subject": self.subject,
+            "files": list(self.files),
+            "bump_kind": self.bump_kind,
+        }
+
+
+Reason = (
+    CommitReason | TriggerReason | MirrorReason | ManualReason | NonConventionalReason
+)
+
+
+class NonConventionalCommitsError(RuntimeError):
+    """Raised when ``unknown_commit_policy = "error"`` and the planner
+    encountered at least one non-conventional commit in scope.
+    """
+
+    def __init__(self, offenders: list[tuple[str, str]]) -> None:
+        # offenders: list of (sha, first_line)
+        self.offenders = offenders
+        super().__init__(
+            f"{len(offenders)} non-conventional commit(s) blocking the plan"
+        )
 
 
 @dataclass
@@ -366,6 +406,9 @@ def _direct_pass(
 
     release_re = re.compile(config.project.release_commit_pattern)
     overlap_all = config.project.overlap_policy == "all"
+    unknown_policy = config.project.unknown_commit_policy
+    offenders: list[tuple[str, str]] = []  # for unknown_commit_policy = error
+
     for name in config.components:
         if since_override is None:
             prefix = tag_prefix(config.tag_format_for(name), name)
@@ -374,6 +417,36 @@ def _direct_pass(
             since = since_override
         ignored = config.ignored_types_for(name)
         for commit in commits_since(repo, since):
+            # Handle non-conventional commits before anything else.
+            if not commit.is_conventional:
+                if unknown_policy == "ignore":
+                    continue
+                # Both 'patch' and 'error' need to know which files in this
+                # commit map to this component.
+                if overlap_all:
+                    owned = tuple(
+                        p for p in commit.files if name in matcher.match_all(p)
+                    )
+                else:
+                    owned = tuple(
+                        p for p in commit.files if matcher.match(p) == name
+                    )
+                if not owned:
+                    continue
+                if unknown_policy == "error":
+                    pair = (commit.sha, commit.subject or "")
+                    if pair not in offenders:
+                        offenders.append(pair)
+                    continue
+                # 'patch'
+                reason = NonConventionalReason(
+                    sha=commit.sha,
+                    subject=commit.subject or "",
+                    files=owned,
+                )
+                _promote(plan, name, "patch", versions[name], reason)
+                continue
+
             header = (
                 f"{commit.type}({commit.scope}): {commit.subject}"
                 if commit.scope
@@ -421,6 +494,9 @@ def _direct_pass(
                 original_kind=commit.bump_kind if demoted else None,
             )
             _promote(plan, name, kind, versions[name], reason)
+
+    if offenders:
+        raise NonConventionalCommitsError(offenders)
 
 
 def _triggers_pass(
