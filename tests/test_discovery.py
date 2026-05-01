@@ -347,6 +347,132 @@ def test_no_components(tmp_path: Path):
     assert discover_components(tmp_path) == {}
 
 
+def test_uv_workspace_with_members(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
+    )
+    foo = tmp_path / "packages" / "foo"
+    foo.mkdir(parents=True)
+    (foo / "pyproject.toml").write_text(
+        '[project]\nname = "foo"\nversion = "0.1.0"\n'
+    )
+    bar = tmp_path / "packages" / "bar"
+    bar.mkdir(parents=True)
+    (bar / "pyproject.toml").write_text(
+        '[project]\nname = "bar"\nversion = "0.2.0"\n'
+    )
+
+    comps = discover_components(tmp_path)
+    # root has no [project]/[tool.poetry] -> not a component
+    assert {"foo", "bar"}.issubset(comps)
+    assert comps["foo"].paths == ["packages/foo/**"]
+    assert str(comps["foo"].bump_files[0].file) == "packages/foo/pyproject.toml"
+
+
+def test_uv_workspace_with_root_package(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "rootlib"\nversion = "1.0.0"\n'
+        '\n[tool.uv.workspace]\nmembers = ["packages/*"]\n'
+    )
+    (tmp_path / "src").mkdir()
+    pkg = tmp_path / "packages" / "extra"
+    pkg.mkdir(parents=True)
+    (pkg / "pyproject.toml").write_text(
+        '[project]\nname = "extra"\nversion = "0.1.0"\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "rootlib" in comps
+    assert "extra" in comps
+    assert comps["rootlib"].paths[0] == "src/**"
+    assert comps["extra"].paths == ["packages/extra/**"]
+
+
+def test_uv_workspace_excludes_skip_member(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
+        'exclude = ["packages/legacy"]\n'
+    )
+    keep = tmp_path / "packages" / "keep"
+    keep.mkdir(parents=True)
+    (keep / "pyproject.toml").write_text(
+        '[project]\nname = "keep"\nversion = "0.1.0"\n'
+    )
+    legacy = tmp_path / "packages" / "legacy"
+    legacy.mkdir(parents=True)
+    (legacy / "pyproject.toml").write_text(
+        '[project]\nname = "legacy"\nversion = "0.1.0"\n'
+    )
+
+    comps = discover_components(tmp_path)
+    assert "keep" in comps
+    assert "legacy" not in comps
+
+
+def test_poetry_legacy_layout(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.poetry]\nname = "old-app"\nversion = "1.0.0"\n'
+    )
+    (tmp_path / "src").mkdir()
+    comps = discover_components(tmp_path)
+    assert "old-app" in comps
+    bf = comps["old-app"].bump_files[0]
+    assert bf.key == "tool.poetry.version"
+    assert str(bf.file) == "pyproject.toml"
+
+
+def test_poetry_monorepo_multiple_pyproject(tmp_path: Path):
+    # No uv workspace, but several pyproject.toml files in subdirs (Poetry monorepo)
+    api = tmp_path / "services" / "api"
+    api.mkdir(parents=True)
+    (api / "pyproject.toml").write_text(
+        '[tool.poetry]\nname = "api"\nversion = "1.0.0"\n'
+    )
+    worker = tmp_path / "services" / "worker"
+    worker.mkdir(parents=True)
+    (worker / "pyproject.toml").write_text(
+        '[project]\nname = "worker"\nversion = "0.5.0"\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "api" in comps and "worker" in comps
+    assert comps["api"].bump_files[0].key == "tool.poetry.version"
+    assert comps["worker"].bump_files[0].key == "project.version"
+
+
+def test_python_workspace_helm_mirrors_by_name(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
+    )
+    api = tmp_path / "packages" / "api"
+    api.mkdir(parents=True)
+    (api / "pyproject.toml").write_text(
+        '[project]\nname = "api"\nversion = "1.0.0"\n'
+    )
+    worker = tmp_path / "packages" / "worker"
+    worker.mkdir(parents=True)
+    (worker / "pyproject.toml").write_text(
+        '[project]\nname = "worker"\nversion = "0.5.0"\n'
+    )
+    _chart(tmp_path, dirname="api")
+    _chart(tmp_path, dirname="worker")
+
+    comps = discover_components(tmp_path)
+    api_mirrors = comps["api"].mirrors
+    worker_mirrors = comps["worker"].mirrors
+    assert len(api_mirrors) == 1
+    assert "charts/api/" in str(api_mirrors[0].file)
+    assert len(worker_mirrors) == 1
+    assert "charts/worker/" in str(worker_mirrors[0].file)
+
+
+def test_pyproject_without_version_is_skipped(tmp_path: Path):
+    # A workspace orchestrator with [project] but no version
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "orch"\n'  # no version
+    )
+    comps = discover_components(tmp_path)
+    assert "orch" not in comps
+
+
 def test_chart_uses_dir_name_when_chart_yaml_missing_name(tmp_path: Path):
     chart_dir = tmp_path / "charts" / "from-dir"
     chart_dir.mkdir(parents=True)

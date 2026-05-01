@@ -42,16 +42,59 @@ _GRADLE_NAME_RE = re.compile(
 )
 
 
-def _read_pyproject_name(path: Path) -> str | None:
+def _read_pyproject_info(path: Path) -> tuple[str, str] | None:
+    """Return ``(name, version_key)`` for a Python project, or ``None``.
+
+    Handles both PEP 621 (``[project]``, used by uv/hatch/setuptools-pep621
+    and modern Poetry) and legacy Poetry (``[tool.poetry]``). Files that
+    declare neither are typically uv workspace orchestrators and are
+    skipped (returning ``None``).
+    """
     try:
         doc = tomlkit.parse(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
     project = doc.get("project")
-    if not isinstance(project, dict):
-        return None
-    name = project.get("name")
-    return str(name) if name else None
+    if isinstance(project, dict):
+        name = project.get("name")
+        if name and "version" in project:
+            return (str(name), "project.version")
+
+    tool = doc.get("tool")
+    if isinstance(tool, dict):
+        poetry = tool.get("poetry")
+        if isinstance(poetry, dict):
+            name = poetry.get("name")
+            version = poetry.get("version")
+            if name and version is not None:
+                return (str(name), "tool.poetry.version")
+
+    return None
+
+
+def _read_uv_workspace(path: Path) -> tuple[list[str], list[str]]:
+    """Return ``(members_globs, exclude_globs)`` from ``[tool.uv.workspace]``."""
+    try:
+        doc = tomlkit.parse(path.read_text(encoding="utf-8"))
+    except Exception:
+        return [], []
+    tool = doc.get("tool")
+    if not isinstance(tool, dict):
+        return [], []
+    uv = tool.get("uv")
+    if not isinstance(uv, dict):
+        return [], []
+    workspace = uv.get("workspace")
+    if not isinstance(workspace, dict):
+        return [], []
+
+    def _list(value) -> list[str]:
+        if isinstance(value, list):
+            return [str(v) for v in value if isinstance(v, str)]
+        return []
+
+    return _list(workspace.get("members")), _list(workspace.get("exclude"))
 
 
 def _read_chart_name(path: Path) -> str | None:
@@ -206,24 +249,48 @@ def _read_cargo(path: Path) -> tuple[str | None, str] | None:
 def discover_components(repo: Path) -> dict[str, Component]:
     """Return a fresh component map populated from manifests found under ``repo``."""
     components: dict[str, Component] = {}
-    python_name: str | None = None
+    python_names: list[str] = []
+    python_raw_names: dict[str, str] = {}
 
-    pyproject = repo / "pyproject.toml"
-    if pyproject.is_file():
-        name = _read_pyproject_name(pyproject) or "app"
-        paths = ["pyproject.toml"]
-        if (repo / "src").is_dir():
-            paths.insert(0, "src/**")
-        if (repo / "tests").is_dir():
-            paths.append("tests/**")
-        if (repo / "Dockerfile").is_file():
-            paths.append("Dockerfile")
-        components[name] = Component(
+    # Collect every pyproject.toml (uv/hatch/setuptools/Poetry) and apply the
+    # uv workspace exclude list when the root declares one.
+    pyprojects = _find_manifests(repo, "pyproject.toml")
+    excluded: set[Path] = set()
+    root_pyproject = repo / "pyproject.toml"
+    if root_pyproject.is_file():
+        _, ws_excludes = _read_uv_workspace(root_pyproject)
+        for pattern in ws_excludes:
+            for path in repo.glob(f"{pattern}/pyproject.toml"):
+                excluded.add(path.resolve())
+
+    for path in pyprojects:
+        if path.resolve() in excluded:
+            continue
+        info = _read_pyproject_info(path)
+        if info is None:
+            continue  # uv workspace orchestrator with no [project], skip
+        raw_name, version_key = info
+        rel_dir = path.parent.relative_to(repo)
+        comp_name = _unique(raw_name, set(components), suffix="py")
+        if rel_dir == Path("."):
+            paths = ["pyproject.toml"]
+            if (repo / "src").is_dir():
+                paths.insert(0, "src/**")
+            if (repo / "tests").is_dir():
+                paths.append("tests/**")
+            if (repo / "Dockerfile").is_file():
+                paths.append("Dockerfile")
+            changelog = Path("CHANGELOG.md")
+        else:
+            paths = [f"{rel_dir.as_posix()}/**"]
+            changelog = Path(f"{rel_dir.as_posix()}/CHANGELOG.md")
+        components[comp_name] = Component(
             paths=paths,
-            bump_files=[FileKey(file=Path("pyproject.toml"), key="project.version")],
-            changelog=Path("CHANGELOG.md"),
+            bump_files=[FileKey(file=path.relative_to(repo), key=version_key)],
+            changelog=changelog,
         )
-        python_name = name
+        python_names.append(comp_name)
+        python_raw_names[comp_name] = raw_name
 
     for cargo_path in _find_manifests(repo, "Cargo.toml"):
         info = _read_cargo(cargo_path)
@@ -317,21 +384,27 @@ def discover_components(repo: Path) -> dict[str, Component]:
         chart_names.append(comp_name)
         chart_raw_names[comp_name] = raw
 
-    if python_name and chart_names:
-        py = components[python_name]
-        # Single chart + single python project: unambiguous, mirror.
-        # Multiple charts: only mirror to the chart(s) whose name matches the
-        # python project, so a 'worker' chart next to an 'api' python project
-        # stays independent.
-        candidates = (
-            chart_names if len(chart_names) == 1
-            else [n for n in chart_names if chart_raw_names[n] == python_name]
-        )
-        for chart_comp_name in candidates:
-            chart_yaml_path = components[chart_comp_name].bump_files[0].file
+    if python_names and chart_names:
+        # Single python + single chart: unambiguous, always pair.
+        # Otherwise: match by name, so a 'worker' chart next to an 'api' python
+        # project stays independent and a multi-python repo wires each python
+        # to its same-named chart only.
+        if len(python_names) == 1 and len(chart_names) == 1:
+            py = components[python_names[0]]
+            chart_yaml_path = components[chart_names[0]].bump_files[0].file
             py.mirrors.append(FileKey(file=chart_yaml_path, key="appVersion"))
+        else:
+            for py_name in python_names:
+                py = components[py_name]
+                py_raw = python_raw_names[py_name]
+                for chart_comp_name in chart_names:
+                    if chart_raw_names[chart_comp_name] == py_raw:
+                        chart_yaml_path = components[chart_comp_name].bump_files[0].file
+                        py.mirrors.append(
+                            FileKey(file=chart_yaml_path, key="appVersion")
+                        )
 
-    _detect_node(repo, components, python_name=python_name)
+    _detect_node(repo, components, python_taken=bool(python_names))
 
     return components
 
@@ -340,7 +413,7 @@ def _detect_node(
     repo: Path,
     components: dict[str, Component],
     *,
-    python_name: str | None,
+    python_taken: bool,
 ) -> None:
     """Add Node.js components, expanding workspaces when declared."""
     package_json = repo / "package.json"
@@ -374,12 +447,12 @@ def _detect_node(
         if name:
             comp_name = _unique(name, set(components), suffix="js")
             paths = ["package.json"]
-            if python_name is None and (repo / "src").is_dir():
+            if not python_taken and (repo / "src").is_dir():
                 paths.insert(0, "src/**")
             components[comp_name] = Component(
                 paths=paths,
                 bump_files=[FileKey(file=Path("package.json"), key="version")],
-                changelog=Path("CHANGELOG.md") if python_name is None else None,
+                changelog=Path("CHANGELOG.md") if not python_taken else None,
             )
 
 
