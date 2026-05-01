@@ -193,6 +193,8 @@ helm package charts/myapp
 | `multicz bump --pre rc` | enter / continue a release-candidate cycle (`1.2.3` → `1.3.0-rc.1` → `1.3.0-rc.2`) |
 | `multicz bump --finalize` | drop a pre-release suffix (`1.3.0-rc.2` → `1.3.0`) — works with no new commits |
 | `multicz check <file>` | validate a commit message — wire as a `commit-msg` hook |
+| `multicz artifacts <comp>` | list what CI should build/push for the current version |
+| `multicz artifacts --all --output json` | machine-readable artifact refs for the whole repo |
 | `multicz validate` | run every config + repo sanity check (CI gate) |
 | `multicz validate --strict` | also fail on warnings (overlapping paths, useless mirrors, …) |
 | `multicz validate --output json` | machine-readable findings shape |
@@ -662,6 +664,73 @@ paths = ["charts/**"]               # default "chart-v…" — fresh history
 
 `multicz status` now shows `api` reading its version from the
 existing `v1.2.0` tag while `chart` starts at `initial_version`.
+
+## Artifacts (what CI should build and push)
+
+`multicz` does **not** build or push artifacts itself. It surfaces the
+information CI needs to do so, decoupled from your specific image
+registry, chart repository, or package index. Declare what each
+component publishes:
+
+```toml
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[[components.api.artifacts]]
+type = "docker"
+ref  = "ghcr.io/foo/api:{version}"
+
+[[components.api.artifacts]]
+type = "docker"
+ref  = "registry.acme.com/api:{version}"
+
+[components.chart]
+paths = ["charts/myapp/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+
+[[components.chart.artifacts]]
+type = "helm"
+ref  = "{component}-{version}.tgz"
+
+[[components.chart.artifacts]]
+type = "oci"
+ref  = "oci://registry.acme.com/charts/{component}:{version}"
+```
+
+`ref` accepts `{version}` and `{component}` placeholders. `type` is
+free-form so CI can filter on it (`docker`, `helm`, `oci`, `npm`,
+`pypi`, …).
+
+Three places surface the rendered artifacts:
+
+```sh
+# Direct lookup against the current version
+multicz artifacts api
+# api (1.2.0)
+#   [docker] ghcr.io/foo/api:1.2.0
+#   [docker] registry.acme.com/api:1.2.0
+
+# Against an explicit target version
+multicz artifacts api --version 1.4.0-rc.1
+
+# JSON for CI scripts
+multicz artifacts --all --output json
+```
+
+`multicz plan --output json` and `multicz bump --output json` both
+include an `artifacts` array per component rendered against the
+*planned* (or just-applied) version. CI can drive the actual
+build/push from a single payload:
+
+```yaml
+- run: |
+    RELEASE=$(multicz bump --commit --tag --output json)
+    echo "$RELEASE" | jq -r '.bumps[].artifacts[] | select(.type=="docker") | .ref' \
+      | xargs -I{} sh -c 'docker build -t {} . && docker push {}'
+    echo "$RELEASE" | jq -r '.bumps[].artifacts[] | select(.type=="helm") | .ref' \
+      | xargs -I{} sh -c 'helm package . && helm push {}'
+```
 
 ## Path ownership and overlap
 
