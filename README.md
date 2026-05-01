@@ -191,7 +191,25 @@ exec multicz check "$1"
 * `.toml` — comments and key order preserved (tomlkit)
 * `.yaml` / `.yml` — comments and quote style preserved (ruamel.yaml)
 * `.json` — indent and key order preserved (e.g. `package.json`)
+* `.properties` — line-based `key=value` substitution (e.g. `gradle.properties`)
 * anything else — treated as a one-line `VERSION` file (`key = ` omitted)
+
+### Auto-discovery languages
+
+`multicz init` detects the following manifests across the working tree
+and seeds one component per project:
+
+| ecosystem | manifest | name source |
+|---|---|---|
+| Python | `pyproject.toml` | `[project].name` |
+| Helm | `**/Chart.yaml` | `name:` field |
+| Rust | `**/Cargo.toml` | `[package].name` (workspaces collapse to one component when `[workspace.package].version` is shared) |
+| Go | `**/go.mod` | last segment of `module …` (strips `/vN`) — tag-driven, no version file |
+| Gradle | root `gradle.properties` with `version=` | `rootProject.name` from `settings.gradle[.kts]` |
+| Node.js | root `package.json` (or workspace members via `workspaces` / `pnpm-workspace.yaml`) | `name` field (npm scopes stripped) |
+
+Common noise dirs (`.git`, `node_modules`, `.venv`, `target`, `build`,
+`dist`, `vendor`, …) are excluded from the scan.
 
 ## Configuration reference
 
