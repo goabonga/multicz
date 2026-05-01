@@ -289,6 +289,50 @@ def test_go_module_in_vendor_skipped(tmp_path: Path):
     assert "junk" not in comps
 
 
+def test_gradle_with_settings_groovy(tmp_path: Path):
+    (tmp_path / "gradle.properties").write_text(
+        "# build settings\nversion=1.2.3\ngroup=com.example\n"
+    )
+    (tmp_path / "settings.gradle").write_text(
+        "rootProject.name = 'myapp'\n"
+    )
+    (tmp_path / "build.gradle").write_text("// noop\n")
+    (tmp_path / "src").mkdir()
+    comps = discover_components(tmp_path)
+    assert "myapp" in comps
+    assert comps["myapp"].bump_files[0].key == "version"
+    assert str(comps["myapp"].bump_files[0].file) == "gradle.properties"
+    assert "src/**" in comps["myapp"].paths
+    assert "build.gradle" in comps["myapp"].paths
+    assert "settings.gradle" in comps["myapp"].paths
+
+
+def test_gradle_with_settings_kotlin(tmp_path: Path):
+    (tmp_path / "gradle.properties").write_text("version=2.0.0\n")
+    (tmp_path / "settings.gradle.kts").write_text(
+        'rootProject.name = "kotlin-app"\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "kotlin-app" in comps
+
+
+def test_gradle_without_settings_falls_back_to_dirname(tmp_path: Path):
+    project = tmp_path / "myproj"
+    project.mkdir()
+    (project / "gradle.properties").write_text("version=1.0.0\n")
+    comps = discover_components(project)
+    assert "myproj" in comps
+
+
+def test_gradle_without_version_in_properties_skipped(tmp_path: Path):
+    (tmp_path / "gradle.properties").write_text("group=com.example\n")
+    (tmp_path / "settings.gradle").write_text(
+        "rootProject.name = 'noversion'\n"
+    )
+    comps = discover_components(tmp_path)
+    assert "noversion" not in comps
+
+
 def test_chart_in_venv_is_skipped(tmp_path: Path):
     _python_project(tmp_path)
     venv = tmp_path / ".venv" / "some" / "Chart.yaml"

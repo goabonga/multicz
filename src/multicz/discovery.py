@@ -29,12 +29,17 @@ change.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import tomlkit
 from ruamel.yaml import YAML
 
 from .config import Component, FileKey
+
+_GRADLE_NAME_RE = re.compile(
+    r"rootProject\.name\s*=\s*['\"]([^'\"]+)['\"]"
+)
 
 
 def _read_pyproject_name(path: Path) -> str | None:
@@ -107,6 +112,38 @@ def _find_manifests(repo: Path, filename: str) -> list[Path]:
 
 def _find_chart_yamls(repo: Path) -> list[Path]:
     return _find_manifests(repo, "Chart.yaml")
+
+
+def _read_gradle_property(path: Path, key: str) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if not stripped or stripped[0] in "#!":
+            continue
+        if "=" not in stripped:
+            continue
+        k, _, v = stripped.partition("=")
+        if k.strip() == key:
+            return v.strip()
+    return None
+
+
+def _read_gradle_root_name(repo: Path) -> str | None:
+    for filename in ("settings.gradle", "settings.gradle.kts"):
+        path = repo / filename
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        match = _GRADLE_NAME_RE.search(text)
+        if match:
+            return match.group(1)
+    return None
 
 
 def _read_go_module(path: Path) -> str | None:
@@ -214,6 +251,33 @@ def discover_components(repo: Path) -> dict[str, Component]:
             bump_files=[FileKey(file=cargo_path.relative_to(repo), key=version_key)],
             changelog=changelog,
         )
+
+    properties_path = repo / "gradle.properties"
+    if properties_path.is_file():
+        version = _read_gradle_property(properties_path, "version")
+        if version is not None:
+            name = _read_gradle_root_name(repo) or repo.name
+            comp_name = _unique(name, set(components), suffix="gradle")
+            paths = ["gradle.properties"]
+            if (repo / "src").is_dir():
+                paths.insert(0, "src/**")
+            for fn in (
+                "build.gradle",
+                "build.gradle.kts",
+                "settings.gradle",
+                "settings.gradle.kts",
+            ):
+                if (repo / fn).is_file():
+                    paths.append(fn)
+            if (repo / "Dockerfile").is_file():
+                paths.append("Dockerfile")
+            components[comp_name] = Component(
+                paths=paths,
+                bump_files=[
+                    FileKey(file=Path("gradle.properties"), key="version")
+                ],
+                changelog=Path("CHANGELOG.md"),
+            )
 
     for gomod_path in _find_manifests(repo, "go.mod"):
         name = _read_go_module(gomod_path)
