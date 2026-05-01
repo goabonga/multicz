@@ -39,6 +39,37 @@ class FileKey(BaseModel):
     key: str | None = None
 
 
+class Artifact(BaseModel):
+    """A build artifact a component produces.
+
+    ``multicz`` does *not* build or push artifacts itself; this declaration
+    only surfaces structured information for CI (via ``plan --output json``
+    or the ``multicz artifacts`` command).
+
+    ``ref`` is a template string accepting ``{version}`` and ``{component}``
+    placeholders. Example::
+
+        [[components.api.artifacts]]
+        type = "docker"
+        ref  = "ghcr.io/foo/myapp:{version}"
+
+        [[components.api.artifacts]]
+        type = "docker"
+        ref  = "registry.acme.com/myapp:{version}"
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(min_length=1)
+    ref: str = Field(min_length=1)
+
+    def render(self, *, component: str, version: str) -> dict[str, str]:
+        return {
+            "type": self.type,
+            "ref": self.ref.format(component=component, version=version),
+        }
+
+
 class DebianSettings(BaseModel):
     """Per-component settings for ``format = "debian"`` packaging.
 
@@ -72,6 +103,7 @@ class Component(BaseModel):
     bump_policy: Literal["as-commit", "scoped"] = "as-commit"
     ignored_types: list[str] = Field(default_factory=list)
     version_scheme: Literal["semver", "pep440"] = "semver"
+    artifacts: list[Artifact] = Field(default_factory=list)
 
     @field_validator("paths", "exclude_paths")
     @classmethod

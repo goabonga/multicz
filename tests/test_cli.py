@@ -389,6 +389,119 @@ def test_plan_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner)
     assert result.exit_code == 1
 
 
+def test_artifacts_text_output(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[[components.api.artifacts]]
+type = "docker"
+ref = "ghcr.io/foo/api:{version}"
+
+[[components.api.artifacts]]
+type = "docker"
+ref = "registry.acme.com/api:{version}"
+""")
+    result = runner.invoke(app, ["artifacts", "api"])
+    assert result.exit_code == 0, result.stdout
+    assert "ghcr.io/foo/api:1.2.0" in result.output
+    assert "registry.acme.com/api:1.2.0" in result.output
+
+
+def test_artifacts_json_output(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[[components.api.artifacts]]
+type = "docker"
+ref = "ghcr.io/foo/api:{version}"
+""")
+    result = runner.invoke(app, ["artifacts", "api", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["api"]["version"] == "1.2.0"
+    [artifact] = payload["api"]["artifacts"]
+    assert artifact == {"type": "docker", "ref": "ghcr.io/foo/api:1.2.0"}
+
+
+def test_artifacts_explicit_version(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[[components.api.artifacts]]
+type = "docker"
+ref = "ghcr.io/foo/api:{version}"
+""")
+    result = runner.invoke(app, ["artifacts", "api", "--version", "9.9.9"])
+    assert result.exit_code == 0
+    assert "ghcr.io/foo/api:9.9.9" in result.output
+
+
+def test_artifacts_all_components(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[[components.api.artifacts]]
+type = "docker"
+ref = "ghcr.io/foo/api:{version}"
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+
+[[components.chart.artifacts]]
+type = "helm"
+ref = "{component}-{version}.tgz"
+""")
+    result = runner.invoke(app, ["artifacts", "--all", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["api"]["artifacts"][0]["ref"] == "ghcr.io/foo/api:1.2.0"
+    assert payload["chart"]["artifacts"][0]["ref"] == "chart-0.4.0.tgz"
+
+
+def test_artifacts_arg_required(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["artifacts"])
+    assert result.exit_code == 1
+
+
+def test_plan_json_includes_artifacts(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+
+[[components.api.artifacts]]
+type = "docker"
+ref = "ghcr.io/foo/api:{version}"
+
+[components.chart]
+paths = ["charts/myapp/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+
+[[components.chart.artifacts]]
+type = "helm"
+ref = "{component}-{version}.tgz"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    result = runner.invoke(app, ["plan", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    api = payload["bumps"]["api"]
+    assert api["next"] == "1.3.0"
+    assert api["artifacts"] == [{"type": "docker", "ref": "ghcr.io/foo/api:1.3.0"}]
+    chart = payload["bumps"]["chart"]
+    assert chart["artifacts"] == [{"type": "helm", "ref": "chart-0.4.1.tgz"}]
+
+
 def test_release_notes_for_upcoming_bump(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     _commit(repo, {"src/main.py": "x = 3\n"}, "fix: null token")
