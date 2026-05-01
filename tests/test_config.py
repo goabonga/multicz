@@ -1,12 +1,13 @@
 """Tests focused on Config parsing semantics, including both supported
 syntaxes for declaring components."""
 
+import json
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from multicz.config import Config, load_config
+from multicz.config import Config, find_config, load_config
 
 
 def _write(tmp_path: Path, body: str) -> Path:
@@ -266,6 +267,133 @@ def test_debian_format_with_overrides(tmp_path: Path):
     assert settings.maintainer == "Chris <chris@example.com>"
     assert settings.debian_revision == 3
     assert settings.epoch == 2
+
+
+def test_load_from_pyproject_tool_multicz(tmp_path: Path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        '[project]\n'
+        'name = "myapp"\n'
+        'version = "1.0.0"\n'
+        '\n'
+        '[tool.multicz]\n'
+        '[tool.multicz.components.api]\n'
+        'paths = ["src/**", "pyproject.toml"]\n'
+        'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
+    )
+    config = load_config(pyproject)
+    assert "api" in config.components
+    assert config.components["api"].paths == ["src/**", "pyproject.toml"]
+
+
+def test_load_from_pyproject_with_array_of_tables(tmp_path: Path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        '[project]\n'
+        'name = "myapp"\n'
+        'version = "1.0.0"\n'
+        '\n'
+        '[tool.multicz]\n'
+        '\n'
+        '[[tool.multicz.components]]\n'
+        'name = "api"\n'
+        'paths = ["src/**"]\n'
+        '\n'
+        '[[tool.multicz.components]]\n'
+        'name = "web"\n'
+        'paths = ["frontend/**"]\n'
+    )
+    config = load_config(pyproject)
+    assert list(config.components) == ["api", "web"]
+
+
+def test_load_from_package_json(tmp_path: Path):
+    pkg = tmp_path / "package.json"
+    pkg.write_text(json.dumps({
+        "name": "monorepo",
+        "version": "1.0.0",
+        "multicz": {
+            "components": {
+                "web": {
+                    "paths": ["src/**", "package.json"],
+                    "bump_files": [{"file": "package.json", "key": "version"}],
+                }
+            }
+        }
+    }, indent=2))
+    config = load_config(pkg)
+    assert "web" in config.components
+
+
+def test_load_from_package_json_with_array_form(tmp_path: Path):
+    pkg = tmp_path / "package.json"
+    pkg.write_text(json.dumps({
+        "name": "monorepo",
+        "multicz": {
+            "components": [
+                {"name": "web", "paths": ["frontend/**"]},
+                {"name": "mobile", "paths": ["mobile/**"]},
+            ]
+        }
+    }))
+    config = load_config(pkg)
+    assert list(config.components) == ["web", "mobile"]
+
+
+def test_pyproject_without_tool_multicz_is_skipped(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "1.0.0"\n'
+    )
+    with pytest.raises(FileNotFoundError):
+        find_config(tmp_path)
+
+
+def test_package_json_without_multicz_key_is_skipped(tmp_path: Path):
+    (tmp_path / "package.json").write_text('{"name": "x", "version": "1.0.0"}')
+    with pytest.raises(FileNotFoundError):
+        find_config(tmp_path)
+
+
+def test_find_config_prefers_multicz_toml(tmp_path: Path):
+    """When both files exist, the dedicated multicz.toml wins."""
+    _write(tmp_path, '[components.fromdedicated]\npaths = ["src/**"]')
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.multicz.components.frompyproject]\npaths = ["src/**"]\n'
+    )
+    found = find_config(tmp_path)
+    assert found.name == "multicz.toml"
+    config = load_config(found)
+    assert "fromdedicated" in config.components
+
+
+def test_find_config_prefers_pyproject_over_package_json(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.multicz.components.frompy]\npaths = ["src/**"]\n'
+    )
+    (tmp_path / "package.json").write_text(
+        '{"multicz": {"components": {"fromjs": {"paths": ["src/**"]}}}}'
+    )
+    found = find_config(tmp_path)
+    assert found.name == "pyproject.toml"
+
+
+def test_find_config_walks_up(tmp_path: Path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        '[tool.multicz.components.api]\npaths = ["src/**"]\n'
+    )
+    nested = tmp_path / "deep" / "nested" / "dir"
+    nested.mkdir(parents=True)
+    found = find_config(nested)
+    assert found == pyproject
+
+
+def test_find_config_raises_with_helpful_message(tmp_path: Path):
+    with pytest.raises(FileNotFoundError) as exc:
+        find_config(tmp_path)
+    assert "multicz.toml" in str(exc.value)
+    assert "pyproject.toml" in str(exc.value)
+    assert "package.json" in str(exc.value)
 
 
 def test_load_config_rejects_components_array_with_extra_fields(tmp_path: Path):

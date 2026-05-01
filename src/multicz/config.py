@@ -12,6 +12,7 @@ strict Helm chart immutability).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Literal
 
@@ -19,6 +20,10 @@ import tomlkit
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 CONFIG_FILENAME = "multicz.toml"
+
+# Alternate hosts for the config, in precedence order. The dedicated
+# multicz.toml always wins when present.
+_ALT_HOSTS: tuple[str, ...] = ("pyproject.toml", "package.json")
 
 
 class FileKey(BaseModel):
@@ -199,21 +204,81 @@ class Config(BaseModel):
                 )
 
 
+def _extract_section(path: Path) -> dict[str, Any] | None:
+    """Return the multicz config dict embedded in ``path``, or ``None``.
+
+    For ``pyproject.toml`` the section is ``[tool.multicz]``.
+    For ``package.json`` the section is the top-level ``"multicz"`` key.
+    For ``multicz.toml`` the whole document is the config.
+    """
+    name = path.name
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    if name == CONFIG_FILENAME:
+        try:
+            return tomlkit.parse(text).unwrap()
+        except Exception:
+            return None
+    if name == "pyproject.toml":
+        try:
+            doc = tomlkit.parse(text).unwrap()
+        except Exception:
+            return None
+        tool = doc.get("tool")
+        if isinstance(tool, dict):
+            section = tool.get("multicz")
+            if isinstance(section, dict):
+                return section
+        return None
+    if name == "package.json":
+        try:
+            data = json.loads(text)
+        except Exception:
+            return None
+        section = data.get("multicz") if isinstance(data, dict) else None
+        return section if isinstance(section, dict) else None
+    return None
+
+
 def load_config(path: Path) -> Config:
-    """Load and validate a multicz config from ``path``."""
-    raw = tomlkit.parse(path.read_text(encoding="utf-8"))
-    config = Config.model_validate(raw.unwrap())
+    """Load and validate a multicz config from ``path``.
+
+    Accepts ``multicz.toml`` (whole-file), ``pyproject.toml``
+    (``[tool.multicz]``), or ``package.json`` (``"multicz"`` key).
+    """
+    raw = _extract_section(path)
+    if raw is None:
+        raise FileNotFoundError(
+            f"no multicz config found in {path}"
+        )
+    config = Config.model_validate(raw)
     config.validate_references()
     return config
 
 
 def find_config(start: Path | None = None) -> Path:
-    """Walk up from ``start`` (default: cwd) looking for ``multicz.toml``."""
+    """Walk up from ``start`` (default: cwd) looking for a multicz config.
+
+    At each directory level, the search order is:
+
+    1. ``multicz.toml`` (always wins when present),
+    2. ``pyproject.toml`` with a ``[tool.multicz]`` table,
+    3. ``package.json`` with a top-level ``"multicz"`` key.
+    """
     here = (start or Path.cwd()).resolve()
     for directory in (here, *here.parents):
-        candidate = directory / CONFIG_FILENAME
-        if candidate.is_file():
-            return candidate
+        canonical = directory / CONFIG_FILENAME
+        if canonical.is_file():
+            return canonical
+        for filename in _ALT_HOSTS:
+            candidate = directory / filename
+            if candidate.is_file() and _extract_section(candidate) is not None:
+                return candidate
     raise FileNotFoundError(
-        f"{CONFIG_FILENAME} not found in {here} or any parent directory"
+        "no multicz config found (looked for multicz.toml, "
+        "pyproject.toml [tool.multicz], or package.json \"multicz\" key) "
+        f"in {here} or any parent directory"
     )
