@@ -607,6 +607,59 @@ A `feat:` commit touching `src/common.py` now bumps both `api` and
 `worker`. With `error` (the default) that same commit refuses to plan
 until you tighten the paths or add `exclude_paths`.
 
+## Per-component bump policy
+
+When a single commit touches multiple components, each component
+*also* gets that commit's bump kind by default. So a:
+
+```
+feat: change API contract and update Helm values
+```
+
+with files in both `src/` and `charts/myapp/values.yaml` bumps **api**
+*and* **chart** to minor — even though the chart only got a config
+tweak.
+
+Components that want stricter semantics can opt into
+`bump_policy = "scoped"`:
+
+```toml
+[components.chart]
+paths = ["charts/myapp/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+bump_policy = "scoped"
+```
+
+| commit | api | chart |
+|---|---|---|
+| `feat: cross-cutting change` (no scope) | minor | minor — no scope means "applies broadly" |
+| `feat(api): rewrite contract` | minor (scope matches) | **patch** — demoted, scope ≠ chart |
+| `feat(chart): add value` | — | minor (scope matches) |
+| `fix: typo` | patch | patch (already patch, no demotion) |
+
+The demotion is surfaced explicitly in `multicz explain`:
+
+```
+2. af74ec5 feat(api): rewrite contract
+    Type:  feat(api) → patch
+    Demoted from minor (bump_policy='scoped', different scope)
+```
+
+…and in the JSON output:
+
+```json
+{"kind": "commit", "type": "feat", "scope": "api",
+ "bump_kind": "patch", "original_kind": "minor", ...}
+```
+
+Two values are supported:
+
+- `as-commit` (default): the commit's natural kind applies to every
+  touched component. Matches semantic-release / lerna / nx semantics.
+- `scoped`: when a commit's scope names a different component,
+  demote `minor`/`major` to `patch`. No-scope commits still propagate
+  as-is.
+
 ## Helm chart immutability
 
 Helm charts are content-addressed by `name-version.tgz`. If `chart-0.5.0`
