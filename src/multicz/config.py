@@ -69,6 +69,7 @@ class Component(BaseModel):
     format: Literal["default", "debian"] = "default"
     debian: DebianSettings | None = None
     tag_format: str | None = None  # overrides the project-level tag_format
+    bump_policy: Literal["as-commit", "scoped"] = "as-commit"
 
     @field_validator("paths", "exclude_paths")
     @classmethod

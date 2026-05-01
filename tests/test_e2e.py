@@ -113,6 +113,112 @@ def test_release_commits_are_skipped(repo: Path):
     assert "release" not in summaries.lower()
 
 
+def test_bump_policy_default_propagates_kind_to_every_touched_component(repo: Path):
+    """A feat commit touching both api and chart files bumps both as minor."""
+    _commit(
+        repo,
+        {
+            "src/main.py": "x = 2\n",
+            "charts/myapp/values.yaml": "x: 1\n",
+        },
+        "feat: change API contract and update Helm values",
+    )
+
+    plan = build_plan(repo, load_config(repo / "multicz.toml"))
+    assert plan.bumps["api"].kind == "minor"
+    assert plan.bumps["chart"].kind == "minor"
+
+
+def test_bump_policy_scoped_demotes_minor_to_patch_for_other_components(repo: Path):
+    """With scoped policy, a feat(api) touching chart files only patches chart."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+bump_policy = "scoped"
+""")
+    _commit(
+        repo,
+        {
+            "src/main.py": "x = 2\n",
+            "charts/myapp/values.yaml": "x: 1\n",
+        },
+        "feat(api): change API contract and update Helm values",
+    )
+
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["api"].kind == "minor"  # scope matches api
+    assert plan.bumps["chart"].kind == "patch"  # demoted: scope=api != chart
+
+    # Demotion is recorded on the CommitReason
+    chart_commit_reasons = [
+        r for r in plan.bumps["chart"].reasons
+        if r.__class__.__name__ == "CommitReason"
+    ]
+    assert chart_commit_reasons[0].original_kind == "minor"
+    assert chart_commit_reasons[0].bump_kind == "patch"
+
+
+def test_bump_policy_scoped_no_scope_propagates_normally(repo: Path):
+    """Commits without a scope are NOT demoted under scoped policy — no scope
+    means 'applies broadly' rather than 'doesn't apply to me'."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+bump_policy = "scoped"
+""")
+    _commit(
+        repo,
+        {
+            "src/main.py": "x = 2\n",
+            "charts/myapp/values.yaml": "x: 1\n",
+        },
+        "feat: cross-cutting change",
+    )
+
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["api"].kind == "minor"
+    assert plan.bumps["chart"].kind == "minor"  # no scope -> not demoted
+
+
+def test_bump_policy_scoped_matching_scope_keeps_kind(repo: Path):
+    """feat(chart): ... on a scoped chart component keeps the minor kind."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+bump_policy = "scoped"
+""")
+    _commit(
+        repo,
+        {"charts/myapp/values.yaml": "x: 1\n"},
+        "feat(chart): add new value",
+    )
+
+    plan = build_plan(repo, load_config(cfg))
+    assert "api" not in plan.bumps  # api files not touched
+    assert plan.bumps["chart"].kind == "minor"  # scope matches chart
+
+
 def test_per_component_tag_format_is_honored(repo: Path):
     # Re-write the config with a tag_format override on api only
     cfg = repo / "multicz.toml"

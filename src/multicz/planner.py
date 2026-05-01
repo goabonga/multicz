@@ -141,11 +141,19 @@ class CommitReason:
     subject: str
     files: tuple[str, ...]  # files matched into THIS component (subset of commit.files)
     bump_kind: BumpKind
+    # When ``bump_policy = "scoped"`` demotes this commit's natural kind
+    # (e.g. minor -> patch because the scope points at another component),
+    # ``original_kind`` records what would have been used otherwise.
+    # ``None`` means no demotion happened.
+    original_kind: BumpKind | None = None
 
     def summary(self) -> str:
         bang = "!" if self.breaking else ""
         scope = f"({self.scope})" if self.scope else ""
-        return f"{self.sha[:7]} {self.type}{scope}{bang}: {self.subject}"
+        head = f"{self.sha[:7]} {self.type}{scope}{bang}: {self.subject}"
+        if self.original_kind is not None:
+            head += f" [demoted: {self.original_kind} -> {self.bump_kind}]"
+        return head
 
     def to_dict(self) -> dict:
         return {
@@ -157,6 +165,7 @@ class CommitReason:
             "subject": self.subject,
             "files": list(self.files),
             "bump_kind": self.bump_kind,
+            "original_kind": self.original_kind,
         }
 
 
@@ -351,6 +360,21 @@ def _direct_pass(
                 )
             if not owned:
                 continue
+
+            comp = config.components[name]
+            kind = commit.bump_kind
+            demoted = False
+            if (
+                comp.bump_policy == "scoped"
+                and commit.scope is not None
+                and commit.scope != name
+                and kind in {"minor", "major"}
+            ):
+                # The commit's scope identifies a different component;
+                # under scoped policy this component may only patch.
+                kind = "patch"
+                demoted = True
+
             reason = CommitReason(
                 sha=commit.sha,
                 type=commit.type,
@@ -358,9 +382,10 @@ def _direct_pass(
                 breaking=commit.breaking,
                 subject=commit.subject,
                 files=owned,
-                bump_kind=commit.bump_kind,
+                bump_kind=kind,
+                original_kind=commit.bump_kind if demoted else None,
             )
-            _promote(plan, name, commit.bump_kind, versions[name], reason)
+            _promote(plan, name, kind, versions[name], reason)
 
 
 def _triggers_pass(

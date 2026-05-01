@@ -278,6 +278,11 @@ def explain(
             console.print(f"      SHA:   {reason.sha}")
             scope = f"({reason.scope})" if reason.scope else ""
             console.print(f"      Type:  {reason.type}{scope} → {reason.bump_kind}")
+            if reason.original_kind is not None:
+                console.print(
+                    f"      [yellow]Demoted from {reason.original_kind} "
+                    "(bump_policy='scoped', different scope)[/]"
+                )
             if reason.breaking:
                 console.print("      Breaking: yes")
             console.print("      Files matched in this component:")
