@@ -13,6 +13,7 @@ strict Helm chart immutability).
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,6 +21,13 @@ import tomlkit
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 CONFIG_FILENAME = "multicz.toml"
+
+# Component names land in git tag names, file paths (CHANGELOG.md location),
+# JSON output, release-notes headings, and CLI arguments
+# (`--force NAME:KIND`). Restrict them to a safe alphabet so none of those
+# downstream uses can break unexpectedly.
+COMPONENT_NAME_RE = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9])?$")
+COMPONENT_NAME_MAX_LEN = 64
 
 # Alternate hosts for the config, in precedence order. The dedicated
 # multicz.toml always wins when present.
@@ -240,6 +248,29 @@ class Config(BaseModel):
     def _non_empty(cls, value: dict[str, Component]) -> dict[str, Component]:
         if not value:
             raise ValueError("at least one component must be declared")
+        return value
+
+    @field_validator("components")
+    @classmethod
+    def _validate_names(cls, value: dict[str, Component]) -> dict[str, Component]:
+        for name in value:
+            if len(name) > COMPONENT_NAME_MAX_LEN:
+                raise ValueError(
+                    f"component name {name!r} is too long "
+                    f"(max {COMPONENT_NAME_MAX_LEN} chars). Component names "
+                    "appear in git tags, file paths, JSON output, and release "
+                    "notes — keep them short."
+                )
+            if not COMPONENT_NAME_RE.match(name):
+                raise ValueError(
+                    f"invalid component name {name!r}: must match "
+                    f"{COMPONENT_NAME_RE.pattern} — "
+                    "no slashes, colons, spaces, or path-like characters; "
+                    "must start and end with a letter or digit. Component "
+                    "names land in git tags, file paths, JSON output, and "
+                    "release notes; keeping them simple avoids escaping "
+                    "issues downstream."
+                )
         return value
 
     def validate_references(self) -> None:

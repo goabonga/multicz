@@ -222,12 +222,23 @@ def init(
 
 
 def _load() -> tuple[Path, object]:
+    from pydantic import ValidationError
     try:
         config_path = find_config()
     except FileNotFoundError as exc:
         err.print(f"[red]{exc}[/]")
         raise typer.Exit(code=1) from exc
-    return config_path.parent, load_config(config_path)
+    try:
+        return config_path.parent, load_config(config_path)
+    except ValidationError as exc:
+        err.print(f"[red]invalid {config_path}:[/]")
+        for error in exc.errors():
+            loc = " -> ".join(str(p) for p in error["loc"])
+            err.print(f"  [yellow]{loc}[/]: {error['msg']}")
+        raise typer.Exit(code=1) from exc
+    except ValueError as exc:
+        err.print(f"[red]invalid {config_path}:[/] {exc}")
+        raise typer.Exit(code=1) from exc
 
 
 def _parse_force_specs(specs: list[str], config) -> dict[str, str]:

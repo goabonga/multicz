@@ -396,6 +396,114 @@ def test_find_config_raises_with_helpful_message(tmp_path: Path):
     assert "package.json" in str(exc.value)
 
 
+def test_component_name_with_slash_is_rejected(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components."api/v1"]
+        paths = ["src/**"]
+        """,
+    )
+    with pytest.raises(ValidationError) as exc:
+        load_config(target)
+    msg = str(exc.value)
+    assert "invalid component name" in msg
+    assert "'api/v1'" in msg
+
+
+def test_component_name_with_path_traversal_is_rejected(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components."../api"]
+        paths = ["src/**"]
+        """,
+    )
+    with pytest.raises(ValidationError):
+        load_config(target)
+
+
+def test_component_name_with_colon_is_rejected(tmp_path: Path):
+    """Colon would conflict with --force NAME:KIND CLI syntax."""
+    target = _write(
+        tmp_path,
+        """
+        [components."chart:prod"]
+        paths = ["src/**"]
+        """,
+    )
+    with pytest.raises(ValidationError):
+        load_config(target)
+
+
+def test_component_name_with_space_is_rejected(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components."my app"]
+        paths = ["src/**"]
+        """,
+    )
+    with pytest.raises(ValidationError):
+        load_config(target)
+
+
+def test_component_name_leading_or_trailing_special_is_rejected(tmp_path: Path):
+    for bad in ("-foo", "foo-", ".hidden", "foo."):
+        target = _write(
+            tmp_path,
+            f'[components."{bad}"]\npaths = ["src/**"]\n',
+        )
+        with pytest.raises(ValidationError):
+            load_config(target)
+
+
+def test_component_name_too_long_is_rejected(tmp_path: Path):
+    long_name = "a" * 65
+    target = _write(
+        tmp_path,
+        f'[components.{long_name}]\npaths = ["src/**"]\n',
+    )
+    with pytest.raises(ValidationError) as exc:
+        load_config(target)
+    assert "too long" in str(exc.value)
+
+
+def test_valid_component_names(tmp_path: Path):
+    """The accepted forms — all common naming conventions.
+
+    Dots in TOML keys need quoting (otherwise the parser reads them as
+    nested tables), but the *resolved* component name still passes.
+    """
+    cases = [
+        ("a", '[components.a]'),
+        ("api", '[components.api]'),
+        ("api-v1", '[components.api-v1]'),
+        ("api.v1", '[components."api.v1"]'),
+        ("api_v1", '[components.api_v1]'),
+        ("myapp-chart", '[components.myapp-chart]'),
+        ("API", '[components.API]'),
+    ]
+    for resolved_name, header in cases:
+        target = _write(tmp_path, f'{header}\npaths = ["src/**"]\n')
+        config = load_config(target)
+        assert resolved_name in config.components
+
+
+def test_array_form_name_is_validated(tmp_path: Path):
+    """The same rules apply to the array-of-tables 'name = ...' field."""
+    target = _write(
+        tmp_path,
+        """
+        [[components]]
+        name = "api/v1"
+        paths = ["src/**"]
+        """,
+    )
+    with pytest.raises(ValidationError):
+        load_config(target)
+
+
 def test_per_component_tag_format_override(tmp_path: Path):
     target = _write(
         tmp_path,
