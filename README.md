@@ -41,6 +41,29 @@ multicz bump           # apply the plan
 
 ## How it works
 
+Components can be declared in either of two equivalent TOML syntaxes:
+
+```toml
+# Dict-of-tables (concise; default emitted by `multicz init`)
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+
+[components.web]
+paths = ["frontend/**"]
+```
+
+```toml
+# Array-of-tables (preferred when you have many components or want
+# to keep declaration order obvious in the file layout)
+[[components]]
+name = "api"
+paths = ["src/**", "pyproject.toml"]
+
+[[components]]
+name = "web"
+paths = ["frontend/**"]
+```
+
 Each component declares:
 
 * `paths` — gitignore-style globs of files it owns;

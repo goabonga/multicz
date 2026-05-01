@@ -13,10 +13,10 @@ strict Helm chart immutability).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import tomlkit
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 CONFIG_FILENAME = "multicz.toml"
 
@@ -93,6 +93,45 @@ class Config(BaseModel):
 
     project: ProjectSettings = Field(default_factory=ProjectSettings)
     components: dict[str, Component]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_components_array(cls, data: Any) -> Any:
+        """Normalise the array-of-tables form ``[[components]]`` into the
+        dict-of-tables form internally used by the rest of the code.
+
+        Both these snippets parse to the same :class:`Config`::
+
+            [components.api]
+            paths = ["src/**"]
+
+            [[components]]
+            name = "api"
+            paths = ["src/**"]
+        """
+        if not isinstance(data, dict):
+            return data
+        raw = data.get("components")
+        if not isinstance(raw, list):
+            return data
+
+        converted: dict[str, dict[str, Any]] = {}
+        for index, item in enumerate(raw):
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"components[{index}] must be a table, got "
+                    f"{type(item).__name__}"
+                )
+            name = item.get("name")
+            if not isinstance(name, str) or not name:
+                raise ValueError(
+                    f"components[{index}] is missing a string 'name' field"
+                )
+            if name in converted:
+                raise ValueError(f"duplicate component name: {name!r}")
+            converted[name] = {k: v for k, v in item.items() if k != "name"}
+
+        return {**data, "components": converted}
 
     @field_validator("components")
     @classmethod
