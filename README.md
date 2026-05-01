@@ -190,6 +190,9 @@ helm package charts/myapp
 | `multicz bump --pre rc` | enter / continue a release-candidate cycle (`1.2.3` → `1.3.0-rc.1` → `1.3.0-rc.2`) |
 | `multicz bump --finalize` | drop a pre-release suffix (`1.3.0-rc.2` → `1.3.0`) — works with no new commits |
 | `multicz check <file>` | validate a commit message — wire as a `commit-msg` hook |
+| `multicz validate` | run every config + repo sanity check (CI gate) |
+| `multicz validate --strict` | also fail on warnings (overlapping paths, useless mirrors, …) |
+| `multicz validate --output json` | machine-readable findings shape |
 
 ### Release candidates
 
@@ -225,6 +228,36 @@ after `--finalize`:
 | `consolidate` (default) | the finalize section/stanza lists every commit since the previous *stable* tag, so the new entry contains the cumulative change list. RC sections stay below as history. |
 | `promote` | same commit selection as `consolidate`, plus the now-superseded `## [1.3.0-rc.*]` markdown sections (and `mypkg (1.3.0~rc*-*)` Debian stanzas) are removed from the file. The final entry stands alone. |
 | `annotate` | the section enumerates only commits since the last *tag* (rc included), so the finalize section may be `_No notable changes._` when no commits landed between the last rc and finalize. Each tag keeps its own dedicated section. |
+
+### `validate`
+
+`multicz validate` is the recommended first step in any CI pipeline —
+it surfaces config and repo problems before they cause a botched
+release. Each finding has three levels:
+
+| level | examples |
+|---|---|
+| `error` | a `bump_file` doesn't exist, a trigger cycle, an unparseable `debian/changelog` — the planner can't run safely |
+| `warning` | two components claim the same file (`first-match-wins` makes the loser silent), a mirror that loops back to its own component |
+| `info` | a mirror to a file no component owns (no cascade fires), a `debian/changelog` that hasn't been created yet |
+
+Exit codes: `0` = clean (warnings/info don't fail), `1` = at least one
+error, `2` = `--strict` and at least one warning.
+
+```sh
+$ multicz validate
+✗ lib: bump_file 'missing.toml' does not exist  (bump_files_exist)
+! lib: shares files with 'api' (e.g. 'src/main.py')  (path_overlap)
+i api: mirror target 'other.yaml' is not owned by any component  (mirror_target_unowned)
+✗ mirror cascade cycle: cycle_a -> cycle_b -> cycle_a  (mirror_cycle)
+
+2 errors, 1 warning, 1 info
+```
+
+The check identifier in parentheses (`bump_files_exist`,
+`mirror_cycle`, …) is stable so CI logs and PR comments can grep on
+it. `--output json` emits the same data as a structured payload with
+a counts summary.
 
 ### `plan` and `explain`
 
