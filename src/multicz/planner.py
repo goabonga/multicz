@@ -359,14 +359,19 @@ def _direct_pass(
     matcher: ComponentMatcher,
     plan: Plan,
     versions: dict[str, Version],
+    *,
+    since_override: str | None = None,
 ) -> None:
     import re
 
     release_re = re.compile(config.project.release_commit_pattern)
     overlap_all = config.project.overlap_policy == "all"
     for name in config.components:
-        prefix = tag_prefix(config.tag_format_for(name), name)
-        since = latest_tag(repo, prefix)
+        if since_override is None:
+            prefix = tag_prefix(config.tag_format_for(name), name)
+            since = latest_tag(repo, prefix)
+        else:
+            since = since_override
         ignored = config.ignored_types_for(name)
         for commit in commits_since(repo, since):
             header = (
@@ -479,18 +484,27 @@ def build_plan(
     *,
     pre: str | None = None,
     finalize: bool = False,
+    since: str | None = None,
 ) -> Plan:
     """Compute the bump plan for ``repo`` against ``config``.
 
-    Pass ``pre="rc"`` (or ``"alpha"``, ``"beta"``, …) to drive a release
-    candidate cycle, or ``finalize=True`` to drop a pre-release suffix.
-    Both flags apply to *every* bumping component in the plan.
+    ``pre="rc"`` enters a release-candidate cycle. ``finalize=True`` drops
+    a pre-release suffix. Both flags apply to every bumping component.
+
+    ``since`` overrides the per-component "last tag" reference used to
+    pick which commits are in scope. When set, every component reads
+    commits from ``since`` to ``HEAD`` instead of from its own latest
+    tag — useful for PR-style 'what would bump if I merged this branch'
+    queries (``since=origin/main``) or for inspecting a different window
+    (``since=HEAD~10``). The *current* version resolution (latest tag,
+    bump_file, initial_version) is unaffected — only the commit window
+    moves.
     """
     matcher = ComponentMatcher(config.components)
     plan = Plan()
     versions = {name: _current_version(repo, config, name) for name in config.components}
 
-    _direct_pass(repo, config, matcher, plan, versions)
+    _direct_pass(repo, config, matcher, plan, versions, since_override=since)
     _triggers_pass(config, plan, versions)
     _mirror_pass(config, matcher, plan, versions)
 

@@ -141,10 +141,17 @@ def _load() -> tuple[Path, object]:
 
 
 @app.command()
-def status() -> None:
+def status(
+    since: str = typer.Option(
+        None, "--since",
+        help="Override the commit window: use this ref instead of each "
+             "component's last tag. Useful for PR previews "
+             "(--since origin/main).",
+    ),
+) -> None:
     """Brief summary of pending bumps (alias of ``plan`` without reasons)."""
     repo, config = _load()
-    plan_obj = build_plan(repo, config)
+    plan_obj = build_plan(repo, config, since=since)
     if not plan_obj:
         console.print("[dim]no bumps pending[/]")
         return
@@ -179,6 +186,13 @@ def plan_cmd(
         False, "--finalize",
         help="Plan as if invoked with `bump --finalize`.",
     ),
+    since: str = typer.Option(
+        None, "--since",
+        help="Override the commit window: use this ref instead of each "
+             "component's last tag. Useful for PR previews "
+             "(--since origin/main) or migration scenarios "
+             "(--since HEAD~10).",
+    ),
 ) -> None:
     """Print the bump plan: every component that would change, the new
     version, and the *reasons* (conventional commits, trigger cascades,
@@ -207,7 +221,7 @@ def plan_cmd(
         raise typer.Exit(code=1)
 
     repo, config = _load()
-    plan_obj = build_plan(repo, config, pre=pre, finalize=finalize)
+    plan_obj = build_plan(repo, config, pre=pre, finalize=finalize, since=since)
 
     if output == "json":
         payload = {
@@ -600,6 +614,10 @@ def _filtered_commits_in_range(
 @app.command()
 def explain(
     component: str = typer.Argument(..., help="Component to explain."),
+    since: str = typer.Option(
+        None, "--since",
+        help="Override the commit window for this explanation.",
+    ),
 ) -> None:
     """Detailed breakdown of why ``component`` is in the bump plan.
 
@@ -613,7 +631,7 @@ def explain(
         err.print(f"[red]unknown component:[/] {component}")
         raise typer.Exit(code=1)
 
-    plan_obj = build_plan(repo, config)
+    plan_obj = build_plan(repo, config, since=since)
     bump = plan_obj.bumps.get(component)
     if bump is None:
         console.print(

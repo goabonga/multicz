@@ -389,6 +389,53 @@ def test_plan_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner)
     assert result.exit_code == 1
 
 
+def test_status_since_overrides_commit_window(repo: Path, runner: CliRunner):
+    # First commit lives "before" the override; second is "after" it.
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: pre-baseline change")
+    sha = _git(repo, "rev-parse", "HEAD").strip()
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: in-window change")
+
+    # Default since (per-component last tag = none) sees both commits
+    result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "pre-baseline" in result.output
+    assert "in-window" in result.output
+
+    # --since <sha> only sees the in-window commit
+    result = runner.invoke(app, ["status", "--since", sha])
+    assert result.exit_code == 0
+    assert "pre-baseline" not in result.output
+    assert "in-window" in result.output
+
+
+def test_plan_since_overrides_commit_window(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: pre")
+    sha = _git(repo, "rev-parse", "HEAD").strip()
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: post")
+
+    result = runner.invoke(
+        app, ["plan", "--since", sha, "--output", "json"]
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    api = payload["bumps"]["api"]
+    # Only the fix landed in the window -> patch, not minor
+    assert api["kind"] == "patch"
+    [reason] = [r for r in api["reasons"] if r["kind"] == "commit"]
+    assert reason["subject"] == "post"
+
+
+def test_explain_since_overrides_commit_window(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: ignored")
+    sha = _git(repo, "rev-parse", "HEAD").strip()
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: kept")
+
+    result = runner.invoke(app, ["explain", "api", "--since", sha])
+    assert result.exit_code == 0
+    assert "kept" in result.output
+    assert "ignored" not in result.output
+
+
 def test_changed_text_output_lists_changed_components(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     result = runner.invoke(app, ["changed"])
