@@ -334,6 +334,8 @@ helm package charts/myapp
 | `multicz bump --commit --tag --push` | …and push commit + tags with `--follow-tags` |
 | `multicz bump --commit -m "..."` | verbatim release-commit message (overrides the template) |
 | `multicz bump --sign` | GPG-sign the release commit and tags (also via `[project].sign_commits/sign_tags`) |
+| `multicz plan --summary $GITHUB_STEP_SUMMARY` | append a markdown plan to GitHub's step-summary file |
+| `multicz bump --summary $GITHUB_STEP_SUMMARY` | append a markdown release block (commit, tags, push) |
 | `multicz bump --force api:patch` | manual bump for rebuilds without commits |
 | `multicz bump --force api:minor --force chart:major` | repeatable across components |
 | `multicz bump --output json` | emit `{"bumps": {...}, "git": {...}}` for CI |
