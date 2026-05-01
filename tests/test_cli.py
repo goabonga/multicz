@@ -1052,6 +1052,75 @@ debian_revision = 3
         monkey.undo()
 
 
+def test_init_print_emits_to_stdout_without_writing(tmp_path: Path, runner: CliRunner):
+    target = tmp_path / "fresh"
+    target.mkdir()
+    (target / "pyproject.toml").write_text(
+        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
+    )
+    (target / "src").mkdir()
+    os.chdir(target)
+    result = runner.invoke(app, ["init", "--print"])
+    assert result.exit_code == 0
+    assert "[components.auto-app]" in result.stdout
+    # Filesystem untouched
+    assert not (target / "multicz.toml").exists()
+
+
+def test_init_print_bare(tmp_path: Path, runner: CliRunner):
+    os.chdir(tmp_path)
+    result = runner.invoke(app, ["init", "--print", "--bare"])
+    assert result.exit_code == 0
+    assert "[components.app]" in result.stdout
+    assert not (tmp_path / "multicz.toml").exists()
+
+
+def test_init_detect_text_summary(tmp_path: Path, runner: CliRunner):
+    target = tmp_path / "fresh"
+    target.mkdir()
+    (target / "pyproject.toml").write_text(
+        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
+    )
+    os.chdir(target)
+    result = runner.invoke(app, ["init", "--detect"])
+    assert result.exit_code == 0
+    assert "Detected" in result.output
+    assert "auto-app" in result.output
+    assert not (target / "multicz.toml").exists()
+
+
+def test_init_detect_json_output(tmp_path: Path, runner: CliRunner):
+    target = tmp_path / "fresh"
+    target.mkdir()
+    (target / "pyproject.toml").write_text(
+        '[project]\nname = "myapp"\nversion = "1.0.0"\n'
+    )
+    os.chdir(target)
+    result = runner.invoke(app, ["init", "--detect", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert "myapp" in payload
+    assert payload["myapp"]["bump_files"][0]["key"] == "project.version"
+
+
+def test_init_detect_rejects_bare(tmp_path: Path, runner: CliRunner):
+    os.chdir(tmp_path)
+    result = runner.invoke(app, ["init", "--detect", "--bare"])
+    assert result.exit_code == 1
+    assert "cannot be combined" in result.output
+
+
+def test_init_detect_rejects_print(tmp_path: Path, runner: CliRunner):
+    target = tmp_path / "fresh"
+    target.mkdir()
+    (target / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "1.0.0"\n'
+    )
+    os.chdir(target)
+    result = runner.invoke(app, ["init", "--detect", "--print"])
+    assert result.exit_code == 1
+
+
 def test_init_auto_detects_pyproject(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
