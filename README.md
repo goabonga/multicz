@@ -1058,6 +1058,40 @@ A `feat:` commit touching `src/common.py` now bumps both `api` and
 `worker`. With `error` (the default) that same commit refuses to plan
 until you tighten the paths or add `exclude_paths`.
 
+## Bump kind by commit type
+
+| commit | bump |
+|---|---|
+| `feat: …` | minor |
+| `feat!: …` or `BREAKING CHANGE:` footer | major |
+| `fix: …` | patch |
+| `perf: …` | patch |
+| `revert: …` | patch — a revert is user-visible activity |
+| `chore`, `docs`, `style`, `test`, `build`, `ci`, `refactor` | none |
+| anything not matching `<type>(<scope>)?: <subject>` | controlled by `unknown_commit_policy` (default: ignored) |
+
+A `revert: feat(api): drop login` is treated as a `patch` because
+something user-visible changed — a feature was removed (or restored).
+The conservative bump avoids saying "no change" when there clearly
+was one. Override per-component with `bump_policy = "scoped"` if you
+need a tighter scope rule, or with `ignored_types = ["revert"]` if
+you really want them silent.
+
+The default `[project].changelog_sections` now includes a `Reverts`
+section so reverted commits show up in `CHANGELOG.md` and
+`release-notes` output:
+
+```markdown
+## [1.3.1] - 2026-05-01
+
+### Reverts
+
+- drop login flow (`abc1234`)
+```
+
+The section only renders when the release window contains revert
+commits — projects without reverts see the same output as before.
+
 ## Non-conventional commits
 
 A commit like `update stuff` (no `<type>:` prefix) doesn't fit the
