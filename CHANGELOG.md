@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [0.2.2] - 2026-05-01
+
+### Fixes
+
+- **bump**: post_bump progress goes to stderr (`677caa5`)
+
 ## [0.2.1] - 2026-05-01
 
 ### Fixes
