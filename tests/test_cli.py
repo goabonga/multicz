@@ -1596,6 +1596,40 @@ post_bump = ["sh -c 'echo nope > should_not_exist.lock'"]
     assert not (repo / "should_not_exist.lock").exists()
 
 
+def test_post_bump_includes_file_already_dirty_before_hook(
+    repo: Path, runner: CliRunner
+):
+    """Reproduces the `uv run` race: uv (or some pre-bump tool)
+    rewrites a lockfile before multicz starts, so the file is already
+    in the dirty set when multicz takes its `before` snapshot. The
+    hook then rewrites it again with different content. A pure set
+    diff would miss it; the hash comparison catches it."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["sh -c 'echo final > preexisting.lock'"]
+""")
+    # Pre-write the lockfile so it's already dirty when multicz starts
+    # (mimics `uv run` re-syncing uv.lock before multicz code executes).
+    (repo / "preexisting.lock").write_text("stale\n")
+    _git(repo, "add", "preexisting.lock")
+    _git(repo, "commit", "-q", "-m", "chore: seed lock")
+    (repo / "preexisting.lock").write_text("intermediate\n")  # dirty
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    # Re-dirty after _commit (which `git add -A`'d the lock above).
+    (repo / "preexisting.lock").write_text("intermediate\n")
+
+    result = runner.invoke(app, ["bump", "--commit"])
+    assert result.exit_code == 0, result.stdout
+
+    head_files = _git(repo, "show", "--name-only", "--format=", "HEAD").split()
+    assert "preexisting.lock" in head_files
+    # The committed content is the *hook output*, not the intermediate.
+    committed = _git(repo, "show", "HEAD:preexisting.lock").strip()
+    assert committed == "final"
+
+
 def test_post_bump_runs_only_for_bumped_components(
     repo: Path, runner: CliRunner
 ):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import shlex
 import subprocess
 import sys
@@ -1010,9 +1011,11 @@ def _git(repo: Path, *args: str) -> str:
 def _porcelain_paths(repo: Path) -> set[str]:
     """Repo-relative paths currently dirty in the working tree.
 
-    Used to diff working-tree state before vs. after running ``post_bump``
-    hooks: anything that wasn't dirty before but is dirty after came from
-    a hook, and gets pulled into the release commit.
+    Used to identify candidate paths to hash before/after running
+    ``post_bump`` hooks. A pure set diff would miss a file that's
+    dirty both before and after with different content — the
+    canonical case being ``uv run`` itself silently re-syncing
+    ``uv.lock`` before multicz even gets to run.
     """
     out = subprocess.run(
         ["git", "status", "--porcelain"],
@@ -1030,6 +1033,13 @@ def _porcelain_paths(repo: Path) -> set[str]:
             rest = rest.split(" -> ", 1)[1]
         paths.add(rest)
     return paths
+
+
+def _hash_file(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
 
 
 def _run_post_bump_hook(repo: Path, command: str) -> None:
@@ -1424,21 +1434,37 @@ def bump(
     # changelog, state) so commands like `uv lock`, `npm install
     # --package-lock-only`, `cargo update --workspace`, `helm dependency
     # update` see the new pyproject.toml / package.json / Chart.yaml /
-    # Cargo.toml. Files modified by hooks are auto-detected via the git
-    # status diff and folded into ``written`` so they ride the release
-    # commit. Hooks only run when ``not dry_run`` — same gate as the
-    # writes themselves.
+    # Cargo.toml. Files modified by hooks are auto-detected and folded
+    # into ``written`` so they ride the release commit.
+    #
+    # Detection compares content hashes — not just the dirty-paths set —
+    # because the entry point is typically ``uv run multicz bump``, and
+    # ``uv run`` re-syncs the venv (which can rewrite ``uv.lock``) before
+    # multicz code runs at all. By the time we snapshot, uv.lock is
+    # already in the dirty set; a set diff would miss the *second*
+    # rewrite the post_bump hook performs against the new pyproject. The
+    # hash comparison catches it.
     if not dry_run and applied:
         hook_components = [
             n for n in applied if config.components[n].post_bump
         ]
         if hook_components:
             before_dirty = _porcelain_paths(repo)
+            before_hashes: dict[str, str | None] = {
+                relpath: _hash_file(repo / relpath)
+                for relpath in before_dirty
+            }
             for name in hook_components:
                 for command in config.components[name].post_bump:
                     _run_post_bump_hook(repo, command)
             after_dirty = _porcelain_paths(repo)
-            for relpath in sorted(after_dirty - before_dirty):
+            hook_modified: set[str] = {
+                relpath
+                for relpath in after_dirty
+                if relpath not in before_dirty
+                or _hash_file(repo / relpath) != before_hashes.get(relpath)
+            }
+            for relpath in sorted(hook_modified):
                 path = (repo / relpath).resolve()
                 if path.is_file() and path not in written:
                     written.append(path)
