@@ -561,14 +561,16 @@ chart: 0.4.0 → 0.4.1 (patch)
 ```
 
 `multicz plan --output json` emits a structured payload — exactly what a
-CI step needs to gate releases or post a comment on a PR:
+CI step needs to gate releases or post a comment on a PR. `schema_version`
+lets consumers guard against future breaking changes:
 
 ```json
 {
+  "schema_version": 1,
   "bumps": {
     "api": {
-      "current": "1.2.0",
-      "next": "1.3.0",
+      "current_version": "1.2.0",
+      "next_version": "1.3.0",
       "kind": "minor",
       "reasons": [
         {
@@ -581,11 +583,14 @@ CI step needs to gate releases or post a comment on a PR:
           "files": ["src/auth.py", "src/main.py"],
           "bump_kind": "minor"
         }
+      ],
+      "artifacts": [
+        {"type": "docker", "ref": "ghcr.io/foo/api:1.3.0"}
       ]
     },
     "chart": {
-      "current": "0.4.0",
-      "next": "0.4.1",
+      "current_version": "0.4.0",
+      "next_version": "0.4.1",
       "kind": "patch",
       "reasons": [
         {
@@ -594,11 +599,38 @@ CI step needs to gate releases or post a comment on a PR:
           "file": "charts/myapp/Chart.yaml",
           "key": "appVersion"
         }
-      ]
+      ],
+      "artifacts": []
     }
   }
 }
 ```
+
+Canonical `jq` queries CI scripts can rely on:
+
+```sh
+# anything pending?
+multicz plan --output json | jq -e '.bumps | length > 0'
+
+# a single component's next version
+multicz plan --output json | jq -r '.bumps.api.next_version'
+
+# every Docker ref to push (after bump --output json)
+multicz bump --commit --tag --output json | \
+  jq -r '.bumps[].artifacts[] | select(.type == "docker") | .ref'
+
+# tags freshly created (from bump output, with --tag)
+multicz bump --commit --tag --output json | jq -r '.git.tags[]'
+```
+
+End-to-end pipelines for the three big platforms are in
+[`examples/ci/`](examples/ci/):
+
+| platform | workflow file |
+|---|---|
+| GitHub Actions | [`examples/ci/github-actions/release.yml`](examples/ci/github-actions/release.yml) |
+| GitLab CI/CD | [`examples/ci/gitlab-ci.yml`](examples/ci/gitlab-ci.yml) |
+| Azure Pipelines | [`examples/ci/azure-pipelines.yml`](examples/ci/azure-pipelines.yml) |
 
 Reason kinds: `commit`, `trigger`, `mirror`, `manual` (e.g. an explicit
 `--finalize`). Each carries its own structured fields.
