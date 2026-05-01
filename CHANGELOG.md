@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [0.2.1] - 2026-05-01
+
+### Fixes
+
+- **bump**: detect post_bump file changes by content hash (`4b59b4e`)
+
 ## [0.2.0] - 2026-05-01
 
 ### Features
