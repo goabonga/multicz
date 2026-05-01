@@ -249,8 +249,11 @@ def test_validate_missing_bump_file_exits_one(repo: Path, runner: CliRunner):
 
 
 def test_validate_strict_exits_two_on_warnings(repo: Path, runner: CliRunner):
-    # Add a second component overlapping with api on src/**
-    (repo / "multicz.toml").write_text(CONFIG + """
+    # Overlap between api and lib on src/** with policy = first-match -> warning
+    (repo / "multicz.toml").write_text("""
+[project]
+overlap_policy = "first-match"
+""" + CONFIG + """
 [components.lib]
 paths = ["src/**"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -258,6 +261,40 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
     result = runner.invoke(app, ["validate", "--strict"])
     assert result.exit_code == 2
     assert "path_overlap" in result.output
+
+
+def test_validate_default_overlap_policy_errors(repo: Path, runner: CliRunner):
+    # No explicit policy -> default "error" -> overlap is an error -> exit 1
+    (repo / "multicz.toml").write_text(CONFIG + """
+[components.lib]
+paths = ["src/**"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 1
+    assert "path_overlap" in result.output
+
+
+def test_overlap_policy_all_bumps_every_component(repo: Path, runner: CliRunner):
+    """A shared file under overlap_policy = 'all' bumps every claiming component."""
+    (repo / "multicz.toml").write_text("""
+[project]
+overlap_policy = "all"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[components.lib]
+paths = ["src/**"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: shared change")
+    result = runner.invoke(app, ["plan", "--output", "json"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert "api" in payload["bumps"]
+    assert "lib" in payload["bumps"]
 
 
 def test_validate_json_output(repo: Path, runner: CliRunner):

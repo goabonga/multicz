@@ -28,11 +28,29 @@ class ComponentMatcher:
             )
 
     def match(self, path: str) -> str | None:
-        """Return the component owning ``path``, or ``None`` if unowned."""
+        """Return the component owning ``path``, or ``None`` if unowned.
+
+        First-match semantics: when several components claim the same file,
+        the one declared earliest in the config wins. Use :meth:`match_all`
+        when the project's ``overlap_policy = "all"`` is in effect.
+        """
         for name in self._order:
             if self._include[name].match_file(path) and not self._exclude[name].match_file(path):
                 return name
         return None
+
+    def match_all(self, path: str) -> list[str]:
+        """Return *every* component whose include patterns match ``path``.
+
+        Used by the ``"all"`` overlap policy so a file shared between
+        several components bumps each of them rather than just the first.
+        """
+        return [
+            name
+            for name in self._order
+            if self._include[name].match_file(path)
+            and not self._exclude[name].match_file(path)
+        ]
 
     def group(self, paths: Iterable[str]) -> dict[str, set[str]]:
         """Group ``paths`` by owning component. Unowned paths are silently dropped."""

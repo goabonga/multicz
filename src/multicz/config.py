@@ -139,6 +139,7 @@ class ProjectSettings(BaseModel):
     breaking_section_title: str = "Breaking changes"
     other_section_title: str = ""
     finalize_strategy: Literal["consolidate", "promote", "annotate"] = "consolidate"
+    overlap_policy: Literal["error", "first-match", "allow", "all"] = "error"
 
 
 class Config(BaseModel):

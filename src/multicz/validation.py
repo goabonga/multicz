@@ -75,8 +75,25 @@ def _check_bump_files_exist(repo: Path, config: Config) -> Iterator[Finding]:
 
 
 def _check_path_overlaps(repo: Path, config: Config) -> Iterator[Finding]:
-    """Detect when multiple components claim the same file. The matcher uses
-    first-match-wins, so the second-and-later components silently lose."""
+    """Detect when multiple components claim the same file.
+
+    The reported level — and whether the finding is reported at all —
+    depends on ``project.overlap_policy``:
+
+    * ``error`` (default): refuse to plan/bump until the user resolves
+      the overlap. Most predictable for newcomers.
+    * ``first-match``: surface as a warning. The first-declared
+      component wins, the others silently lose. Backwards-compatible
+      with multicz before this knob existed.
+    * ``allow``: same runtime behavior as ``first-match`` but the
+      finding is suppressed (you've explicitly accepted the overlap).
+    * ``all``: surface as info. A shared file bumps every claiming
+      component (see :meth:`ComponentMatcher.match_all`).
+    """
+    policy = config.project.overlap_policy
+    if policy == "allow":
+        return
+
     files = _list_tracked_files(repo)
     if not files:
         return
@@ -103,15 +120,36 @@ def _check_path_overlaps(repo: Path, config: Config) -> Iterator[Finding]:
         for loser in owners[1:]:
             seen.setdefault((winner, loser), f)
 
+    if not seen:
+        return
+
+    level: Level
+    if policy == "error":
+        level = "error"
+        suffix = (
+            "Set overlap_policy = 'first-match', 'allow', or 'all' to "
+            "accept it, or tighten the paths / add an exclude_paths entry."
+        )
+    elif policy == "first-match":
+        level = "warning"
+        suffix = (
+            "first-match-wins means the earlier-declared component owns "
+            "the shared files."
+        )
+    else:  # all
+        level = "info"
+        suffix = (
+            "overlap_policy = 'all' is in effect — every claiming "
+            "component bumps when the shared file changes."
+        )
+
     for (winner, loser), sample in seen.items():
         yield Finding(
-            level="warning",
+            level=level,
             check="path_overlap",
             component=loser,
             message=(
-                f"shares files with {winner!r} (e.g. {sample!r}); "
-                f"first-match-wins means {winner!r} owns it. Tighten the "
-                "paths or add an exclude_paths entry."
+                f"shares files with {winner!r} (e.g. {sample!r}). {suffix}"
             ),
         )
 

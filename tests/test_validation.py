@@ -74,13 +74,17 @@ bump_files = [{ file = "missing.toml", key = "version" }]
 # ----------------------------------------------------------------------
 
 
-def test_path_overlap_warning(repo: Path):
+def _overlap_repo(repo: Path, policy: str | None = None) -> None:
+    """Common fixture: api and lib both claim src/**."""
     (repo / "pyproject.toml").write_text(
         '[project]\nname = "x"\nversion = "1.0.0"\n'
     )
     (repo / "src").mkdir()
     (repo / "src" / "main.py").write_text("x = 1\n")
-    _write_config(repo, """
+    project_block = (
+        f'\n[project]\noverlap_policy = "{policy}"\n' if policy else ""
+    )
+    _write_config(repo, project_block + """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -91,11 +95,38 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 """)
     _commit_all(repo)
 
+
+def test_path_overlap_default_is_error(repo: Path):
+    _overlap_repo(repo)  # default: overlap_policy = "error"
+
     findings = validate(repo, load_config(repo / "multicz.toml"))
     overlaps = [f for f in findings if f.check == "path_overlap"]
     assert overlaps
-    assert overlaps[0].level == "warning"
+    assert overlaps[0].level == "error"
     assert overlaps[0].component == "lib"  # 'api' wins (declared first)
+
+
+def test_path_overlap_first_match_warns(repo: Path):
+    _overlap_repo(repo, policy="first-match")
+
+    findings = validate(repo, load_config(repo / "multicz.toml"))
+    overlaps = [f for f in findings if f.check == "path_overlap"]
+    assert overlaps and overlaps[0].level == "warning"
+
+
+def test_path_overlap_allow_silent(repo: Path):
+    _overlap_repo(repo, policy="allow")
+
+    findings = validate(repo, load_config(repo / "multicz.toml"))
+    assert all(f.check != "path_overlap" for f in findings)
+
+
+def test_path_overlap_all_is_info(repo: Path):
+    _overlap_repo(repo, policy="all")
+
+    findings = validate(repo, load_config(repo / "multicz.toml"))
+    overlaps = [f for f in findings if f.check == "path_overlap"]
+    assert overlaps and overlaps[0].level == "info"
 
 
 # ----------------------------------------------------------------------

@@ -327,6 +327,7 @@ def _direct_pass(
     import re
 
     release_re = re.compile(config.project.release_commit_pattern)
+    overlap_all = config.project.overlap_policy == "all"
     for name in config.components:
         prefix = tag_prefix(config.tag_format_for(name), name)
         since = latest_tag(repo, prefix)
@@ -340,7 +341,14 @@ def _direct_pass(
                 continue
             if commit.bump_kind is None:
                 continue
-            owned = tuple(p for p in commit.files if matcher.match(p) == name)
+            if overlap_all:
+                owned = tuple(
+                    p for p in commit.files if name in matcher.match_all(p)
+                )
+            else:
+                owned = tuple(
+                    p for p in commit.files if matcher.match(p) == name
+                )
             if not owned:
                 continue
             reason = CommitReason(
