@@ -186,6 +186,8 @@ class ProjectSettings(BaseModel):
     ignored_types: list[str] = Field(default_factory=list)
     state_file: Path | None = None  # opt-in JSON snapshot, written on bump
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
+    sign_commits: bool = False  # gpg-sign release commits (git commit -S)
+    sign_tags: bool = False     # gpg-sign tags (git tag -s)
 
 
 class Config(BaseModel):

@@ -867,6 +867,109 @@ version_scheme = "pep440"
     assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
 
 
+def _capture_git_args(monkeypatch):
+    """Spy that captures every (cwd, args) pair passed to subprocess.run
+    for git, while still letting the real subprocess execute (so the
+    write side-effects happen)."""
+    import subprocess as real_subprocess
+    captured: list[list[str]] = []
+    real_run = real_subprocess.run
+
+    def spy(args, *posargs, **kwargs):
+        if args and args[0] == "git":
+            captured.append(list(args[1:]))
+        return real_run(args, *posargs, **kwargs)
+
+    monkeypatch.setattr("multicz.cli.subprocess.run", spy)
+    return captured
+
+
+def test_bump_sign_passes_signing_flags_to_git(
+    repo: Path, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+):
+    captured = _capture_git_args(monkeypatch)
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+
+    # Use --sign — the real `git commit -S` will likely fail in CI without
+    # GPG, but we're inspecting the *args*, not the result.
+    runner.invoke(app, ["bump", "--commit", "--tag", "--sign"])
+
+    # The fixture setup uses `git commit -q` and `git tag -m` directly, so
+    # filter to the release commit/tag (those don't include -q from us, and
+    # the tag args carry -s/-m without --list).
+    release_commit = [
+        args for args in captured
+        if args[:1] == ["commit"] and "-q" not in args
+    ]
+    release_tag = [
+        args for args in captured
+        if args[:1] == ["tag"] and "--list" not in args and "-d" not in args
+    ]
+    assert release_commit and "-S" in release_commit[0]
+    assert release_tag and "-s" in release_tag[0]
+
+
+def test_bump_default_does_not_pass_signing_flags(
+    repo: Path, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+):
+    captured = _capture_git_args(monkeypatch)
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    release_commit = [
+        args for args in captured
+        if args[:1] == ["commit"] and "-q" not in args
+    ]
+    release_tag = [
+        args for args in captured
+        if args[:1] == ["tag"] and "--list" not in args and "-d" not in args
+    ]
+    assert release_commit and "-S" not in release_commit[0]
+    assert release_tag and "-s" not in release_tag[0]
+
+
+def test_config_sign_commits_enables_signing(
+    repo: Path, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+sign_commits = true
+""")
+    captured = _capture_git_args(monkeypatch)
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    runner.invoke(app, ["bump", "--commit"])
+
+    release_commit = [
+        args for args in captured
+        if args[:1] == ["commit"] and "-q" not in args
+    ]
+    assert release_commit and "-S" in release_commit[0]
+
+
+def test_config_sign_tags_only_signs_tags(
+    repo: Path, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+sign_tags = true
+""")
+    captured = _capture_git_args(monkeypatch)
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    release_commit = [
+        args for args in captured
+        if args[:1] == ["commit"] and "-q" not in args
+    ]
+    release_tag = [
+        args for args in captured
+        if args[:1] == ["tag"] and "--list" not in args and "-d" not in args
+    ]
+    # commit not signed, tag signed
+    assert release_commit and "-S" not in release_commit[0]
+    assert release_tag and "-s" in release_tag[0]
+
+
 def test_bump_force_creates_bump_without_commits(repo: Path, runner: CliRunner):
     """--force bumps a component even when no commits would normally trigger it."""
     result = runner.invoke(app, ["bump", "--force", "api:patch"])

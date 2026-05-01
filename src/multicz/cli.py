@@ -1122,6 +1122,12 @@ def bump(
              "detection — use for manual rebuilds (e.g. weekly base "
              "image refresh: `--force api:patch`).",
     ),
+    sign: bool = typer.Option(
+        False, "--sign",
+        help="GPG-sign the release commit AND tags. Equivalent to setting "
+             "[project].sign_commits=true and [project].sign_tags=true. "
+             "Either source enables signing; the CLI flag never disables.",
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
     if pre is not None and finalize:
@@ -1245,6 +1251,9 @@ def bump(
         if state_path not in written:
             written.append(state_path)
 
+    sign_commits_flag = sign or config.project.sign_commits
+    sign_tags_flag = sign or config.project.sign_tags
+
     if not dry_run and commit and written:
         rel_paths = [str(p.relative_to(repo)) for p in written]
         _git(repo, "add", "--", *rel_paths)
@@ -1254,7 +1263,10 @@ def bump(
             msg = _release_commit_message(
                 applied, config.project.release_commit_message
             )
-        _git(repo, "commit", "-m", msg)
+        commit_args = ["commit", "-m", msg]
+        if sign_commits_flag:
+            commit_args.insert(1, "-S")  # before -m so git accepts it
+        _git(repo, *commit_args)
         sha = _git(repo, "rev-parse", "HEAD").strip()
         git_summary["commit"] = sha
 
@@ -1264,9 +1276,18 @@ def bump(
             tag_name = config.tag_format_for(name).format(
                 component=name, version=info["next"]
             )
-            _git(repo, "tag", "-m", f"{name} {info['next']}", tag_name)
+            tag_args = ["tag"]
+            if sign_tags_flag:
+                # -s creates a signed annotated tag; -m supplies the message.
+                tag_args.append("-s")
+            tag_args.extend(["-m", f"{name} {info['next']}", tag_name])
+            _git(repo, *tag_args)
             tags_created.append(tag_name)
         git_summary["tags"] = tags_created
+        if sign_tags_flag:
+            git_summary["signed_tags"] = "yes"
+        if sign_commits_flag and "commit" in git_summary:
+            git_summary["signed_commit"] = "yes"
 
     if not dry_run and push:
         _git(repo, "push", "--follow-tags")
