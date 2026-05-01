@@ -217,6 +217,47 @@ exec multicz check "$1"
 * `.properties` — line-based `key=value` substitution (e.g. `gradle.properties`)
 * anything else — treated as a one-line `VERSION` file (`key = ` omitted)
 
+### Debian packages (`format = "debian"`)
+
+`multicz` writes a proper `debian/changelog` instead of a markdown
+`CHANGELOG.md` for components built as `.deb`:
+
+```toml
+[components.mypkg]
+paths  = ["debian/**", "src/**"]
+format = "debian"
+
+[components.mypkg.debian]
+changelog       = "debian/changelog"     # default
+distribution    = "UNRELEASED"           # default — change to "unstable" before upload
+urgency         = "medium"               # default
+debian_revision = 1                      # appended as -<n> to the upstream version
+# maintainer    = "Name <email>"         # falls back to debian/control then git config
+# epoch         = 2                      # rare, prepended as "<n>:"
+```
+
+On `multicz bump`, the upstream version is read from the topmost stanza
+of `debian/changelog`, the new upstream is computed from the conventional
+commits since the last tag, and a fresh stanza is **prepended** to the
+file:
+
+```
+mypkg (1.3.0-1) UNRELEASED; urgency=medium
+
+  * feat: Add login flow
+  * fix(api): Null token on logout
+
+ -- Chris <chris@example.com>  Fri, 01 May 2026 10:01:44 +0000
+
+mypkg (1.2.3-1) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Chris <chris@example.com>  Sun, 01 Jan 2023 00:00:00 +0000
+```
+
+Old stanzas are never rewritten, matching the contract of `dch(1)`.
+
 ### Auto-discovery languages
 
 `multicz init` detects the following manifests across the working tree
@@ -230,6 +271,7 @@ and seeds one component per project:
 | Go | `**/go.mod` | last segment of `module …` (strips `/vN`) — tag-driven, no version file |
 | Gradle | root `gradle.properties` with `version=` | `rootProject.name` from `settings.gradle[.kts]` |
 | Node.js | root `package.json` (or workspace members via `workspaces` / `pnpm-workspace.yaml`) | `name` field (npm scopes stripped) |
+| Debian | `debian/changelog` | package name from the top stanza header |
 
 Common noise dirs (`.git`, `node_modules`, `.venv`, `target`, `build`,
 `dist`, `vendor`, …) are excluded from the scan.
