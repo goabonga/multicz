@@ -108,8 +108,9 @@ def test_release_commits_are_skipped(repo: Path):
     plan = build_plan(repo, load_config(repo / "multicz.toml"))
 
     assert plan.bumps["api"].kind == "minor"
-    assert "real change" in " ".join(plan.bumps["api"].reasons)
-    assert "release" not in " ".join(plan.bumps["api"].reasons).lower()
+    summaries = " ".join(plan.bumps["api"].reason_summaries())
+    assert "real change" in summaries
+    assert "release" not in summaries.lower()
 
 
 def test_per_component_tag_format_is_honored(repo: Path):

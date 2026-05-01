@@ -153,7 +153,7 @@ def status() -> None:
             "→",
             str(bump.next),
             bump.kind,
-            "\n".join(bump.reasons),
+            "\n".join(bump.reason_summaries()),
         )
     console.print(table)
 

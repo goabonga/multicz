@@ -25,7 +25,6 @@ from packaging.version import InvalidVersion, Version
 
 from .commits import (
     BumpKind,
-    Commit,
     commits_since,
     latest_tag,
     latest_version,
@@ -131,12 +130,98 @@ def compute_next(
     return f"{target.major}.{target.minor}.{target.micro}-{pre}.1"
 
 
+@dataclass(frozen=True)
+class CommitReason:
+    """A planned bump driven by a conventional commit landing on this component."""
+
+    sha: str
+    type: str
+    scope: str | None
+    breaking: bool
+    subject: str
+    files: tuple[str, ...]  # files matched into THIS component (subset of commit.files)
+    bump_kind: BumpKind
+
+    def summary(self) -> str:
+        bang = "!" if self.breaking else ""
+        scope = f"({self.scope})" if self.scope else ""
+        return f"{self.sha[:7]} {self.type}{scope}{bang}: {self.subject}"
+
+    def to_dict(self) -> dict:
+        return {
+            "kind": "commit",
+            "sha": self.sha,
+            "type": self.type,
+            "scope": self.scope,
+            "breaking": self.breaking,
+            "subject": self.subject,
+            "files": list(self.files),
+            "bump_kind": self.bump_kind,
+        }
+
+
+@dataclass(frozen=True)
+class TriggerReason:
+    """A planned bump cascaded from a declared upstream component."""
+
+    upstream: str
+    upstream_kind: BumpKind
+
+    def summary(self) -> str:
+        return f"triggered by {self.upstream} ({self.upstream_kind})"
+
+    def to_dict(self) -> dict:
+        return {
+            "kind": "trigger",
+            "upstream": self.upstream,
+            "upstream_kind": self.upstream_kind,
+        }
+
+
+@dataclass(frozen=True)
+class MirrorReason:
+    """A planned bump cascaded from a mirror writing into this component's path."""
+
+    upstream: str
+    file: str
+    key: str | None
+
+    def summary(self) -> str:
+        target = self.file if self.key is None else f"{self.file}:{self.key}"
+        return f"mirror cascade from {self.upstream} ({target})"
+
+    def to_dict(self) -> dict:
+        return {
+            "kind": "mirror",
+            "upstream": self.upstream,
+            "file": self.file,
+            "key": self.key,
+        }
+
+
+@dataclass(frozen=True)
+class ManualReason:
+    """A planned bump that came from a CLI flag (``--finalize``, force-bump,
+    …) rather than a commit, trigger, or mirror."""
+
+    note: str
+
+    def summary(self) -> str:
+        return self.note
+
+    def to_dict(self) -> dict:
+        return {"kind": "manual", "note": self.note}
+
+
+Reason = CommitReason | TriggerReason | MirrorReason | ManualReason
+
+
 @dataclass
 class PlannedBump:
     component: str
     current: Version
     kind: BumpKind
-    reasons: list[str] = field(default_factory=list)
+    reasons: list[Reason] = field(default_factory=list)
     pre: str | None = None
     finalize: bool = False
 
@@ -152,6 +237,9 @@ class PlannedBump:
         """Parsed Version of :attr:`next` (for ordering)."""
         return Version(self.next)
 
+    def reason_summaries(self) -> list[str]:
+        return [r.summary() for r in self.reasons]
+
 
 @dataclass
 class Plan:
@@ -164,18 +252,12 @@ class Plan:
         return iter(self.bumps.values())
 
 
-def _commit_summary(commit: Commit) -> str:
-    bang = "!" if commit.breaking else ""
-    scope = f"({commit.scope})" if commit.scope else ""
-    return f"{commit.sha[:7]} {commit.type}{scope}{bang}: {commit.subject}"
-
-
 def _promote(
     plan: Plan,
     component: str,
     kind: BumpKind,
     current: Version,
-    reason: str,
+    reason: Reason,
 ) -> bool:
     """Add or upgrade ``component`` in ``plan``. Returns True if it changed."""
     existing = plan.bumps.get(component)
@@ -258,9 +340,19 @@ def _direct_pass(
                 continue
             if commit.bump_kind is None:
                 continue
-            if not any(matcher.match(path) == name for path in commit.files):
+            owned = tuple(p for p in commit.files if matcher.match(p) == name)
+            if not owned:
                 continue
-            _promote(plan, name, commit.bump_kind, versions[name], _commit_summary(commit))
+            reason = CommitReason(
+                sha=commit.sha,
+                type=commit.type,
+                scope=commit.scope,
+                breaking=commit.breaking,
+                subject=commit.subject,
+                files=owned,
+                bump_kind=commit.bump_kind,
+            )
+            _promote(plan, name, commit.bump_kind, versions[name], reason)
 
 
 def _triggers_pass(
@@ -274,12 +366,16 @@ def _triggers_pass(
                 upstream_bump = plan.bumps.get(upstream)
                 if upstream_bump is None:
                     continue
+                reason = TriggerReason(
+                    upstream=upstream,
+                    upstream_kind=upstream_bump.kind,
+                )
                 if _promote(
                     plan,
                     name,
                     upstream_bump.kind,
                     versions[name],
-                    f"triggered by {upstream}",
+                    reason,
                 ):
                     changed = True
 
@@ -299,12 +395,17 @@ def _mirror_pass(
                 target = matcher.match(str(mirror.file))
                 if target is None or target == name:
                     continue
+                reason = MirrorReason(
+                    upstream=name,
+                    file=str(mirror.file),
+                    key=mirror.key,
+                )
                 if _promote(
                     plan,
                     target,
                     "patch",
                     versions[target],
-                    f"mirror cascade from {name}",
+                    reason,
                 ):
                     changed = True
 
@@ -345,7 +446,7 @@ def build_plan(
                     component=name,
                     current=current,
                     kind="patch",
-                    reasons=["explicit --finalize"],
+                    reasons=[ManualReason("explicit --finalize")],
                     finalize=True,
                 )
 
