@@ -64,7 +64,7 @@ The planner runs three passes:
 
 ```toml
 [components.api]
-paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile", ".dockerignore"]
+paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 mirrors    = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
 changelog  = "CHANGELOG.md"

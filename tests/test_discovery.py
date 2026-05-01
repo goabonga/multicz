@@ -32,21 +32,22 @@ def test_python_only(tmp_path: Path):
     assert comps["myapp"].mirrors == []
 
 
-def test_dockerfile_pulls_in_dockerignore_only_when_present(tmp_path: Path):
+def test_dockerfile_added_when_present(tmp_path: Path):
     _python_project(tmp_path)
     (tmp_path / "Dockerfile").write_text("FROM python:3.12")
     comps = discover_components(tmp_path)
     assert "Dockerfile" in comps["myapp"].paths
-    assert ".dockerignore" not in comps["myapp"].paths
-
-    (tmp_path / ".dockerignore").write_text("__pycache__\n")
-    comps = discover_components(tmp_path)
-    assert ".dockerignore" in comps["myapp"].paths
 
 
-def test_dockerignore_alone_is_ignored(tmp_path: Path):
+def test_dockerignore_is_never_auto_added(tmp_path: Path):
+    """`.dockerignore` is build-context hygiene, not an artifact change.
+
+    Including it would silently bump the api on routine cleanup.
+    Users who want it can add it manually.
+    """
     _python_project(tmp_path)
-    (tmp_path / ".dockerignore").write_text("noise\n")
+    (tmp_path / "Dockerfile").write_text("FROM python:3.12")
+    (tmp_path / ".dockerignore").write_text("__pycache__\n")
     comps = discover_components(tmp_path)
     assert ".dockerignore" not in comps["myapp"].paths
 

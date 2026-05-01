@@ -5,8 +5,10 @@ Walks the working tree once and proposes a :class:`Config` populated with one
 manifest itself (``[project].name`` in ``pyproject.toml``, ``name`` in
 ``Chart.yaml`` and ``package.json``) so the generated tags read naturally
 (``multicz-v1.3.0`` rather than ``api-v1.3.0``). Paths only include files
-that actually exist on disk: no ``Dockerfile`` if there is no Dockerfile,
-no ``.dockerignore`` unless paired with one.
+whose change clearly warrants a version bump: ``Dockerfile`` is included
+when present (new base image / RUN step = new artifact), but
+``.dockerignore`` is not — it almost always signals build-context hygiene
+rather than an artifact change. Users who disagree can add it manually.
 """
 
 from __future__ import annotations
@@ -80,8 +82,6 @@ def discover_components(repo: Path) -> dict[str, Component]:
             paths.append("tests/**")
         if (repo / "Dockerfile").is_file():
             paths.append("Dockerfile")
-            if (repo / ".dockerignore").is_file():
-                paths.append(".dockerignore")
         components[name] = Component(
             paths=paths,
             bump_files=[FileKey(file=Path("pyproject.toml"), key="project.version")],

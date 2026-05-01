@@ -22,7 +22,7 @@ tag_format = "{component}-v{version}"
 initial_version = "0.1.0"
 
 [components.api]
-paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile", ".dockerignore"]
+paths = ["src/**", "pyproject.toml", "tests/**", "Dockerfile"]
 bump_files = [
   { file = "pyproject.toml", key = "project.version" },
 ]
