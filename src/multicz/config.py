@@ -175,6 +175,7 @@ class ProjectSettings(BaseModel):
     tag_format: str = "{component}-v{version}"
     initial_version: str = "0.1.0"
     release_commit_pattern: str = r"^chore\(release\)"
+    release_commit_message: str = "chore(release): bump {summary}\n\n{body}"
     changelog_sections: list[ChangelogSection] = Field(
         default_factory=_default_changelog_sections
     )

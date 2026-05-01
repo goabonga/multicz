@@ -866,6 +866,77 @@ version_scheme = "pep440"
     assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
 
 
+def test_release_commit_message_template_components(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+release_commit_message = "chore(release): {components}"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    head_msg = _git(repo, "log", "-1", "--format=%B").strip()
+    assert head_msg == "chore(release): api v1.3.0, chart v0.4.1"
+
+
+def test_release_commit_message_template_count(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+release_commit_message = "release: {count} components ({summary})"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    head_msg = _git(repo, "log", "-1", "--format=%B").strip()
+    assert head_msg.startswith("release: 2 components")
+    assert "api 1.2.0 -> 1.3.0" in head_msg
+
+
+def test_release_commit_message_default_unchanged(repo: Path, runner: CliRunner):
+    """Without override the historical format must be preserved exactly."""
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    head_msg = _git(repo, "log", "-1", "--format=%B").strip()
+    assert head_msg.startswith(
+        "chore(release): bump api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.4.1"
+    )
+    # default body is the bullet list
+    assert "- api: 1.2.0 -> 1.3.0 (minor)" in head_msg
+    assert "- chart: 0.4.0 -> 0.4.1 (patch)" in head_msg
+
+
+def test_bump_commit_message_cli_override(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(
+        app,
+        ["bump", "--commit", "--tag", "--commit-message", "release: my custom message"],
+    )
+    assert result.exit_code == 0, result.stdout
+
+    head_msg = _git(repo, "log", "-1", "--format=%B").strip()
+    assert head_msg == "release: my custom message"
+
+
+def test_bump_commit_message_requires_commit(repo: Path, runner: CliRunner):
+    result = runner.invoke(
+        app, ["bump", "--commit-message", "ignored without --commit"]
+    )
+    assert result.exit_code == 1
+    assert "--commit" in result.output
+
+
+def test_release_commit_message_template_with_literal_braces(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+release_commit_message = "release {{json}} for {components}"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    head_msg = _git(repo, "log", "-1", "--format=%B").strip()
+    assert head_msg == "release {json} for api v1.3.0, chart v0.4.1"
+
+
 def test_bump_pre_rc_enters_cycle(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
     result = runner.invoke(app, ["bump", "--pre", "rc"])

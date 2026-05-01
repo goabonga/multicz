@@ -1000,14 +1000,41 @@ def _bump_debian(
     changelogs_updated.append(str(settings.changelog))
 
 
-def _release_commit_message(applied: dict[str, dict[str, str]]) -> str:
-    parts = [f"{name} {info['current']} -> {info['next']}" for name, info in applied.items()]
-    summary = ", ".join(parts)
-    body_lines = [
+def _release_commit_message(
+    applied: dict[str, dict[str, str]],
+    template: str,
+) -> str:
+    """Render the release commit message from a template with placeholders.
+
+    Available placeholders:
+
+    * ``{summary}``    — ``api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.5.0``
+    * ``{components}`` — ``api v1.3.0, chart v0.5.0`` (versions only, ``v`` prefixed)
+    * ``{body}``       — bullet list with kind annotations
+    * ``{count}``      — number of components bumped
+
+    Literal ``{`` and ``}`` in a template should be escaped as ``{{`` / ``}}``.
+    """
+    summary = ", ".join(
+        f"{name} {info['current']} -> {info['next']}"
+        for name, info in applied.items()
+    )
+    components = ", ".join(
+        f"{name} v{info['next']}" for name, info in applied.items()
+    )
+    body = "\n".join(
         f"- {name}: {info['current']} -> {info['next']} ({info['kind']})"
         for name, info in applied.items()
-    ]
-    return f"chore(release): bump {summary}\n\n" + "\n".join(body_lines) + "\n"
+    )
+    rendered = template.format(
+        summary=summary,
+        components=components,
+        body=body,
+        count=len(applied),
+    )
+    if not rendered.endswith("\n"):
+        rendered += "\n"
+    return rendered
 
 
 @app.command()
@@ -1044,10 +1071,19 @@ def bump(
         help="Drop a pre-release suffix and ship the final version. Works "
              "even when there are no new commits since the rc tag.",
     ),
+    commit_message: str = typer.Option(
+        None, "--commit-message", "-m",
+        help="Verbatim release commit message (overrides the project's "
+             "release_commit_message template). Like 'git commit -m', no "
+             "placeholders are expanded — the string is used as-is.",
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
     if pre is not None and finalize:
         err.print("[red]--pre and --finalize are mutually exclusive[/]")
+        raise typer.Exit(code=1)
+    if commit_message is not None and not commit:
+        err.print("[red]--commit-message requires --commit[/]")
         raise typer.Exit(code=1)
 
     repo, config = _load()
@@ -1161,7 +1197,13 @@ def bump(
     if not dry_run and commit and written:
         rel_paths = [str(p.relative_to(repo)) for p in written]
         _git(repo, "add", "--", *rel_paths)
-        _git(repo, "commit", "-m", _release_commit_message(applied))
+        if commit_message is not None:
+            msg = commit_message  # CLI override is verbatim, no placeholders
+        else:
+            msg = _release_commit_message(
+                applied, config.project.release_commit_message
+            )
+        _git(repo, "commit", "-m", msg)
         sha = _git(repo, "rev-parse", "HEAD").strip()
         git_summary["commit"] = sha
 
