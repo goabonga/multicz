@@ -562,6 +562,80 @@ def test_pnpm_workspace_yaml(tmp_path: Path):
     assert "monorepo" not in comps
 
 
+def test_fastapi_plus_react_in_subdir_both_detected(tmp_path: Path):
+    """The standard FastAPI + React monorepo: pyproject at root, SPA in
+    frontend/, no npm workspace declared. Both components must be picked
+    up so they get independent tags and CHANGELOG.md files."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "api"\nversion = "1.0.0"\n'
+    )
+    (tmp_path / "src").mkdir()
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    (frontend / "package.json").write_text(
+        '{"name": "web", "version": "0.5.0"}\n'
+    )
+
+    comps = discover_components(tmp_path)
+    assert "api" in comps
+    assert "web" in comps
+    # frontend lives in its own dir -> its own changelog
+    assert str(comps["web"].changelog) == "frontend/CHANGELOG.md"
+    assert comps["web"].paths == ["frontend/**"]
+    # api keeps its own root changelog and bump_file
+    assert str(comps["api"].changelog) == "CHANGELOG.md"
+
+
+def test_multiple_subdir_packages_without_workspace(tmp_path: Path):
+    """Multiple standalone package.json siblings (web, mobile, admin)
+    without any workspace declaration are all detected."""
+    for sub, version in (("web", "1.0.0"), ("mobile", "2.0.0"), ("admin", "0.1.0")):
+        d = tmp_path / sub
+        d.mkdir()
+        (d / "package.json").write_text(
+            f'{{"name": "{sub}", "version": "{version}"}}\n'
+        )
+    comps = discover_components(tmp_path)
+    assert {"web", "mobile", "admin"}.issubset(comps)
+
+
+def test_subdir_package_json_in_node_modules_still_skipped(tmp_path: Path):
+    (tmp_path / "package.json").write_text(
+        '{"name": "root", "version": "1.0.0"}\n'
+    )
+    nm = tmp_path / "node_modules" / "leaked"
+    nm.mkdir(parents=True)
+    (nm / "package.json").write_text(
+        '{"name": "leaked", "version": "9.9.9"}\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "root" in comps
+    assert "leaked" not in comps
+
+
+def test_workspace_declaration_keeps_strict_member_list(tmp_path: Path):
+    """When workspaces are declared, packages outside the listed globs
+    are NOT added — the user has been explicit about what is in scope."""
+    (tmp_path / "package.json").write_text(
+        '{"name": "monorepo", "workspaces": ["packages/*"]}\n'
+    )
+    keep = tmp_path / "packages" / "keep"
+    keep.mkdir(parents=True)
+    (keep / "package.json").write_text(
+        '{"name": "keep", "version": "1.0.0"}\n'
+    )
+    extra = tmp_path / "extras" / "extra"
+    extra.mkdir(parents=True)
+    (extra / "package.json").write_text(
+        '{"name": "extra", "version": "1.0.0"}\n'
+    )
+
+    comps = discover_components(tmp_path)
+    assert "keep" in comps
+    assert "extra" not in comps
+    assert "monorepo" not in comps
+
+
 def test_workspace_member_without_version_skipped(tmp_path: Path):
     (tmp_path / "package.json").write_text(
         '{"name": "monorepo", "workspaces": ["packages/*"]}\n'

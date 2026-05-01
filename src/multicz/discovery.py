@@ -415,11 +415,22 @@ def _detect_node(
     *,
     python_taken: bool,
 ) -> None:
-    """Add Node.js components, expanding workspaces when declared."""
-    package_json = repo / "package.json"
-    pnpm_workspace = repo / "pnpm-workspace.yaml"
-    workspace_globs = _read_workspace_globs(package_json, pnpm_workspace)
+    """Add Node.js components, expanding workspaces when declared.
 
+    When the repo declares a workspace (npm/yarn ``"workspaces"`` array,
+    yarn-berry ``"workspaces.packages"``, or ``pnpm-workspace.yaml``), only
+    the listed members are added — the user has been explicit about what
+    is and isn't part of the workspace.
+
+    When no workspace is declared, every ``package.json`` outside noise dirs
+    is added as its own component. That covers the common FastAPI + React
+    layout where the SPA sits in ``frontend/`` next to a root pyproject.
+    """
+    root_pkg = repo / "package.json"
+    pnpm_ws = repo / "pnpm-workspace.yaml"
+    workspace_globs = _read_workspace_globs(root_pkg, pnpm_ws)
+
+    candidates: list[Path] = []
     if workspace_globs:
         for pattern in workspace_globs:
             for member in sorted(repo.glob(f"{pattern}/package.json")):
@@ -427,33 +438,32 @@ def _detect_node(
                     part in _NOISE_DIRS for part in member.relative_to(repo).parts
                 ):
                     continue
-                name = _read_package_json_name(member)
-                version = _read_package_json_version(member)
-                if not name or version is None:
-                    continue
-                comp_name = _unique(name, set(components), suffix="js")
-                rel_dir = member.parent.relative_to(repo).as_posix()
-                components[comp_name] = Component(
-                    paths=[f"{rel_dir}/**"],
-                    bump_files=[
-                        FileKey(file=member.relative_to(repo), key="version")
-                    ],
-                    changelog=Path(f"{rel_dir}/CHANGELOG.md"),
-                )
-        return
+                candidates.append(member)
+    else:
+        candidates = _find_manifests(repo, "package.json")
 
-    if package_json.is_file():
-        name = _read_package_json_name(package_json)
-        if name:
-            comp_name = _unique(name, set(components), suffix="js")
+    for path in candidates:
+        name = _read_package_json_name(path)
+        version = _read_package_json_version(path)
+        if not name or version is None:
+            continue
+        comp_name = _unique(name, set(components), suffix="js")
+        rel_dir = path.parent.relative_to(repo)
+        if rel_dir == Path("."):
             paths = ["package.json"]
             if not python_taken and (repo / "src").is_dir():
                 paths.insert(0, "src/**")
-            components[comp_name] = Component(
-                paths=paths,
-                bump_files=[FileKey(file=Path("package.json"), key="version")],
-                changelog=Path("CHANGELOG.md") if not python_taken else None,
+            changelog: Path | None = (
+                Path("CHANGELOG.md") if not python_taken else None
             )
+        else:
+            paths = [f"{rel_dir.as_posix()}/**"]
+            changelog = Path(f"{rel_dir.as_posix()}/CHANGELOG.md")
+        components[comp_name] = Component(
+            paths=paths,
+            bump_files=[FileKey(file=path.relative_to(repo), key="version")],
+            changelog=changelog,
+        )
 
 
 def _read_package_json_version(path: Path) -> str | None:
