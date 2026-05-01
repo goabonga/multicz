@@ -17,7 +17,7 @@ jobs:
           # multicz validate / plan need the full history for tag detection
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v8
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: ${{ matrix.python }}
 
