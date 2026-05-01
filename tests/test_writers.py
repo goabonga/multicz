@@ -67,6 +67,40 @@ def test_json_nested_key(tmp_path: Path):
     assert read_value(p, "image.tag") == "2.0.0"
 
 
+def test_properties_round_trip(tmp_path: Path):
+    p = tmp_path / "gradle.properties"
+    p.write_text(
+        "# build settings\n"
+        "version=1.0.0\n"
+        "group=com.example\n"
+        "# trailing comment\n"
+    )
+    write_value(p, "version", "2.0.0")
+    text = p.read_text()
+    assert "version=2.0.0" in text
+    assert "# build settings" in text
+    assert "group=com.example" in text
+    assert "# trailing comment" in text
+    assert read_value(p, "version") == "2.0.0"
+
+
+def test_properties_dotted_key_is_taken_verbatim(tmp_path: Path):
+    p = tmp_path / "app.properties"
+    p.write_text("release.version=1.0.0\nfoo=bar\n")
+    write_value(p, "release.version", "9.9.9")
+    assert "release.version=9.9.9" in p.read_text()
+    assert "foo=bar" in p.read_text()
+
+
+def test_properties_appends_when_key_missing(tmp_path: Path):
+    p = tmp_path / "gradle.properties"
+    p.write_text("group=com.example\n")
+    write_value(p, "version", "1.0.0")
+    text = p.read_text()
+    assert "group=com.example" in text
+    assert "version=1.0.0" in text
+
+
 def test_plain_file_round_trip(tmp_path: Path):
     p = tmp_path / "VERSION"
     p.write_text("0.1.0\n")

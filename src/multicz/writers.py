@@ -1,14 +1,18 @@
 """Read and write versions inside structured config files.
 
-Supports four formats, dispatched by file extension:
+Supports five formats, dispatched by file extension:
 
 * ``.toml`` via :mod:`tomlkit` — preserves comments, key order, whitespace.
 * ``.yaml`` / ``.yml`` via :mod:`ruamel.yaml` — preserves comments and style.
 * ``.json`` via :mod:`json` — preserves key order and detected indentation.
+* ``.properties`` — line-based key=value substitution, preserves comments.
 * anything else — treated as a plain text file holding only the version.
 
 A ``key`` is a dotted path (``project.version``, ``image.tag``). Passing
-``None`` means the whole file is one version literal.
+``None`` means the whole file is one version literal. For ``.properties``
+files the dotted-path interpretation is disabled — the key is taken
+verbatim, since properties files routinely use dotted keys (``a.b.c``)
+that are *not* nested.
 """
 
 from __future__ import annotations
@@ -56,6 +60,47 @@ def _is_json(file: Path) -> bool:
     return file.suffix.lower() == ".json"
 
 
+def _is_properties(file: Path) -> bool:
+    return file.suffix.lower() == ".properties"
+
+
+def _read_property(text: str, key: str) -> str | None:
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if not stripped or stripped[0] in "#!":
+            continue
+        for sep in ("=", ":"):
+            if sep in stripped:
+                k, _, v = stripped.partition(sep)
+                if k.strip() == key:
+                    return v.strip()
+                break
+    return None
+
+
+def _write_property(text: str, key: str, value: str) -> str:
+    lines = text.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        if not stripped or stripped[0] in "#!":
+            continue
+        if "=" not in stripped:
+            continue
+        k = stripped.split("=", 1)[0].strip()
+        if k != key:
+            continue
+        indent = line[: len(line) - len(line.lstrip())]
+        ending = "\n" if line.endswith("\n") else ""
+        lines[index] = f"{indent}{key}={value}{ending}"
+        if not lines[index].endswith("\n") and index == len(lines) - 1:
+            lines[index] += "\n"
+        return "".join(lines)
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] = lines[-1] + "\n"
+    lines.append(f"{key}={value}\n")
+    return "".join(lines)
+
+
 def _yaml() -> YAML:
     yaml = YAML(typ="rt")
     yaml.preserve_quotes = True
@@ -76,6 +121,11 @@ def read_value(file: Path, key: str | None) -> str:
     text = file.read_text(encoding="utf-8")
     if key is None:
         return text.strip()
+    if _is_properties(file):
+        result = _read_property(text, key)
+        if result is None:
+            raise WriterError(f"key {key!r} not found in {file}")
+        return result
     parts = _split_key(key)
     if _is_toml(file):
         doc = tomlkit.parse(text)
@@ -105,6 +155,11 @@ def write_value(file: Path, key: str | None, value: str) -> None:
         raise WriterError(f"file does not exist: {file}")
     if key is None:
         file.write_text(value + "\n", encoding="utf-8")
+        return
+
+    if _is_properties(file):
+        text = file.read_text(encoding="utf-8")
+        file.write_text(_write_property(text, key, value), encoding="utf-8")
         return
 
     parts = _split_key(key)
