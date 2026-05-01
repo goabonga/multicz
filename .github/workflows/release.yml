@@ -37,6 +37,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # `pypi` matches the GitHub-side environment registered with the
+    # PyPI Trusted Publisher. Without this, the OIDC token claim
+    # `environment` is `MISSING` and PyPI returns `invalid-publisher`.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/multicz
     # Only run when CI was green AND the trigger wasn't our own
     # `chore(release)` commit (which would loop forever).
     if: >-
