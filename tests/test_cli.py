@@ -154,7 +154,48 @@ def test_changelog_markdown_groups_by_section(repo: Path, runner: CliRunner):
 def test_changelog_markdown_no_changes(repo: Path, runner: CliRunner):
     result = runner.invoke(app, ["changelog", "--output", "md", "--component", "api"])
     assert result.exit_code == 0
-    assert "_No changes._" in result.stdout
+    assert "_No notable changes._" in result.stdout
+
+
+def test_changelog_markdown_uses_project_sections(repo: Path, runner: CliRunner):
+    # rewrite multicz.toml with custom sections (keep-a-changelog vocabulary)
+    (repo / "multicz.toml").write_text(CONFIG + """
+[[project.changelog_sections]]
+title = "Added"
+types = ["feat"]
+
+[[project.changelog_sections]]
+title = "Fixed"
+types = ["fix"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: null token")
+    _commit(repo, {"src/main.py": "x = 4\n"}, "perf: tighter loop")
+
+    result = runner.invoke(app, ["changelog", "--output", "md", "--component", "api"])
+    assert result.exit_code == 0, result.stdout
+    assert "### Added" in result.stdout
+    assert "### Fixed" in result.stdout
+    # Performance is no longer a configured section -> commit dropped
+    assert "Performance" not in result.stdout
+    assert "tighter loop" not in result.stdout
+
+
+def test_bump_writes_changelog_with_custom_sections(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[[project.changelog_sections]]
+title = "Added"
+types = ["feat"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: y")  # not in any section -> dropped
+
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 0, result.stdout
+    api_log = (repo / "CHANGELOG.md").read_text()
+    assert "### Added" in api_log
+    assert "Fixes" not in api_log
+    assert "Fixed" not in api_log
 
 
 def test_bump_writes_changelogs(repo: Path, runner: CliRunner):

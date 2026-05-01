@@ -132,6 +132,39 @@ The file is created with a small preamble on first use, and subsequent
 runs insert the new section directly above the latest existing release.
 Pass `--no-changelog` to opt out for a single bump.
 
+#### Configuring sections
+
+By default, only `feat`, `fix`, and `perf` are rendered (under "Features",
+"Fixes", "Performance"). Anything else (`chore`, `docs`, `test`, `style`,
+`ci`, `build`, `refactor`, `revert`) is silently dropped to keep the
+changelog focused on user-visible changes.
+
+To pick your own vocabulary — for example keep-a-changelog's
+Added/Changed/Fixed — declare sections in `[project]`:
+
+```toml
+[project]
+breaking_section_title = "Breaking changes"   # set to "" to disable the bucket
+other_section_title = ""                       # set to e.g. "Misc" to keep unmatched
+
+[[project.changelog_sections]]
+title = "Added"
+types = ["feat"]
+
+[[project.changelog_sections]]
+title = "Fixed"
+types = ["fix"]
+
+[[project.changelog_sections]]
+title = "Changed"
+types = ["refactor", "perf"]
+```
+
+Sections render in declaration order, after the implicit "Breaking changes"
+bucket (if any commit has `!` or a `BREAKING CHANGE:` footer). One commit
+type can appear in multiple sections; commits whose type matches no section
+are dropped (or land in `other_section_title` if you set it).
+
 ### Commit-msg hook
 
 ```sh

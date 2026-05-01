@@ -50,6 +50,30 @@ class Component(BaseModel):
         return [v.strip() for v in value if v.strip()]
 
 
+class ChangelogSection(BaseModel):
+    """A bucket in the rendered CHANGELOG.md.
+
+    Commits whose conventional-commit type matches any of ``types``
+    (case-insensitive) land in this section. Sections are emitted in their
+    declaration order, after the implicit Breaking changes block. Commits
+    whose type matches no section are silently dropped unless
+    ``ProjectSettings.other_section_title`` is set.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    types: list[str] = Field(min_length=1)
+
+
+def _default_changelog_sections() -> list[ChangelogSection]:
+    return [
+        ChangelogSection(title="Features", types=["feat"]),
+        ChangelogSection(title="Fixes", types=["fix"]),
+        ChangelogSection(title="Performance", types=["perf"]),
+    ]
+
+
 class ProjectSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +81,11 @@ class ProjectSettings(BaseModel):
     tag_format: str = "{component}-v{version}"
     initial_version: str = "0.1.0"
     release_commit_pattern: str = r"^chore\(release\)"
+    changelog_sections: list[ChangelogSection] = Field(
+        default_factory=_default_changelog_sections
+    )
+    breaking_section_title: str = "Breaking changes"
+    other_section_title: str = ""
 
 
 class Config(BaseModel):

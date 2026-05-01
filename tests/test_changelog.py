@@ -1,20 +1,18 @@
 from datetime import date
 from pathlib import Path
 
-from multicz.changelog import insert_section, render_section, update_changelog_file
+from multicz.changelog import insert_section, render_body, render_section, update_changelog_file
 from multicz.commits import parse_commit
+from multicz.config import ChangelogSection
 
 
-def _commit(sha: str, msg: str, scope: str | None = None) -> object:
-    return parse_commit(sha, msg, ())
-
-
-def test_render_groups_by_section():
+def test_render_default_groups_feat_fix_perf():
     commits = [
         parse_commit("aaaaaaa", "feat(api): add login", ()),
         parse_commit("bbbbbbb", "fix: null token", ()),
-        parse_commit("ccccccc", "feat!: rewrite", ()),
+        parse_commit("ccccccc", "perf: tighter loop", ()),
         parse_commit("ddddddd", "chore: tweak", ()),
+        parse_commit("eeeeeee", "feat!: rewrite", ()),
     ]
     text = render_section("1.3.0", commits, today=date(2026, 4, 30))
 
@@ -22,13 +20,67 @@ def test_render_groups_by_section():
     assert "### Breaking changes" in text
     assert "### Features" in text
     assert "### Fixes" in text
-    assert "### Other" in text
-    # ordering: Breaking < Features < Fixes < Other
-    order = ["Breaking changes", "Features", "Fixes", "Other"]
+    assert "### Performance" in text
+    # chore is silently dropped by default
+    assert "chore" not in text
+    assert "tweak" not in text
+    # ordering
+    order = ["Breaking changes", "Features", "Fixes", "Performance"]
     indices = [text.index(f"### {s}") for s in order]
     assert indices == sorted(indices)
-    # scope rendered as bold prefix
     assert "**api**: add login" in text
+
+
+def test_render_keepachangelog_vocabulary():
+    sections = [
+        ChangelogSection(title="Added", types=["feat"]),
+        ChangelogSection(title="Fixed", types=["fix"]),
+        ChangelogSection(title="Changed", types=["refactor"]),
+    ]
+    commits = [
+        parse_commit("a", "feat: x", ()),
+        parse_commit("b", "fix: y", ()),
+        parse_commit("c", "refactor: z", ()),
+        parse_commit("d", "perf: w", ()),  # not claimed -> dropped
+    ]
+    body = render_body(commits, sections=sections, breaking_title="")
+    assert "### Added" in body
+    assert "### Fixed" in body
+    assert "### Changed" in body
+    assert "Performance" not in body
+    assert "perf" not in body
+
+
+def test_render_other_section_keeps_unmatched():
+    sections = [ChangelogSection(title="Features", types=["feat"])]
+    commits = [
+        parse_commit("a", "feat: x", ()),
+        parse_commit("b", "docs: y", ()),
+        parse_commit("c", "test: z", ()),
+    ]
+    body = render_body(commits, sections=sections, other_title="Misc")
+    assert "### Features" in body
+    assert "### Misc" in body
+    # Misc bucket holds the unclaimed types
+    misc_index = body.index("### Misc")
+    assert "y" in body[misc_index:]
+    assert "z" in body[misc_index:]
+
+
+def test_render_breaking_disabled_falls_through():
+    sections = [ChangelogSection(title="Features", types=["feat"])]
+    commits = [parse_commit("a", "feat!: rewrite", ())]
+    body = render_body(commits, sections=sections, breaking_title="")
+    # no Breaking changes header — the breaking commit lands in Features
+    assert "### Breaking" not in body
+    assert "### Features" in body
+    assert "rewrite" in body
+
+
+def test_render_only_chore_means_no_notable_changes():
+    commits = [parse_commit("a", "chore: x", ()), parse_commit("b", "docs: y", ())]
+    body = render_body(commits)
+    assert "_No notable changes._" in body
 
 
 def test_render_no_commits():

@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .changelog import update_changelog_file
+from .changelog import render_body, update_changelog_file
 from .commits import (
     DEFAULT_TYPES,
     commits_since,
@@ -241,7 +241,14 @@ def bump(
                 and any(matcher.match(f) == planned.component for f in c.files)
             ]
             changelog_path = repo / comp.changelog
-            update_changelog_file(changelog_path, new_version, relevant)
+            update_changelog_file(
+                changelog_path,
+                new_version,
+                relevant,
+                sections=config.project.changelog_sections,
+                breaking_title=config.project.breaking_section_title,
+                other_title=config.project.other_section_title,
+            )
             if changelog_path not in written:
                 written.append(changelog_path)
             changelogs_updated.append(str(comp.changelog))
@@ -327,28 +334,6 @@ def get_value(target: str = typer.Argument(..., help="component[.field]")) -> No
     print(read_value(repo / primary.file, primary.key))
 
 
-_MD_SECTIONS: list[tuple[str, set[str]]] = [
-    ("Breaking changes", set()),  # special-cased: any commit with breaking=True
-    ("Features", {"feat"}),
-    ("Fixes", {"fix"}),
-    ("Performance", {"perf"}),
-    ("Other", set()),  # special-cased: anything else conventional
-]
-
-
-def _bucket(commit) -> str:
-    if commit.breaking:
-        return "Breaking changes"
-    t = commit.type.lower()
-    if t == "feat":
-        return "Features"
-    if t == "fix":
-        return "Fixes"
-    if t == "perf":
-        return "Performance"
-    return "Other"
-
-
 @app.command()
 def changelog(
     component: str = typer.Option(None, "--component", "-c"),
@@ -360,7 +345,7 @@ def changelog(
     names = [component] if component else list(config.components)
     plan = build_plan(repo, config)
 
-    md_lines: list[str] = []
+    md_chunks: list[str] = []
 
     for name in names:
         if name not in config.components:
@@ -381,27 +366,13 @@ def changelog(
                 heading += f" {planned.current} → {planned.next}"
             elif since:
                 heading += f" (since {since})"
-            md_lines.append(heading)
-            md_lines.append("")
-            if not relevant:
-                md_lines.append("_No changes._")
-                md_lines.append("")
-                continue
-            buckets: dict[str, list] = {title: [] for title, _ in _MD_SECTIONS}
-            for commit in relevant:
-                buckets[_bucket(commit)].append(commit)
-            for section, _ in _MD_SECTIONS:
-                items = buckets[section]
-                if not items:
-                    continue
-                md_lines.append(f"### {section}")
-                md_lines.append("")
-                for commit in items:
-                    scope = f"**{commit.scope}**: " if commit.scope else ""
-                    md_lines.append(
-                        f"- {scope}{commit.subject} (`{commit.sha[:7]}`)"
-                    )
-                md_lines.append("")
+            body = render_body(
+                relevant,
+                sections=config.project.changelog_sections,
+                breaking_title=config.project.breaking_section_title,
+                other_title=config.project.other_section_title,
+            )
+            md_chunks.append(f"{heading}\n\n{body}")
         else:
             header = f"## {name}"
             if since:
@@ -419,8 +390,7 @@ def changelog(
                 )
 
     if output == "md":
-        # plain print so the output is pipeable into a CHANGELOG.md
-        print("\n".join(md_lines).rstrip() + "\n")
+        print("\n".join(chunk.rstrip() + "\n" for chunk in md_chunks).rstrip() + "\n")
 
 
 @app.command()
