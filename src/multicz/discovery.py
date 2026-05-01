@@ -1,23 +1,29 @@
 """Repo-aware initial config generation.
 
-Walks the working tree once and proposes a :class:`Config` populated with one
-:class:`Component` per detected manifest. Component names come from the
-manifest itself (``[project].name`` in ``pyproject.toml``, ``name`` in each
-``Chart.yaml`` and the root ``package.json``) so the generated tags read
-naturally (``multicz-v1.3.0`` rather than ``api-v1.3.0``).
+Walks the working tree once and proposes a :class:`Config` populated with
+one :class:`Component` per detected manifest. Component names come from the
+manifest itself (``[project].name`` in ``pyproject.toml``, ``[package].name``
+in ``Cargo.toml``, the last segment of ``module …`` in ``go.mod``, ``name``
+in ``Chart.yaml`` and ``package.json``, etc.).
 
-``Chart.yaml`` is searched recursively across the whole repo (excluding
-common noise directories like ``node_modules`` or ``.venv``) so charts
-under ``helm/``, ``deploy/``, ``infra/``, or any other layout are picked
-up. When multiple charts coexist with one python project, the auto-mirror
-only wires charts whose ``name`` matches the python project, so a
-``worker`` chart next to an ``api`` service stays independent. A single
-chart + single python project always pairs unambiguously.
+Recognised manifests (all searched recursively, except where noted):
+
+* Python — ``pyproject.toml`` at repo root
+* Helm — every ``Chart.yaml``
+* Rust — every ``Cargo.toml`` (workspaces with ``[workspace.package].version``
+  collapse to a single component; member crates that inherit are skipped)
+* Go — every ``go.mod`` (tag-driven, no version file)
+* Gradle — root ``gradle.properties`` with a ``version=`` line
+* Node.js — ``package.json`` at repo root, with workspace members expanded
+  when the root declares ``workspaces`` (or a sibling ``pnpm-workspace.yaml``)
+
+Common noise directories (``.git``, ``node_modules``, ``.venv``, ``target``,
+``build``, ``dist``, ``vendor``, …) are excluded.
 
 Paths only include files whose change clearly warrants a version bump:
-``Dockerfile`` is included when present (new base image / RUN step = new
-artifact), but ``.dockerignore`` is not — it almost always signals
-build-context hygiene rather than an artifact change.
+``Dockerfile`` is included when present, but ``.dockerignore`` is not —
+it almost always signals build-context hygiene rather than an artifact
+change.
 """
 
 from __future__ import annotations
@@ -86,10 +92,10 @@ _NOISE_DIRS = frozenset({
 })
 
 
-def _find_chart_yamls(repo: Path) -> list[Path]:
-    """Return every ``Chart.yaml`` under ``repo`` outside common noise dirs."""
+def _find_manifests(repo: Path, filename: str) -> list[Path]:
+    """Return every ``filename`` under ``repo`` outside noise dirs."""
     found: list[Path] = []
-    for path in repo.rglob("Chart.yaml"):
+    for path in repo.rglob(filename):
         if not path.is_file():
             continue
         rel_parts = path.relative_to(repo).parts
@@ -97,6 +103,45 @@ def _find_chart_yamls(repo: Path) -> list[Path]:
             continue
         found.append(path)
     return sorted(found)
+
+
+def _find_chart_yamls(repo: Path) -> list[Path]:
+    return _find_manifests(repo, "Chart.yaml")
+
+
+def _read_cargo(path: Path) -> tuple[str | None, str] | None:
+    """Read a Cargo.toml. Returns (name, version_key) or None when there's
+    nothing to bump (e.g. a workspace-only file with no shared version, or
+    a member crate that inherits via ``version.workspace = true``).
+    """
+    try:
+        doc = tomlkit.parse(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    workspace = doc.get("workspace")
+    if isinstance(workspace, dict):
+        wpkg = workspace.get("package")
+        if isinstance(wpkg, dict) and "version" in wpkg:
+            name: str | None = None
+            pkg = doc.get("package")
+            if isinstance(pkg, dict):
+                pkg_name = pkg.get("name")
+                if pkg_name:
+                    name = str(pkg_name)
+            return (name, "workspace.package.version")
+
+    pkg = doc.get("package")
+    if not isinstance(pkg, dict):
+        return None
+    pkg_version = pkg.get("version")
+    if pkg_version is None or isinstance(pkg_version, dict):
+        # missing or inheriting from workspace
+        return None
+    pkg_name = pkg.get("name")
+    if not pkg_name:
+        return None
+    return (str(pkg_name), "package.version")
 
 
 def discover_components(repo: Path) -> dict[str, Component]:
@@ -120,6 +165,33 @@ def discover_components(repo: Path) -> dict[str, Component]:
             changelog=Path("CHANGELOG.md"),
         )
         python_name = name
+
+    for cargo_path in _find_manifests(repo, "Cargo.toml"):
+        info = _read_cargo(cargo_path)
+        if info is None:
+            continue
+        raw_name, version_key = info
+        if not raw_name:
+            continue
+        rel_dir = cargo_path.parent.relative_to(repo)
+        comp_name = _unique(raw_name, set(components), suffix="crate")
+        if rel_dir == Path("."):
+            paths = ["src/**", "Cargo.toml"]
+            if (repo / "Cargo.lock").is_file():
+                paths.append("Cargo.lock")
+            if (repo / "tests").is_dir():
+                paths.append("tests/**")
+            if (repo / "Dockerfile").is_file():
+                paths.append("Dockerfile")
+            changelog = Path("CHANGELOG.md")
+        else:
+            paths = [f"{rel_dir.as_posix()}/**"]
+            changelog = Path(f"{rel_dir.as_posix()}/CHANGELOG.md")
+        components[comp_name] = Component(
+            paths=paths,
+            bump_files=[FileKey(file=cargo_path.relative_to(repo), key=version_key)],
+            changelog=changelog,
+        )
 
     chart_names: list[str] = []
     chart_raw_names: dict[str, str] = {}  # comp_name -> raw chart name (for matching)

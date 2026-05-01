@@ -157,6 +157,90 @@ def test_chart_in_node_modules_is_skipped(tmp_path: Path):
     assert "leaked" not in comps
 
 
+def test_cargo_plain_crate_at_root(tmp_path: Path):
+    (tmp_path / "Cargo.toml").write_text(
+        '[package]\nname = "myapp"\nversion = "0.1.0"\n'
+    )
+    (tmp_path / "src").mkdir()
+    comps = discover_components(tmp_path)
+    assert "myapp" in comps
+    bf = comps["myapp"].bump_files[0]
+    assert bf.key == "package.version"
+    assert str(bf.file) == "Cargo.toml"
+    assert "src/**" in comps["myapp"].paths
+
+
+def test_cargo_workspace_with_shared_version(tmp_path: Path):
+    (tmp_path / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["crates/foo", "crates/bar"]\n'
+        '\n[workspace.package]\nversion = "0.1.0"\n'
+    )
+    foo = tmp_path / "crates" / "foo"
+    foo.mkdir(parents=True)
+    (foo / "Cargo.toml").write_text(
+        '[package]\nname = "foo"\nversion.workspace = true\n'
+    )
+    bar = tmp_path / "crates" / "bar"
+    bar.mkdir(parents=True)
+    (bar / "Cargo.toml").write_text(
+        '[package]\nname = "bar"\nversion.workspace = true\n'
+    )
+
+    comps = discover_components(tmp_path)
+    # only the root workspace component is added; members inherit
+    assert "foo" not in comps
+    assert "bar" not in comps
+    # the root crate has no [package].name in this layout, so no component for the workspace
+    # (a "virtual workspace") -> nothing is added. That's the correct behavior.
+
+
+def test_cargo_workspace_with_shared_version_and_root_package(tmp_path: Path):
+    (tmp_path / "Cargo.toml").write_text(
+        '[package]\nname = "rootkit"\nversion = "0.1.0"\n'
+        '\n[workspace]\nmembers = ["crates/foo"]\n'
+        '\n[workspace.package]\nversion = "0.1.0"\n'
+    )
+    foo = tmp_path / "crates" / "foo"
+    foo.mkdir(parents=True)
+    (foo / "Cargo.toml").write_text(
+        '[package]\nname = "foo"\nversion.workspace = true\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "rootkit" in comps
+    assert comps["rootkit"].bump_files[0].key == "workspace.package.version"
+    assert "foo" not in comps  # member inherits
+
+
+def test_cargo_independent_member_crates(tmp_path: Path):
+    (tmp_path / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["crates/foo", "crates/bar"]\n'
+    )
+    foo = tmp_path / "crates" / "foo"
+    foo.mkdir(parents=True)
+    (foo / "Cargo.toml").write_text(
+        '[package]\nname = "foo"\nversion = "1.0.0"\n'
+    )
+    bar = tmp_path / "crates" / "bar"
+    bar.mkdir(parents=True)
+    (bar / "Cargo.toml").write_text(
+        '[package]\nname = "bar"\nversion = "2.0.0"\n'
+    )
+    comps = discover_components(tmp_path)
+    assert {"foo", "bar"}.issubset(comps)
+    assert comps["foo"].paths == ["crates/foo/**"]
+    assert comps["bar"].paths == ["crates/bar/**"]
+
+
+def test_cargo_in_target_dir_skipped(tmp_path: Path):
+    target_cargo = tmp_path / "target" / "package" / "Cargo.toml"
+    target_cargo.parent.mkdir(parents=True)
+    target_cargo.write_text(
+        '[package]\nname = "leaked"\nversion = "0.1.0"\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "leaked" not in comps
+
+
 def test_chart_in_venv_is_skipped(tmp_path: Path):
     _python_project(tmp_path)
     venv = tmp_path / ".venv" / "some" / "Chart.yaml"
