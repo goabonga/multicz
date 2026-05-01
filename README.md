@@ -201,6 +201,7 @@ helm package charts/myapp
 | `multicz artifacts <comp>` | list what CI should build/push for the current version |
 | `multicz artifacts --all --output json` | machine-readable artifact refs for the whole repo |
 | `multicz validate` | run every config + repo sanity check (CI gate) |
+| `multicz state` | inspect the optional persistent state file (audit trail) |
 | `multicz validate --strict` | also fail on warnings (overlapping paths, useless mirrors, …) |
 | `multicz validate --output json` | machine-readable findings shape |
 
@@ -828,6 +829,62 @@ build/push from a single payload:
     echo "$RELEASE" | jq -r '.bumps[].artifacts[] | select(.type=="helm") | .ref' \
       | xargs -I{} sh -c 'helm package . && helm push {}'
 ```
+
+## Optional state file
+
+`multicz` is normally stateless — every command recomputes from git
+tags and the in-tree manifests. For monorepos that want a persistent
+audit trail or **drift detection** (catch manual edits that bypassed
+`multicz bump`), opt into a state file:
+
+```toml
+[project]
+state_file = ".multicz/state.json"
+```
+
+After every successful `multicz bump`, the file is written next to the
+version updates and lands in the release commit (when `--commit` is
+used):
+
+```json
+{
+  "version": 1,
+  "git_head": "fe9a637d223e570fc873ecac9ee4e53c3c05ee31",
+  "git_head_short": "fe9a637",
+  "timestamp": "2026-05-01T17:46:27Z",
+  "components": {
+    "api": {
+      "version": "1.3.0",
+      "tag": "api-v1.3.0",
+      "tag_sha": null
+    }
+  }
+}
+```
+
+`multicz state` prints the snapshot. `multicz state --output json`
+emits the same JSON for `jq` consumption.
+
+### Drift detection in `validate`
+
+When `state_file` is set, `multicz validate` adds two checks:
+
+* **`state_drift`** (warning) — the recorded version doesn't match the
+  current value in the primary `bump_file`. Fires when someone edits
+  `pyproject.toml` / `Chart.yaml` / `package.json` manually without
+  going through `multicz bump`:
+  ```
+  ! api: state recorded version '1.3.0' but pyproject.toml now reads
+    '9.9.9' — someone may have edited the file outside multicz bump
+    (state_drift)
+  ```
+* **`state_unknown_component`** (warning) — the state references a name
+  no longer declared in `multicz.toml` (typically after a component
+  was renamed or removed without clearing state).
+
+The state file is **opt-in**. The default stateless flow remains the
+recommended setup for most repos — the planner always re-derives from
+git, which is the source of truth.
 
 ## Path ownership and overlap
 
