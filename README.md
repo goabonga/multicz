@@ -654,6 +654,95 @@ mypkg (1.2.3-1) unstable; urgency=medium
 
 Old stanzas are never rewritten, matching the contract of `dch(1)`.
 
+### Workspace rules
+
+The user's natural worry: *"what happens with nested workspaces?"*. Four
+explicit rules govern how `multicz init` resolves them.
+
+#### 1. Is the root manifest a component?
+
+| ecosystem | root has version? | root has workspace block? | root → component? |
+|---|---|---|---|
+| Python | `[project].version` set | with `[tool.uv.workspace]` | **yes** |
+| Python | no `[project]` table | with `[tool.uv.workspace]` | **no** (orchestrator) |
+| Cargo | `[package]` set | with `[workspace]` | **yes** |
+| Cargo | no `[package]` | with `[workspace]` | **no** (virtual workspace) |
+| Node.js | any `version` | `workspaces` declared | **no** (members only) |
+| Node.js | `version` set | no `workspaces` | **yes** (single-package) |
+
+A workspace orchestrator with no version is **never** a component — its
+job is to delegate, not to ship. A root that doubles as a package
+(common for Python and Cargo) IS a component, alongside its members.
+
+#### 2. Do workspace members inherit the version?
+
+Each ecosystem decides:
+
+| ecosystem | per-member? | shared? |
+|---|---|---|
+| uv (`[tool.uv.workspace]`) | members own their `[project].version` | — |
+| Cargo `[workspace.package].version` | when present, members inherit via `version.workspace = true` | yes |
+| Cargo without `workspace.package.version` | members own their `[package].version` | — |
+| npm/yarn/pnpm `workspaces` | each `package.json` has its own `version` | — |
+
+When Cargo declares `[workspace.package].version`, multicz collapses
+the workspace into a **single component** bumping that one key.
+Members that inherit are silently skipped to avoid double-bumping.
+Mixed members (some inheriting, some declaring their own `[package].version`)
+are not currently supported — declare uniformly.
+
+#### 3. Are excluded members really ignored?
+
+| declaration | excludes |
+|---|---|
+| `[tool.uv.workspace].exclude = ["packages/legacy"]` | uv |
+| `[workspace].exclude = ["crates/legacy"]` | Cargo |
+| `"workspaces": ["packages/*", "!packages/legacy"]` | npm / yarn |
+| `pnpm-workspace.yaml`: `packages: ['packages/*', '!packages/legacy']` | pnpm |
+
+All four are honored — excluded members never appear as components.
+The cross-ecosystem rule is consistent: if the workspace declaration
+excludes a path, multicz skips it.
+
+#### 4. What if two manifests share the same name?
+
+`_unique` auto-suffixes the second one with the manifest type:
+
+| collision | result |
+|---|---|
+| python `api` + chart `api` | `api`, `api-chart` |
+| python `api` + python `api` (rare) | `api`, `api-py` |
+| chart `foo` + chart `foo` (different dirs) | `foo`, `foo-chart-2` |
+
+Suffix order is deterministic — the **first** manifest discovered keeps
+the bare name. To force a different naming, edit `multicz.toml`
+manually after `init` (the discovery only runs at `init` time; the
+planner reads whatever names you've declared).
+
+#### Reference layout (covered by integration tests)
+
+```
+repo/
+├── pyproject.toml              # root: [project] + [tool.uv.workspace]
+├── services/
+│   ├── api/pyproject.toml      # uv workspace member
+│   └── worker/pyproject.toml   # uv workspace member
+├── packages/
+│   └── client/package.json     # npm package (no workspace block)
+└── charts/
+    └── api/Chart.yaml          # name collides with services/api
+```
+
+`multicz init` produces:
+
+| component | source | mirrors |
+|---|---|---|
+| `monorepo` | root pyproject (workspace + `[project]`) | — |
+| `api` | `services/api/pyproject.toml` | → `charts/api/Chart.yaml:appVersion` |
+| `worker` | `services/worker/pyproject.toml` | none (no chart with that name) |
+| `client` | `packages/client/package.json` | — |
+| `api-chart` | `charts/api/Chart.yaml` (suffixed: collides with python `api`) | — |
+
 ### Auto-discovery languages
 
 `multicz init` detects the following manifests across the working tree
