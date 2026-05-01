@@ -12,6 +12,9 @@ bump_files = [
     {file = "pyproject.toml", key = "project.version"},
 ]
 changelog = "CHANGELOG.md"
+# Keep uv.lock in sync with pyproject.toml's new version, otherwise the
+# next `uv sync --frozen` (CI) fails on lockfile drift.
+post_bump = ["uv lock"]
 
 [[components.multicz.artifacts]]
 type = "pypi"
