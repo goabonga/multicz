@@ -1047,7 +1047,8 @@ def _run_post_bump_hook(repo: Path, command: str) -> None:
     args = shlex.split(command)
     if not args:
         return
-    console.print(f"  [dim]post_bump:[/] {command}")
+    # stderr, so `multicz bump --output json | jq` stays parseable.
+    err.print(f"  [dim]post_bump:[/] {command}")
     result = subprocess.run(
         args, cwd=repo, capture_output=True, text=True
     )

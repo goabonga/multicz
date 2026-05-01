@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -1628,6 +1629,31 @@ post_bump = ["sh -c 'echo final > preexisting.lock'"]
     # The committed content is the *hook output*, not the intermediate.
     committed = _git(repo, "show", "HEAD:preexisting.lock").strip()
     assert committed == "final"
+
+
+def test_post_bump_json_output_has_clean_stdout(
+    repo: Path, runner: CliRunner, capsys: pytest.CaptureFixture[str]
+):
+    """`--output json` must keep stdout JSON-parseable even when a
+    post_bump hook fires — the hook header must go to stderr, otherwise
+    pipelines that pipe into `jq` choke."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["sh -c 'echo lock > out.lock'"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    # Bypass CliRunner so stdout/stderr stay separate (CliRunner in
+    # current click no longer supports mix_stderr=False).
+    proc = subprocess.run(
+        [sys.executable, "-m", "multicz", "bump", "--commit",
+         "--output", "json"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    json.loads(proc.stdout)  # raises if stdout isn't pure JSON
+    assert "post_bump" in proc.stderr
 
 
 def test_post_bump_runs_only_for_bumped_components(
