@@ -174,6 +174,10 @@ helm package charts/myapp
 | command | what it does |
 |---|---|
 | `multicz init` | write a starter `multicz.toml` |
+| `multicz init --print` | render the discovered config to stdout (no file written) |
+| `multicz init --print --bare` | render the generic stub to stdout |
+| `multicz init --detect` | summary of detected components without rendering full TOML |
+| `multicz init --detect --output json` | machine-readable detection shape |
 | `multicz status` | brief table of pending bumps with reason summaries |
 | `multicz status --since origin/main` | preview the bump plan for a PR (vs main) |
 | `multicz changed` | components with files changed since their last tag (CI matrix) |
@@ -653,6 +657,46 @@ mypkg (1.2.3-1) unstable; urgency=medium
 ```
 
 Old stanzas are never rewritten, matching the contract of `dch(1)`.
+
+### `init` modes
+
+`multicz init` has three output modes that compose with the existing
+`--bare` flag:
+
+```sh
+# default: discover the working tree, write multicz.toml
+multicz init
+
+# render the discovered config to stdout, no file written
+multicz init --print > custom-name.toml
+
+# render the generic stub to stdout (composes with --bare)
+multicz init --print --bare
+
+# inspection only — show what would be detected, no rendering
+multicz init --detect
+
+# machine-readable detection (paths, bump_files, mirrors, format, …)
+multicz init --detect --output json
+```
+
+`--print` and `--detect` are non-destructive: the filesystem is
+untouched, so they're safe to run inside CI without `--force`.
+
+`--detect` is the lightest possible answer to *"what would init pick up
+in this repo?"*:
+
+```
+$ multicz init --detect
+Detected 2 component(s):
+  • api (pyproject.toml)
+      mirrors → charts/myapp/Chart.yaml:appVersion
+  • myapp (charts/myapp/Chart.yaml)
+```
+
+`--print` returns the byte-for-byte TOML — pipe it into a file with a
+custom name, or into a diff against an existing config. Combinations
+rejected at parse time: `--detect + --bare` and `--detect + --print`.
 
 ### Workspace rules
 
