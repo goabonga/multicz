@@ -1058,6 +1058,41 @@ A `feat:` commit touching `src/common.py` now bumps both `api` and
 `worker`. With `error` (the default) that same commit refuses to plan
 until you tighten the paths or add `exclude_paths`.
 
+## Non-conventional commits
+
+A commit like `update stuff` (no `<type>:` prefix) doesn't fit the
+conventional grammar. The default behaviour silently skips it — but
+that can hide real activity. `project.unknown_commit_policy` makes
+the choice explicit:
+
+```toml
+[project]
+unknown_commit_policy = "ignore"   # default
+# or "patch"
+# or "error"
+```
+
+| value | planner behaviour |
+|---|---|
+| `ignore` (default) | silent skip — backwards-compatible |
+| `patch` | the commit produces a `NonConventionalReason` at patch level, visible in `plan` / `explain` / JSON |
+| `error` | refuse to plan, list every offending SHA with a remediation hint |
+
+`error` mode renders a clean CLI message instead of a traceback:
+
+```
+$ multicz plan
+✗ 2 non-conventional commit(s) blocking the plan (unknown_commit_policy='error')
+  - 1b233e5: update stuff
+  - 53f374b: wip
+
+Either rewrite their headers as conventional commits (`git rebase -i`),
+or set unknown_commit_policy = "ignore" (or "patch") in [project].
+```
+
+Use it in CI as a strict gate; `ignore` (default) keeps the existing
+laissez-faire experience.
+
 ## Ignoring commit types
 
 Some commit types should never appear in any bump or changelog —
