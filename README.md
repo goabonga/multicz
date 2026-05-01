@@ -197,6 +197,55 @@ helm package charts/myapp
 | `multicz validate --strict` | also fail on warnings (overlapping paths, useless mirrors, …) |
 | `multicz validate --output json` | machine-readable findings shape |
 
+### Version scheme (semver vs PEP 440)
+
+Pre-release versions render differently across ecosystems:
+
+| ecosystem | form | example |
+|---|---|---|
+| npm, Cargo, Helm, generic | semver 2.0 | `1.3.0-rc.1` |
+| Python (canonical PEP 440) | dotless | `1.3.0rc1` |
+| Debian source packages | tilde | `1.3.0~rc1` |
+
+The default `version_scheme = "semver"` works for npm, Cargo, Helm,
+and is **also accepted** by PEP 440 (just normalized internally). For
+projects that want strict canonical Python output, opt into pep440
+per-component:
+
+```toml
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+version_scheme = "pep440"
+
+[components.chart]
+paths = ["charts/myapp/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+# default semver — Helm requires it
+```
+
+A run of `multicz bump --pre rc --commit --tag` writes:
+
+```
+pyproject.toml      version = "1.3.0rc1"
+charts/.../Chart.yaml
+  version:    0.4.1-rc.1     ← chart's own scheme (semver)
+  appVersion: 1.3.0rc1       ← mirror copies api's rendered form
+git tags
+  api-v1.3.0rc1
+  chart-v0.4.1-rc.1
+```
+
+PEP 440 compact label aliases are applied on output: `--pre alpha`
+with `scheme = "pep440"` produces `1.3.0a1` (canonical), not
+`1.3.0alpha1`. Both forms are still parseable, so ordering and
+re-reads stay correct across schemes.
+
+`format = "debian"` is incompatible with `version_scheme = "pep440"` —
+the Debian flow uses semver internally and applies its own
+`~rc1` notation at write time. Configs that combine the two are
+rejected at load.
+
 ### Release candidates
 
 A typical RC workflow:
