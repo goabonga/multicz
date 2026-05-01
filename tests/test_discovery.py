@@ -241,6 +241,54 @@ def test_cargo_in_target_dir_skipped(tmp_path: Path):
     assert "leaked" not in comps
 
 
+def test_go_module_at_root(tmp_path: Path):
+    (tmp_path / "go.mod").write_text(
+        "module github.com/foo/bar\n\ngo 1.21\n"
+    )
+    (tmp_path / "main.go").write_text("package main\n")
+    comps = discover_components(tmp_path)
+    assert "bar" in comps
+    assert comps["bar"].bump_files == []
+    assert "go.mod" in comps["bar"].paths
+    assert "**/*.go" in comps["bar"].paths
+
+
+def test_go_module_strips_major_version_suffix(tmp_path: Path):
+    (tmp_path / "go.mod").write_text(
+        "module github.com/foo/bar/v3\n\ngo 1.21\n"
+    )
+    comps = discover_components(tmp_path)
+    assert "bar" in comps
+    assert "v3" not in comps
+
+
+def test_go_module_keeps_v_when_part_of_name(tmp_path: Path):
+    # 'va' is not a major version (digits required after the 'v')
+    (tmp_path / "go.mod").write_text("module example.com/va\n")
+    comps = discover_components(tmp_path)
+    assert "va" in comps
+
+
+def test_go_module_in_subdirectory(tmp_path: Path):
+    sub = tmp_path / "services" / "api"
+    sub.mkdir(parents=True)
+    (sub / "go.mod").write_text("module example.com/api\n")
+    comps = discover_components(tmp_path)
+    assert "api" in comps
+    assert comps["api"].paths == ["services/api/**"]
+
+
+def test_go_module_in_vendor_skipped(tmp_path: Path):
+    (tmp_path / "go.mod").write_text("module example.com/main\n")
+    vend = tmp_path / "vendor" / "junk"
+    vend.mkdir(parents=True)
+    (vend / "go.mod").write_text("module leaked\n")
+    comps = discover_components(tmp_path)
+    assert "main" in comps
+    assert "leaked" not in comps
+    assert "junk" not in comps
+
+
 def test_chart_in_venv_is_skipped(tmp_path: Path):
     _python_project(tmp_path)
     venv = tmp_path / ".venv" / "some" / "Chart.yaml"

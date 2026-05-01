@@ -109,6 +109,28 @@ def _find_chart_yamls(repo: Path) -> list[Path]:
     return _find_manifests(repo, "Chart.yaml")
 
 
+def _read_go_module(path: Path) -> str | None:
+    """Return the trailing segment of ``module …`` from a go.mod, ignoring /vN."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("module "):
+            continue
+        module = stripped[len("module "):].strip().strip('"')
+        parts = [p for p in module.split("/") if p]
+        if (
+            len(parts) >= 2
+            and parts[-1].startswith("v")
+            and parts[-1][1:].isdigit()
+        ):
+            parts = parts[:-1]
+        return parts[-1] if parts else None
+    return None
+
+
 def _read_cargo(path: Path) -> tuple[str | None, str] | None:
     """Read a Cargo.toml. Returns (name, version_key) or None when there's
     nothing to bump (e.g. a workspace-only file with no shared version, or
@@ -190,6 +212,28 @@ def discover_components(repo: Path) -> dict[str, Component]:
         components[comp_name] = Component(
             paths=paths,
             bump_files=[FileKey(file=cargo_path.relative_to(repo), key=version_key)],
+            changelog=changelog,
+        )
+
+    for gomod_path in _find_manifests(repo, "go.mod"):
+        name = _read_go_module(gomod_path)
+        if not name:
+            continue
+        rel_dir = gomod_path.parent.relative_to(repo)
+        comp_name = _unique(name, set(components), suffix="go")
+        if rel_dir == Path("."):
+            paths = ["**/*.go", "go.mod"]
+            if (repo / "go.sum").is_file():
+                paths.append("go.sum")
+            if (repo / "Dockerfile").is_file():
+                paths.append("Dockerfile")
+            changelog = Path("CHANGELOG.md")
+        else:
+            paths = [f"{rel_dir.as_posix()}/**"]
+            changelog = Path(f"{rel_dir.as_posix()}/CHANGELOG.md")
+        components[comp_name] = Component(
+            paths=paths,
+            bump_files=[],  # Go is tag-driven
             changelog=changelog,
         )
 
