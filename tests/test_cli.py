@@ -389,6 +389,95 @@ def test_plan_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner)
     assert result.exit_code == 1
 
 
+def test_release_notes_for_upcoming_bump(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: null token")
+    result = runner.invoke(app, ["release-notes", "api"])
+    assert result.exit_code == 0, result.stdout
+    assert "### Features" in result.stdout
+    assert "**api**: add login" in result.stdout
+    assert "### Fixes" in result.stdout
+
+
+def test_release_notes_all_renders_every_bumping_component(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["release-notes", "--all"])
+    assert result.exit_code == 0, result.stdout
+    assert "## api" in result.stdout
+    assert "## chart" in result.stdout
+    # mirror cascade: chart has no commits but its own (the rc body)
+    # api section has the feat
+    assert "add login" in result.stdout
+
+
+def test_release_notes_text_output(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    result = runner.invoke(app, ["release-notes", "api", "--output", "text"])
+    assert result.exit_code == 0
+    assert "api 1.2.0 → 1.3.0" in result.output
+    assert "feat: add login" in result.output
+
+
+def test_release_notes_json_output(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    result = runner.invoke(app, ["release-notes", "api", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    [section] = payload["sections"]
+    assert section["component"] == "api"
+    assert section["from_version"] == "1.2.0"
+    assert section["to_version"] == "1.3.0"
+    [commit] = section["commits"]
+    assert commit["type"] == "feat"
+
+
+def test_release_notes_for_past_tag_uses_previous_stable(repo: Path, runner: CliRunner):
+    """When asking for notes on a stable tag, multicz looks at commits
+    since the previous *stable* tag — not since the most recent rc."""
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: bug")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    runner.invoke(app, ["bump", "--finalize", "--commit", "--tag"])
+
+    result = runner.invoke(app, ["release-notes", "--tag", "api-v1.3.0"])
+    assert result.exit_code == 0, result.stdout
+    # both commits land in the consolidated notes
+    assert "add login" in result.stdout
+    assert "bug" in result.stdout
+
+
+def test_release_notes_for_rc_tag_uses_previous_tag(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: bug")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+
+    result = runner.invoke(
+        app, ["release-notes", "--tag", "api-v1.3.0-rc.2"]
+    )
+    assert result.exit_code == 0
+    # rc.2's notes only show delta since rc.1
+    assert "bug" in result.stdout
+    assert "add login" not in result.stdout
+
+
+def test_release_notes_unknown_tag_errors(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["release-notes", "--tag", "unrelated-tag"])
+    assert result.exit_code == 1
+    assert "doesn't match any component" in result.output
+
+
+def test_release_notes_arg_required(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["release-notes"])
+    assert result.exit_code == 1
+
+
+def test_release_notes_tag_exclusive_with_component(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["release-notes", "api", "--tag", "api-v1.0.0"])
+    assert result.exit_code == 1
+
+
 def test_explain_lists_files_per_commit(repo: Path, runner: CliRunner):
     _commit(repo, {
         "src/main.py": "x = 2\n",

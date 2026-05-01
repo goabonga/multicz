@@ -185,7 +185,14 @@ def latest_stable_tag(cwd: Path, prefix: str) -> str | None:
 
 def commits_since(cwd: Path, since: str | None) -> list[Commit]:
     """List commits between ``since`` (exclusive) and HEAD, in chronological order."""
-    range_arg = f"{since}..HEAD" if since else "HEAD"
+    return commits_in_range(cwd, since, "HEAD")
+
+
+def commits_in_range(
+    cwd: Path, since: str | None, end: str = "HEAD"
+) -> list[Commit]:
+    """List commits between ``since`` (exclusive) and ``end`` (inclusive)."""
+    range_arg = f"{since}..{end}" if since else end
     try:
         sha_out = _run_git(["rev-list", "--reverse", "--no-merges", range_arg], cwd)
     except GitError:
@@ -201,6 +208,45 @@ def commits_since(cwd: Path, since: str | None) -> list[Commit]:
         files = tuple(line.strip() for line in files_out.splitlines() if line.strip())
         commits.append(parse_commit(sha, message, files))
     return commits
+
+
+def previous_tag(cwd: Path, prefix: str, current: str) -> str | None:
+    """The tag immediately preceding ``current`` for the same prefix."""
+    return _adjacent_tag(cwd, prefix, current, stable_only=False)
+
+
+def previous_stable_tag(cwd: Path, prefix: str, current: str) -> str | None:
+    """The previous *stable* (non pre-release) tag for ``prefix``."""
+    return _adjacent_tag(cwd, prefix, current, stable_only=True)
+
+
+def _adjacent_tag(
+    cwd: Path, prefix: str, current: str, *, stable_only: bool
+) -> str | None:
+    out = _run_git(["tag", "--list", f"{prefix}*"], cwd)
+    pairs: list[tuple[Version, str]] = []
+    for line in out.splitlines():
+        name = line.strip()
+        if not name.startswith(prefix):
+            continue
+        try:
+            v = Version(name[len(prefix):])
+        except InvalidVersion:
+            continue
+        if stable_only and v.is_prerelease:
+            continue
+        pairs.append((v, name))
+    pairs.sort(key=lambda p: p[0])
+    try:
+        cur_v = Version(current[len(prefix):])
+    except (InvalidVersion, ValueError):
+        return None
+    prev: str | None = None
+    for v, name in pairs:
+        if v >= cur_v:
+            break
+        prev = name
+    return prev
 
 
 def tag_prefix(tag_format: str, component: str) -> str:
