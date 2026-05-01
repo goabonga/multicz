@@ -212,6 +212,35 @@ def _read_go_module(path: Path) -> str | None:
     return None
 
 
+def _read_cargo_excludes(repo: Path) -> set[Path]:
+    """Resolve ``[workspace].exclude`` paths from a root Cargo.toml.
+
+    Each entry is a directory path (not a glob). The contained
+    ``Cargo.toml`` is what we want to skip during discovery.
+    """
+    root = repo / "Cargo.toml"
+    if not root.is_file():
+        return set()
+    try:
+        doc = tomlkit.parse(root.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    workspace = doc.get("workspace")
+    if not isinstance(workspace, dict):
+        return set()
+    excludes = workspace.get("exclude")
+    if not isinstance(excludes, list):
+        return set()
+    out: set[Path] = set()
+    for entry in excludes:
+        if not isinstance(entry, str):
+            continue
+        candidate = (repo / entry / "Cargo.toml")
+        if candidate.is_file():
+            out.add(candidate.resolve())
+    return out
+
+
 def _read_cargo(path: Path) -> tuple[str | None, str] | None:
     """Read a Cargo.toml. Returns (name, version_key) or None when there's
     nothing to bump (e.g. a workspace-only file with no shared version, or
@@ -293,7 +322,10 @@ def discover_components(repo: Path) -> dict[str, Component]:
         python_names.append(comp_name)
         python_raw_names[comp_name] = raw_name
 
+    cargo_excluded = _read_cargo_excludes(repo)
     for cargo_path in _find_manifests(repo, "Cargo.toml"):
+        if cargo_path.resolve() in cargo_excluded:
+            continue
         info = _read_cargo(cargo_path)
         if info is None:
             continue
@@ -457,15 +489,29 @@ def _detect_node(
     pnpm_ws = repo / "pnpm-workspace.yaml"
     workspace_globs = _read_workspace_globs(root_pkg, pnpm_ws)
 
+    # npm/yarn/pnpm support '!pattern' to exclude members from a workspace.
+    include_globs = [g for g in workspace_globs if not g.startswith("!")]
+    exclude_globs = [g[1:] for g in workspace_globs if g.startswith("!")]
+
     candidates: list[Path] = []
-    if workspace_globs:
-        for pattern in workspace_globs:
+    if include_globs:
+        excluded_paths: set[Path] = set()
+        for pattern in exclude_globs:
+            for member in repo.glob(f"{pattern}/package.json"):
+                excluded_paths.add(member.resolve())
+        for pattern in include_globs:
             for member in sorted(repo.glob(f"{pattern}/package.json")):
                 if any(
                     part in _NOISE_DIRS for part in member.relative_to(repo).parts
                 ):
                     continue
+                if member.resolve() in excluded_paths:
+                    continue
                 candidates.append(member)
+    elif workspace_globs:
+        # globs were declared but they're all '!exclusions' with no includes —
+        # nothing to add.
+        return
     else:
         candidates = _find_manifests(repo, "package.json")
 

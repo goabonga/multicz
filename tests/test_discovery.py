@@ -231,6 +231,25 @@ def test_cargo_independent_member_crates(tmp_path: Path):
     assert comps["bar"].paths == ["crates/bar/**"]
 
 
+def test_cargo_workspace_exclude_is_honored(tmp_path: Path):
+    (tmp_path / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["crates/*"]\nexclude = ["crates/legacy"]\n'
+    )
+    keep = tmp_path / "crates" / "keep"
+    keep.mkdir(parents=True)
+    (keep / "Cargo.toml").write_text(
+        '[package]\nname = "keep"\nversion = "1.0.0"\n'
+    )
+    legacy = tmp_path / "crates" / "legacy"
+    legacy.mkdir(parents=True)
+    (legacy / "Cargo.toml").write_text(
+        '[package]\nname = "legacy"\nversion = "0.1.0"\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "keep" in comps
+    assert "legacy" not in comps
+
+
 def test_cargo_in_target_dir_skipped(tmp_path: Path):
     target_cargo = tmp_path / "target" / "package" / "Cargo.toml"
     target_cargo.parent.mkdir(parents=True)
@@ -682,6 +701,98 @@ def test_workspace_declaration_keeps_strict_member_list(tmp_path: Path):
     assert "keep" in comps
     assert "extra" not in comps
     assert "monorepo" not in comps
+
+
+def test_npm_workspaces_bang_pattern_excludes_member(tmp_path: Path):
+    (tmp_path / "package.json").write_text(
+        '{"name": "monorepo", '
+        '"workspaces": ["packages/*", "!packages/legacy"]}\n'
+    )
+    keep = tmp_path / "packages" / "keep"
+    keep.mkdir(parents=True)
+    (keep / "package.json").write_text(
+        '{"name": "keep", "version": "1.0.0"}\n'
+    )
+    legacy = tmp_path / "packages" / "legacy"
+    legacy.mkdir(parents=True)
+    (legacy / "package.json").write_text(
+        '{"name": "legacy", "version": "0.1.0"}\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "keep" in comps
+    assert "legacy" not in comps
+
+
+def test_pnpm_workspace_bang_pattern_excludes_member(tmp_path: Path):
+    (tmp_path / "package.json").write_text(
+        '{"name": "monorepo", "private": true}\n'
+    )
+    (tmp_path / "pnpm-workspace.yaml").write_text(
+        "packages:\n  - 'packages/*'\n  - '!packages/legacy'\n"
+    )
+    keep = tmp_path / "packages" / "keep"
+    keep.mkdir(parents=True)
+    (keep / "package.json").write_text('{"name": "keep", "version": "1.0.0"}\n')
+    legacy = tmp_path / "packages" / "legacy"
+    legacy.mkdir(parents=True)
+    (legacy / "package.json").write_text(
+        '{"name": "legacy", "version": "0.1.0"}\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "keep" in comps
+    assert "legacy" not in comps
+
+
+def test_full_polyglot_workspace_layout(tmp_path: Path):
+    """End-to-end check on the user's exact layout from the docs.
+
+    repo/
+    ├── pyproject.toml              # workspace + root [project]
+    ├── services/api/pyproject.toml
+    ├── services/worker/pyproject.toml
+    ├── packages/client/package.json
+    └── charts/api/Chart.yaml
+    """
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "monorepo"\nversion = "1.0.0"\n'
+        '\n[tool.uv.workspace]\nmembers = ["services/*"]\n'
+    )
+    api = tmp_path / "services" / "api"
+    api.mkdir(parents=True)
+    (api / "pyproject.toml").write_text(
+        '[project]\nname = "api"\nversion = "1.0.0"\n'
+    )
+    worker = tmp_path / "services" / "worker"
+    worker.mkdir(parents=True)
+    (worker / "pyproject.toml").write_text(
+        '[project]\nname = "worker"\nversion = "0.5.0"\n'
+    )
+    client = tmp_path / "packages" / "client"
+    client.mkdir(parents=True)
+    (client / "package.json").write_text(
+        '{"name": "client", "version": "0.5.0"}\n'
+    )
+    chart = tmp_path / "charts" / "api"
+    chart.mkdir(parents=True)
+    (chart / "Chart.yaml").write_text(
+        "apiVersion: v2\nname: api\nversion: 0.4.0\nappVersion: 1.0.0\n"
+    )
+
+    comps = discover_components(tmp_path)
+    # Root pyproject has [project], so it IS a component (alongside members)
+    assert "monorepo" in comps
+    assert "api" in comps
+    assert "worker" in comps
+    assert "client" in comps
+    # Chart.yaml's name 'api' collides with the python 'api' -> chart suffixed
+    assert "api-chart" in comps
+
+    # Auto-mirror: python 'api' -> 'api-chart' (name match), worker has none
+    api_mirrors = comps["api"].mirrors
+    assert len(api_mirrors) == 1
+    assert "charts/api/Chart.yaml" in str(api_mirrors[0].file)
+    assert comps["worker"].mirrors == []
+    assert comps["monorepo"].mirrors == []
 
 
 def test_workspace_member_without_version_skipped(tmp_path: Path):
