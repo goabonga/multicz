@@ -230,6 +230,35 @@ def _load() -> tuple[Path, object]:
     return config_path.parent, load_config(config_path)
 
 
+def _parse_force_specs(specs: list[str], config) -> dict[str, str]:
+    """Parse ``--force <name>:<kind>`` flags into a dict.
+
+    Validates the component name and kind upfront so the user gets a
+    clear error before the planner runs.
+    """
+    valid_kinds = {"major", "minor", "patch"}
+    parsed: dict[str, str] = {}
+    for spec in specs or []:
+        if ":" not in spec:
+            err.print(
+                f"[red]invalid --force spec[/] {spec!r}: "
+                "expected NAME:KIND (e.g. api:patch)"
+            )
+            raise typer.Exit(code=1)
+        name, _, kind = spec.partition(":")
+        if name not in config.components:
+            err.print(f"[red]unknown component:[/] {name}")
+            raise typer.Exit(code=1)
+        if kind not in valid_kinds:
+            err.print(
+                f"[red]invalid kind[/] {kind!r}: "
+                "must be major, minor, or patch"
+            )
+            raise typer.Exit(code=1)
+        parsed[name] = kind
+    return parsed
+
+
 def _build_plan_or_exit(repo, config, **kwargs):
     """Wrap build_plan() and surface NonConventionalCommitsError as a clean
     typer.Exit instead of a raw traceback."""
@@ -304,6 +333,12 @@ def plan_cmd(
              "(--since origin/main) or migration scenarios "
              "(--since HEAD~10).",
     ),
+    force: list[str] = typer.Option(
+        None, "--force",
+        help="Force-bump <name>:<kind>. Repeatable. Bypasses commit "
+             "detection — use for manual rebuilds (CVE base image refresh, "
+             "weekly artefact rebuild, …).",
+    ),
 ) -> None:
     """Print the bump plan: every component that would change, the new
     version, and the *reasons* (conventional commits, trigger cascades,
@@ -332,7 +367,10 @@ def plan_cmd(
         raise typer.Exit(code=1)
 
     repo, config = _load()
-    plan_obj = _build_plan_or_exit(repo, config, pre=pre, finalize=finalize, since=since)
+    forced = _parse_force_specs(force, config) if force else {}
+    plan_obj = _build_plan_or_exit(
+        repo, config, pre=pre, finalize=finalize, since=since, force=forced or None
+    )
 
     if output == "json":
         payload = {
@@ -1077,6 +1115,12 @@ def bump(
              "release_commit_message template). Like 'git commit -m', no "
              "placeholders are expanded — the string is used as-is.",
     ),
+    force: list[str] = typer.Option(
+        None, "--force",
+        help="Force-bump <name>:<kind>. Repeatable. Bypasses commit "
+             "detection — use for manual rebuilds (e.g. weekly base "
+             "image refresh: `--force api:patch`).",
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
     if pre is not None and finalize:
@@ -1087,7 +1131,10 @@ def bump(
         raise typer.Exit(code=1)
 
     repo, config = _load()
-    plan = _build_plan_or_exit(repo, config, pre=pre, finalize=finalize)
+    forced = _parse_force_specs(force, config) if force else {}
+    plan = _build_plan_or_exit(
+        repo, config, pre=pre, finalize=finalize, force=forced or None
+    )
 
     if component:
         plan.bumps = {n: b for n, b in plan.bumps.items() if n in set(component)}
@@ -1096,7 +1143,10 @@ def bump(
         if output == "json":
             console.print_json(data={"bumps": {}})
         else:
-            console.print("[dim]no bumps pending[/]")
+            console.print(
+                "[dim]no bumps pending — "
+                "use [bold]--force <name>:<kind>[/] for a manual bump[/]"
+            )
         return
 
     matcher = ComponentMatcher(config.components)

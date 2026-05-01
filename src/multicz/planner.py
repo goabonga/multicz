@@ -561,6 +561,7 @@ def build_plan(
     pre: str | None = None,
     finalize: bool = False,
     since: str | None = None,
+    force: dict[str, BumpKind] | None = None,
 ) -> Plan:
     """Compute the bump plan for ``repo`` against ``config``.
 
@@ -602,6 +603,32 @@ def build_plan(
                     reasons=[ManualReason("explicit --finalize")],
                     finalize=True,
                 )
+
+    # --force applies after every other pass so it composes with --pre,
+    # --finalize, triggers and mirrors. The forced kind is promoted into
+    # any existing bump (never demoted) and adds a ManualReason for
+    # auditability.
+    if force:
+        for name, kind in force.items():
+            if name not in config.components:
+                continue
+            reason = ManualReason(f"--force {name}:{kind}")
+            existing = plan.bumps.get(name)
+            if existing is None:
+                plan.bumps[name] = PlannedBump(
+                    component=name,
+                    current=versions[name],
+                    kind=kind,
+                    reasons=[reason],
+                    pre=pre,
+                    finalize=finalize,
+                )
+            else:
+                stronger = _stronger(existing.kind, kind)
+                if stronger != existing.kind:
+                    existing.kind = stronger  # type: ignore[assignment]
+                if reason not in existing.reasons:
+                    existing.reasons.append(reason)
 
     # Apply per-component version_scheme so .next renders correctly.
     for name, bump in plan.bumps.items():

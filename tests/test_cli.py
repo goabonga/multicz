@@ -866,6 +866,85 @@ version_scheme = "pep440"
     assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
 
 
+def test_bump_force_creates_bump_without_commits(repo: Path, runner: CliRunner):
+    """--force bumps a component even when no commits would normally trigger it."""
+    result = runner.invoke(app, ["bump", "--force", "api:patch"])
+    assert result.exit_code == 0, result.stdout
+    assert 'version = "1.2.1"' in (repo / "pyproject.toml").read_text()
+
+
+def test_bump_force_repeatable(repo: Path, runner: CliRunner):
+    result = runner.invoke(
+        app, ["bump", "--force", "api:minor", "--force", "chart:major"]
+    )
+    assert result.exit_code == 0, result.stdout
+    assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
+    chart = (repo / "charts/myapp/Chart.yaml").read_text()
+    assert "version: 1.0.0" in chart  # major bump
+
+
+def test_bump_force_promotes_existing_bump(repo: Path, runner: CliRunner):
+    """Force-major over a feat (which would be minor) wins."""
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["bump", "--force", "api:major"])
+    assert result.exit_code == 0
+    assert 'version = "2.0.0"' in (repo / "pyproject.toml").read_text()
+
+
+def test_bump_force_does_not_demote(repo: Path, runner: CliRunner):
+    """Force-patch when commits already imply minor doesn't downgrade."""
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["bump", "--force", "api:patch"])
+    assert result.exit_code == 0
+    # feat is minor, force patch is weaker, minor wins
+    assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
+
+
+def test_bump_force_invalid_kind(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["bump", "--force", "api:weird"])
+    assert result.exit_code == 1
+    assert "invalid kind" in result.output
+
+
+def test_bump_force_unknown_component(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["bump", "--force", "nope:patch"])
+    assert result.exit_code == 1
+    assert "unknown component" in result.output
+
+
+def test_bump_force_invalid_spec(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["bump", "--force", "no-colon"])
+    assert result.exit_code == 1
+    assert "invalid --force spec" in result.output
+
+
+def test_bump_force_composes_with_pre(repo: Path, runner: CliRunner):
+    result = runner.invoke(
+        app, ["bump", "--force", "api:minor", "--pre", "rc"]
+    )
+    assert result.exit_code == 0, result.stdout
+    assert 'version = "1.3.0-rc.1"' in (repo / "pyproject.toml").read_text()
+
+
+def test_plan_force_shows_manual_reason(repo: Path, runner: CliRunner):
+    result = runner.invoke(
+        app, ["plan", "--force", "api:patch", "--output", "json"]
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    api = payload["bumps"]["api"]
+    assert api["next"] == "1.2.1"
+    [reason] = api["reasons"]
+    assert reason["kind"] == "manual"
+    assert "force" in reason["note"]
+
+
+def test_empty_plan_message_mentions_force(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 0
+    assert "--force" in result.output
+
+
 def test_release_commit_message_template_components(repo: Path, runner: CliRunner):
     (repo / "multicz.toml").write_text(CONFIG + """
 [project]
