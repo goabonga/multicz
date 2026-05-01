@@ -131,7 +131,33 @@ helm package charts/myapp
 | `multicz changelog [-c name]` | per-component conventional-commit log since the last tag |
 | `multicz changelog --output md` | the same, grouped into Breaking / Features / Fixes / Perf / Other |
 | `multicz bump --no-changelog` | bump versions without touching declared `CHANGELOG.md` files |
+| `multicz bump --pre rc` | enter / continue a release-candidate cycle (`1.2.3` → `1.3.0-rc.1` → `1.3.0-rc.2`) |
+| `multicz bump --finalize` | drop a pre-release suffix (`1.3.0-rc.2` → `1.3.0`) — works with no new commits |
 | `multicz check <file>` | validate a commit message — wire as a `commit-msg` hook |
+
+### Release candidates
+
+A typical RC workflow:
+
+```sh
+# starting from api-v1.2.3, with new feat commits on the branch
+multicz bump --pre rc --commit --tag      # → api-v1.3.0-rc.1
+# more fixes
+multicz bump --pre rc --commit --tag      # → api-v1.3.0-rc.2
+# QA approves — ship the final
+multicz bump --finalize --commit --tag    # → api-v1.3.0
+```
+
+`--pre <label>` accepts any label (`rc`, `alpha`, `beta`, `dev`, …) and
+the counter resets when you switch labels. `--finalize` is allowed even
+when no commits landed since the last RC tag — finalising IS a release
+event in its own right. Without either flag, a `multicz bump` from a
+pre-release version auto-finalises.
+
+For Debian-format components the changelog stanza renders with `~`
+notation so `apt`'s ordering puts pre-releases *before* the final:
+`mypkg (1.3.0~rc1-1)` < `mypkg (1.3.0-1)`. The git tag itself stays in
+semver form (`mypkg-v1.3.0-rc.1`).
 
 ### Per-component CHANGELOG.md
 
