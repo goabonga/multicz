@@ -331,13 +331,49 @@ def discover_components(repo: Path) -> dict[str, Component]:
             chart_yaml_path = components[chart_comp_name].bump_files[0].file
             py.mirrors.append(FileKey(file=chart_yaml_path, key="appVersion"))
 
+    _detect_node(repo, components, python_name=python_name)
+
+    return components
+
+
+def _detect_node(
+    repo: Path,
+    components: dict[str, Component],
+    *,
+    python_name: str | None,
+) -> None:
+    """Add Node.js components, expanding workspaces when declared."""
     package_json = repo / "package.json"
+    pnpm_workspace = repo / "pnpm-workspace.yaml"
+    workspace_globs = _read_workspace_globs(package_json, pnpm_workspace)
+
+    if workspace_globs:
+        for pattern in workspace_globs:
+            for member in sorted(repo.glob(f"{pattern}/package.json")):
+                if any(
+                    part in _NOISE_DIRS for part in member.relative_to(repo).parts
+                ):
+                    continue
+                name = _read_package_json_name(member)
+                version = _read_package_json_version(member)
+                if not name or version is None:
+                    continue
+                comp_name = _unique(name, set(components), suffix="js")
+                rel_dir = member.parent.relative_to(repo).as_posix()
+                components[comp_name] = Component(
+                    paths=[f"{rel_dir}/**"],
+                    bump_files=[
+                        FileKey(file=member.relative_to(repo), key="version")
+                    ],
+                    changelog=Path(f"{rel_dir}/CHANGELOG.md"),
+                )
+        return
+
     if package_json.is_file():
         name = _read_package_json_name(package_json)
         if name:
             comp_name = _unique(name, set(components), suffix="js")
             paths = ["package.json"]
-            # only claim src/** for the JS app if there's no Python project to do it
             if python_name is None and (repo / "src").is_dir():
                 paths.insert(0, "src/**")
             components[comp_name] = Component(
@@ -346,7 +382,51 @@ def discover_components(repo: Path) -> dict[str, Component]:
                 changelog=Path("CHANGELOG.md") if python_name is None else None,
             )
 
-    return components
+
+def _read_package_json_version(path: Path) -> str | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return data.get("version") if isinstance(data, dict) else None
+
+
+def _read_workspace_globs(
+    package_json: Path, pnpm_workspace: Path
+) -> list[str]:
+    """Return workspace member globs from npm/yarn (package.json) or pnpm.
+
+    Recognised shapes:
+
+    * ``"workspaces": ["packages/*"]`` (npm, yarn classic)
+    * ``"workspaces": {"packages": ["packages/*"]}`` (yarn berry)
+    * ``pnpm-workspace.yaml`` with ``packages: [...]``
+    """
+    globs: list[str] = []
+    if package_json.is_file():
+        try:
+            data = json.loads(package_json.read_text(encoding="utf-8"))
+        except Exception:
+            data = None
+        if isinstance(data, dict):
+            workspaces = data.get("workspaces")
+            if isinstance(workspaces, list):
+                globs = [str(g) for g in workspaces if isinstance(g, str)]
+            elif isinstance(workspaces, dict):
+                packages = workspaces.get("packages")
+                if isinstance(packages, list):
+                    globs = [str(g) for g in packages if isinstance(g, str)]
+    if not globs and pnpm_workspace.is_file():
+        try:
+            data = YAML(typ="safe").load(
+                pnpm_workspace.read_text(encoding="utf-8")
+            ) or {}
+        except Exception:
+            data = {}
+        packages = data.get("packages") if isinstance(data, dict) else None
+        if isinstance(packages, list):
+            globs = [str(g) for g in packages if isinstance(g, str)]
+    return globs
 
 
 def render_config(

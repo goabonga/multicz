@@ -384,6 +384,71 @@ def test_package_json_creates_component(tmp_path: Path):
     assert comps["frontend"].bump_files[0].key == "version"
 
 
+def test_npm_workspaces_array_expands(tmp_path: Path):
+    (tmp_path / "package.json").write_text(
+        '{"name": "monorepo", "private": true, '
+        '"workspaces": ["packages/*"]}\n'
+    )
+    web = tmp_path / "packages" / "web"
+    web.mkdir(parents=True)
+    (web / "package.json").write_text(
+        '{"name": "web", "version": "1.0.0"}\n'
+    )
+    api = tmp_path / "packages" / "api"
+    api.mkdir(parents=True)
+    (api / "package.json").write_text(
+        '{"name": "api-js", "version": "0.5.0"}\n'
+    )
+    comps = discover_components(tmp_path)
+
+    assert "web" in comps
+    assert "api-js" in comps
+    assert "monorepo" not in comps  # root is not added when workspaces are declared
+    assert comps["web"].paths == ["packages/web/**"]
+    assert str(comps["web"].bump_files[0].file) == "packages/web/package.json"
+
+
+def test_yarn_berry_workspaces_object(tmp_path: Path):
+    (tmp_path / "package.json").write_text(
+        '{"name": "monorepo", "workspaces": {"packages": ["apps/*"]}}\n'
+    )
+    foo = tmp_path / "apps" / "foo"
+    foo.mkdir(parents=True)
+    (foo / "package.json").write_text('{"name": "foo", "version": "0.1.0"}\n')
+    comps = discover_components(tmp_path)
+    assert "foo" in comps
+
+
+def test_pnpm_workspace_yaml(tmp_path: Path):
+    (tmp_path / "package.json").write_text(
+        '{"name": "monorepo", "private": true}\n'
+    )
+    (tmp_path / "pnpm-workspace.yaml").write_text(
+        "packages:\n  - 'packages/*'\n"
+    )
+    web = tmp_path / "packages" / "web"
+    web.mkdir(parents=True)
+    (web / "package.json").write_text(
+        '{"name": "@acme/web", "version": "1.0.0"}\n'
+    )
+    comps = discover_components(tmp_path)
+    assert "web" in comps  # npm scope stripped
+    assert "monorepo" not in comps
+
+
+def test_workspace_member_without_version_skipped(tmp_path: Path):
+    (tmp_path / "package.json").write_text(
+        '{"name": "monorepo", "workspaces": ["packages/*"]}\n'
+    )
+    private_pkg = tmp_path / "packages" / "private"
+    private_pkg.mkdir(parents=True)
+    (private_pkg / "package.json").write_text(
+        '{"name": "private", "private": true}\n'  # no version
+    )
+    comps = discover_components(tmp_path)
+    assert "private" not in comps
+
+
 def test_package_json_scope_is_stripped(tmp_path: Path):
     (tmp_path / "package.json").write_text(
         '{"name": "@acme/widget", "version": "0.1.0"}\n'
