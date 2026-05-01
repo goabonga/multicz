@@ -201,7 +201,7 @@ and seeds one component per project:
 
 | ecosystem | manifest | name source |
 |---|---|---|
-| Python | `pyproject.toml` | `[project].name` |
+| Python | `**/pyproject.toml` | `[project].name` (PEP 621 / uv / hatch / modern Poetry) **or** `[tool.poetry].name` (legacy Poetry) — `[tool.uv.workspace].members` and `exclude` are honoured |
 | Helm | `**/Chart.yaml` | `name:` field |
 | Rust | `**/Cargo.toml` | `[package].name` (workspaces collapse to one component when `[workspace.package].version` is shared) |
 | Go | `**/go.mod` | last segment of `module …` (strips `/vN`) — tag-driven, no version file |
