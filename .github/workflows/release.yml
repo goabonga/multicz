@@ -1,0 +1,91 @@
+name: release
+
+# Self-hosted release pipeline: multicz manages multicz.
+#
+# What it does on every push to main:
+#   1. validate the multicz config (CI gate)
+#   2. plan the release (skip the rest if nothing pending)
+#   3. bump pyproject.toml + CHANGELOG.md, commit, tag, push
+#   4. build the wheel + sdist (uv build)
+#   5. publish to PyPI via Trusted Publishing (OIDC, no token needed)
+#   6. open a GitHub Release per new tag, with notes from
+#      `multicz release-notes`
+#
+# Setup: configure PyPI trusted publishing for the repo
+# (https://docs.pypi.org/trusted-publishers/) — no PYPI_TOKEN secret
+# required. If you prefer token-based publishing, swap the
+# pypa/gh-action-pypi-publish step for `uv publish` with
+# `UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}`.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # push the release commit and tags
+  id-token: write   # OIDC claim for PyPI Trusted Publishing
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Don't loop on the chore(release) commit we just pushed.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate
+        run: uv run multicz validate --strict
+
+      - name: Plan
+        id: plan
+        run: |
+          uv run multicz plan --output json | tee /tmp/plan.json
+          if [ "$(jq '.bumps | length' /tmp/plan.json)" = "0" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "no release pending"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump, commit, tag, push
+        if: steps.plan.outputs.release == 'true'
+        run: |
+          uv run multicz bump --commit --tag --push --output json \
+            | tee /tmp/release.json
+
+      - name: Reinstall (pick up the new version)
+        if: steps.plan.outputs.release == 'true'
+        run: uv sync --frozen
+
+      - name: Build wheel and sdist
+        if: steps.plan.outputs.release == 'true'
+        run: uv build
+
+      - name: Publish to PyPI (Trusted Publishing via OIDC)
+        if: steps.plan.outputs.release == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub Release
+        if: steps.plan.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for tag in $(git tag --points-at HEAD); do
+            uv run multicz release-notes --tag "$tag" \
+              | gh release create "$tag" --title "$tag" --notes-file -
+          done
