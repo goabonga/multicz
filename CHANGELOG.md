@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [0.2.0] - 2026-05-01
+
+### Features
+
+- **bump**: post_bump hooks regenerate lockfiles atomically (`4f43698`)
+
 ## [0.1.0] - 2026-05-01
 
 ### Features
