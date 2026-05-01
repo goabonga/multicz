@@ -568,6 +568,45 @@ paths = ["charts/**"]               # default "chart-v…" — fresh history
 `multicz status` now shows `api` reading its version from the
 existing `v1.2.0` tag while `chart` starts at `initial_version`.
 
+## Path ownership and overlap
+
+The matcher uses **first-match-wins** by default: when two components
+both claim a file (e.g. `api` and `worker` both listing `src/**`), the
+component declared first in the config silently owns it, and the
+others lose. That's predictable but easy to miss.
+
+`project.overlap_policy` makes the choice explicit:
+
+```toml
+[project]
+overlap_policy = "error"   # default
+```
+
+| value | `validate` | runtime behaviour |
+|---|---|---|
+| `error` (default) | error | refuses to plan/bump until you resolve the overlap |
+| `first-match` | warning | first-declared component owns the file (the others lose) |
+| `allow` | silent | same runtime as `first-match` — suppresses the finding |
+| `all` | info | a shared file bumps **every** claiming component |
+
+The `all` mode is genuinely useful for monorepos where several
+components share code:
+
+```toml
+[project]
+overlap_policy = "all"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+
+[components.worker]
+paths = ["src/**", "workers/**"]
+```
+
+A `feat:` commit touching `src/common.py` now bumps both `api` and
+`worker`. With `error` (the default) that same commit refuses to plan
+until you tighten the paths or add `exclude_paths`.
+
 ## Helm chart immutability
 
 Helm charts are content-addressed by `name-version.tgz`. If `chart-0.5.0`
