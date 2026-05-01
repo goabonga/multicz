@@ -82,11 +82,23 @@ class Commit:
 
     @property
     def bump_kind(self) -> BumpKind | None:
+        """Semver level implied by the conventional-commit type.
+
+        ``major``: ``!`` marker or ``BREAKING CHANGE:`` footer.
+        ``minor``: ``feat``.
+        ``patch``: ``fix``, ``perf``, ``revert``. A revert is a
+        user-visible change (something was removed or restored), and a
+        patch is the conservative answer — the next release isn't a
+        feature or breaking change, but it isn't nothing either.
+
+        Other types (``chore``, ``docs``, ``style``, ``refactor``,
+        ``test``, ``build``, ``ci``) return ``None`` and don't bump.
+        """
         if self.breaking:
             return "major"
         if self.type.lower() == "feat":
             return "minor"
-        if self.type.lower() in {"fix", "perf"}:
+        if self.type.lower() in {"fix", "perf", "revert"}:
             return "patch"
         return None
 

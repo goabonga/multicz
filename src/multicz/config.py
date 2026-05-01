@@ -164,6 +164,7 @@ def _default_changelog_sections() -> list[ChangelogSection]:
         ChangelogSection(title="Features", types=["feat"]),
         ChangelogSection(title="Fixes", types=["fix"]),
         ChangelogSection(title="Performance", types=["perf"]),
+        ChangelogSection(title="Reverts", types=["revert"]),
     ]
 
 

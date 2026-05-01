@@ -19,6 +19,25 @@ def test_perf_is_patch():
     assert commit.bump_kind == "patch"
 
 
+def test_revert_is_patch():
+    commit = parse_commit("a", "revert: feat: add login", ())
+    assert commit.type == "revert"
+    assert commit.bump_kind == "patch"
+
+
+def test_revert_with_scope_is_patch():
+    commit = parse_commit("a", "revert(api): drop login flow", ())
+    assert commit.scope == "api"
+    assert commit.bump_kind == "patch"
+
+
+def test_revert_breaking_is_still_major():
+    """An explicit '!' on a revert means the original was breaking and
+    re-applying the breaking change. Honour the '!'."""
+    commit = parse_commit("a", "revert!: drop the new API", ())
+    assert commit.bump_kind == "major"
+
+
 def test_bang_is_breaking():
     commit = parse_commit("a", "feat!: rewrite", ())
     assert commit.breaking

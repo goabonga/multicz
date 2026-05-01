@@ -6,13 +6,14 @@ from multicz.commits import parse_commit
 from multicz.config import ChangelogSection
 
 
-def test_render_default_groups_feat_fix_perf():
+def test_render_default_groups_feat_fix_perf_revert():
     commits = [
         parse_commit("aaaaaaa", "feat(api): add login", ()),
         parse_commit("bbbbbbb", "fix: null token", ()),
         parse_commit("ccccccc", "perf: tighter loop", ()),
         parse_commit("ddddddd", "chore: tweak", ()),
         parse_commit("eeeeeee", "feat!: rewrite", ()),
+        parse_commit("fffffff", "revert: drop x feature", ()),
     ]
     text = render_section("1.3.0", commits, today=date(2026, 4, 30))
 
@@ -21,14 +22,16 @@ def test_render_default_groups_feat_fix_perf():
     assert "### Features" in text
     assert "### Fixes" in text
     assert "### Performance" in text
+    assert "### Reverts" in text
     # chore is silently dropped by default
     assert "chore" not in text
     assert "tweak" not in text
-    # ordering
-    order = ["Breaking changes", "Features", "Fixes", "Performance"]
+    # ordering: Breaking < Features < Fixes < Performance < Reverts
+    order = ["Breaking changes", "Features", "Fixes", "Performance", "Reverts"]
     indices = [text.index(f"### {s}") for s in order]
     assert indices == sorted(indices)
     assert "**api**: add login" in text
+    assert "drop x feature" in text
 
 
 def test_render_keepachangelog_vocabulary():
