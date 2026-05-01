@@ -175,6 +175,8 @@ helm package charts/myapp
 |---|---|
 | `multicz init` | write a starter `multicz.toml` |
 | `multicz status` | brief table of pending bumps with reason summaries |
+| `multicz changed` | components with files changed since their last tag (CI matrix) |
+| `multicz changed --since origin/main` | what changed in this branch vs main |
 | `multicz plan` | per-component plan with explicit reasons (commit / trigger / mirror) |
 | `multicz plan --output json` | machine-readable shape for CI |
 | `multicz explain <component>` | full breakdown — every commit, the matched files, every cascade |
@@ -312,6 +314,61 @@ The check identifier in parentheses (`bump_files_exist`,
 `mirror_cycle`, …) is stable so CI logs and PR comments can grep on
 it. `--output json` emits the same data as a structured payload with
 a counts summary.
+
+### `changed` (CI matrix gating)
+
+`multicz changed` is the lightest possible question — *did anything
+change* — designed for CI to only run jobs for the components a PR
+actually touched. Distinct from `plan`: `plan` says "would bump",
+`changed` says "any activity, regardless of whether it's release-
+worthy".
+
+```sh
+multicz changed                       # per-component (since each one's last tag)
+multicz changed --since origin/main   # every component vs main (PR gating)
+multicz changed --output json
+```
+
+Default text output is one component name per line — pipeable into
+shell loops:
+
+```sh
+for comp in $(multicz changed --since origin/main); do
+  echo "rebuilding $comp"
+done
+```
+
+JSON output exposes both lists, ideal for `fromJson` in GitHub Actions
+matrices:
+
+```yaml
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.c.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: c
+        run: |
+          echo "list=$(multicz changed --since origin/main \
+                       --output json | jq -c .changed)" >> $GITHUB_OUTPUT
+
+  test:
+    needs: detect
+    if: needs.detect.outputs.changed != '[]'
+    strategy:
+      matrix:
+        component: ${{ fromJson(needs.detect.outputs.changed) }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: cd ${{ matrix.component }} && make test
+```
+
+Release commits matching `project.release_commit_pattern` are
+filtered out so a previous `multicz bump --commit` doesn't keep
+flagging every component forever.
 
 ### `plan` and `explain`
 
