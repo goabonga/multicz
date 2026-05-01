@@ -159,6 +159,17 @@ notation so `apt`'s ordering puts pre-releases *before* the final:
 `mypkg (1.3.0~rc1-1)` < `mypkg (1.3.0-1)`. The git tag itself stays in
 semver form (`mypkg-v1.3.0-rc.1`).
 
+#### Finalize strategy
+
+`[project].finalize_strategy` controls what the changelog looks like
+after `--finalize`:
+
+| value | behaviour |
+|---|---|
+| `consolidate` (default) | the finalize section/stanza lists every commit since the previous *stable* tag, so the new entry contains the cumulative change list. RC sections stay below as history. |
+| `promote` | same commit selection as `consolidate`, plus the now-superseded `## [1.3.0-rc.*]` markdown sections (and `mypkg (1.3.0~rc*-*)` Debian stanzas) are removed from the file. The final entry stands alone. |
+| `annotate` | the section enumerates only commits since the last *tag* (rc included), so the finalize section may be `_No notable changes._` when no commits landed between the last rc and finalize. Each tag keeps its own dedicated section. |
+
 ### Per-component CHANGELOG.md
 
 When a component declares `changelog = "path/to/CHANGELOG.md"`, every
