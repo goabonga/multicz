@@ -192,6 +192,8 @@ helm package charts/myapp
 | `multicz bump --commit --tag` | release in one shot: write, commit, tag |
 | `multicz bump --commit --tag --push` | …and push commit + tags with `--follow-tags` |
 | `multicz bump --commit -m "..."` | verbatim release-commit message (overrides the template) |
+| `multicz bump --force api:patch` | manual bump for rebuilds without commits |
+| `multicz bump --force api:minor --force chart:major` | repeatable across components |
 | `multicz bump --output json` | emit `{"bumps": {...}, "git": {...}}` for CI |
 | `multicz get <component>` | read the current version from the primary bump file |
 | `multicz changelog [-c name]` | per-component conventional-commit log since the last tag |
@@ -258,6 +260,75 @@ re-reads stay correct across schemes.
 the Debian flow uses semver internally and applies its own
 `~rc1` notation at write time. Configs that combine the two are
 rejected at load.
+
+### Empty release / manual bump
+
+When there are no commits the planner can act on, `multicz bump` is a
+no-op:
+
+```
+$ multicz bump
+no bumps pending — use --force <name>:<kind> for a manual bump
+```
+
+Exit code is 0 — "nothing to do" is success, not failure.
+
+For the cases where you genuinely need a release without code changes
+(weekly base-image rebuild for security patches, dependency-only
+update, deliberate retag), `--force NAME:KIND` is the manual escape
+hatch:
+
+```sh
+# Single forced bump
+multicz bump --force api:patch
+
+# Multiple components in one go
+multicz bump --force api:minor --force chart:major
+
+# Compose with --pre / --finalize / --commit / --tag
+multicz bump --force api:minor --pre rc --commit --tag
+```
+
+`--force` shows up in the plan and explain output as a `ManualReason`
+so the audit trail is preserved:
+
+```json
+{
+  "kind": "manual",
+  "note": "--force api:patch"
+}
+```
+
+Promotion semantics: if the component would already bump from commits,
+`--force` is **upgraded** (never downgraded). A `feat:` (minor) plus
+`--force api:patch` stays at minor; `feat:` plus `--force api:major`
+jumps to major. The strongest level always wins.
+
+Validation is upfront and explicit:
+
+```
+$ multicz bump --force api:weird
+invalid kind 'weird': must be major, minor, or patch
+exit=1
+
+$ multicz bump --force unknown:patch
+unknown component: unknown
+exit=1
+
+$ multicz bump --force no-colon
+invalid --force spec 'no-colon': expected NAME:KIND (e.g. api:patch)
+exit=1
+```
+
+`--force` does **not** add anything to the changelog (no commit to
+list), so the rendered `CHANGELOG.md` will say
+`_No notable changes._` for the forced section. If you want a custom
+note, also pass `--commit-message`:
+
+```sh
+multicz bump --force api:patch --commit \
+  -m "chore(release): rebuild api for CVE-2024-1234"
+```
 
 ### Release commit message
 
