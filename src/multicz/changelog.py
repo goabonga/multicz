@@ -27,6 +27,7 @@ older release section.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Sequence
 from datetime import date
 from pathlib import Path
@@ -128,17 +129,39 @@ def render_section(
 
 
 def insert_section(existing: str, section: str) -> str:
-    """Insert ``section`` (which already ends in a blank line) into ``existing``."""
+    """Insert ``section`` into ``existing``, separating it from neighbouring
+    sections with a blank line.
+    """
     if not existing.strip():
         return _PREAMBLE + section.rstrip() + "\n"
 
     lines = existing.splitlines(keepends=True)
     for index, line in enumerate(lines):
         if line.startswith("## "):
-            return "".join(lines[:index]) + section + "".join(lines[index:])
+            block = section.rstrip("\n") + "\n\n"
+            return "".join(lines[:index]) + block + "".join(lines[index:])
 
-    suffix = "" if existing.endswith("\n") else "\n"
-    return existing + suffix + "\n" + section.rstrip() + "\n"
+    return existing.rstrip("\n") + "\n\n" + section.rstrip() + "\n"
+
+
+def drop_prerelease_sections(text: str, base_version: str) -> str:
+    """Remove markdown sections whose H2 heading is ``[<base_version>-<pre>.<n>]``.
+
+    Used by the ``promote`` finalize strategy so that once ``[1.3.0]`` is
+    written, the now-superseded ``[1.3.0-rc.1]``, ``[1.3.0-rc.2]``, …
+    sections are removed from the file.
+    """
+    pre_re = re.compile(
+        rf"^## \[{re.escape(base_version)}-[A-Za-z]+\.\d+\]"
+    )
+    out: list[str] = []
+    skip = False
+    for line in text.splitlines(keepends=True):
+        if line.startswith("## "):
+            skip = bool(pre_re.match(line))
+        if not skip:
+            out.append(line)
+    return "".join(out)
 
 
 def update_changelog_file(
@@ -150,8 +173,14 @@ def update_changelog_file(
     sections: Sequence[ChangelogSection] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
+    drop_prereleases: bool = False,
 ) -> None:
-    """Render a new section and merge it into ``path`` (creating the file if needed)."""
+    """Render a new section and merge it into ``path`` (creating the file if needed).
+
+    ``drop_prereleases=True`` removes any prior ``## [<version>-<pre>.<n>]``
+    sections from the file before inserting the new release section —
+    used by the ``promote`` finalize strategy.
+    """
     section = render_section(
         version,
         commits,
@@ -161,5 +190,7 @@ def update_changelog_file(
         other_title=other_title,
     )
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if drop_prereleases:
+        existing = drop_prerelease_sections(existing, version)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(insert_section(existing, section), encoding="utf-8")

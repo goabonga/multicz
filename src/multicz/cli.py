@@ -15,13 +15,19 @@ from .changelog import render_body, update_changelog_file
 from .commits import (
     DEFAULT_TYPES,
     commits_since,
+    latest_stable_tag,
     latest_tag,
     tag_prefix,
     validate_message,
 )
 from .components import ComponentMatcher
 from .config import CONFIG_FILENAME, find_config, load_config
-from .debian import format_debian_version, prepend_stanza, render_stanza
+from .debian import (
+    drop_prerelease_stanzas,
+    format_debian_version,
+    prepend_stanza,
+    render_stanza,
+)
 from .discovery import discover_components, render_config
 from .planner import build_plan
 from .writers import read_value, write_value
@@ -198,13 +204,25 @@ def _component_relevant_commits(
     config,  # Config
     repo: Path,
     matcher: ComponentMatcher,
+    *,
+    since_stable: bool = False,
 ):
-    """Conventional commits since the component's last tag, with release
-    commits filtered out so they don't pollute the changelog body."""
+    """Conventional commits owning ``name`` since the component's last tag.
+
+    Release commits matching ``project.release_commit_pattern`` are filtered
+    out so they don't pollute the changelog body. When ``since_stable`` is
+    True, the range starts at the previous *stable* tag instead — used by
+    the ``consolidate`` and ``promote`` finalize strategies so the final
+    section enumerates everything since the last shipped release.
+    """
     import re
 
     prefix = tag_prefix(config.project.tag_format, name)
-    since = latest_tag(repo, prefix)
+    since = (
+        latest_stable_tag(repo, prefix)
+        if since_stable
+        else latest_tag(repo, prefix)
+    )
     release_re = re.compile(config.project.release_commit_pattern)
     return [
         c
@@ -221,6 +239,13 @@ def _commit_header(commit) -> str:
     return f"{commit.type}: {commit.subject}"
 
 
+def _is_finalize(planned) -> bool:
+    """A finalize op is any planned bump that turns a pre-release into a
+    final version (either via --finalize or auto-finalize when --pre isn't
+    set on a current pre-release)."""
+    return planned.current.is_prerelease and planned.pre is None
+
+
 def _bump_debian(
     name: str,
     comp,  # Component
@@ -229,6 +254,7 @@ def _bump_debian(
     matcher: ComponentMatcher,
     new_version: str,
     *,
+    is_finalize: bool,
     dry_run: bool,
     written: list[Path],
     changelogs_updated: list[str],
@@ -238,12 +264,23 @@ def _bump_debian(
     The git tag uses the semver form (``mypkg-v1.3.0-rc.1``) so multicz can
     re-read it later via :class:`packaging.version.Version`; only the
     *changelog file* gets the Debian-style ``~rc1`` rendering.
+
+    On finalize, the project's :attr:`finalize_strategy` controls whether
+    the new stanza enumerates commits since the last RC (``annotate``) or
+    since the last *stable* tag (``consolidate`` / ``promote``), and whether
+    the now-superseded ``~rc*`` stanzas are removed from the file
+    (``promote`` only).
     """
     settings = comp.debian
     if dry_run:
         return
 
-    relevant = _component_relevant_commits(name, config, repo, matcher)
+    strategy = config.project.finalize_strategy
+    use_stable_since = is_finalize and strategy in {"consolidate", "promote"}
+
+    relevant = _component_relevant_commits(
+        name, config, repo, matcher, since_stable=use_stable_since
+    )
     debian_version = format_debian_version(
         new_version,
         debian_revision=settings.debian_revision,
@@ -265,6 +302,8 @@ def _bump_debian(
         if changelog_path.is_file()
         else ""
     )
+    if is_finalize and strategy == "promote":
+        existing = drop_prerelease_stanzas(existing, new_version)
     changelog_path.parent.mkdir(parents=True, exist_ok=True)
     changelog_path.write_text(prepend_stanza(existing, stanza), encoding="utf-8")
     if changelog_path not in written:
@@ -343,6 +382,8 @@ def bump(
         comp = config.components[planned.component]
         new_version = str(planned.next)
 
+        is_final = _is_finalize(planned)
+
         if comp.format == "debian":
             _bump_debian(
                 planned.component,
@@ -351,6 +392,7 @@ def bump(
                 repo,
                 matcher,
                 new_version,
+                is_finalize=is_final,
                 dry_run=dry_run,
                 written=written,
                 changelogs_updated=changelogs_updated,
@@ -369,8 +411,11 @@ def bump(
                         written.append(file)
 
             if comp.changelog and not no_changelog and not dry_run:
+                strategy = config.project.finalize_strategy
+                use_stable_since = is_final and strategy in {"consolidate", "promote"}
                 relevant = _component_relevant_commits(
-                    planned.component, config, repo, matcher
+                    planned.component, config, repo, matcher,
+                    since_stable=use_stable_since,
                 )
                 changelog_path = repo / comp.changelog
                 update_changelog_file(
@@ -380,6 +425,7 @@ def bump(
                     sections=config.project.changelog_sections,
                     breaking_title=config.project.breaking_section_title,
                     other_title=config.project.other_section_title,
+                    drop_prereleases=is_final and strategy == "promote",
                 )
                 if changelog_path not in written:
                     written.append(changelog_path)

@@ -157,6 +157,32 @@ def latest_version(cwd: Path, prefix: str) -> Version | None:
     return Version(tag[len(prefix):])
 
 
+def latest_stable_tag(cwd: Path, prefix: str) -> str | None:
+    """Like :func:`latest_tag` but skips pre-release tags.
+
+    Used by the ``consolidate`` and ``promote`` finalize strategies so the
+    final section/stanza enumerates every commit since the previous *stable*
+    release rather than just commits since the last RC.
+    """
+    out = _run_git(["tag", "--list", f"{prefix}*"], cwd)
+    versioned: list[tuple[Version, str]] = []
+    for line in out.splitlines():
+        name = line.strip()
+        if not name.startswith(prefix):
+            continue
+        try:
+            v = Version(name[len(prefix):])
+        except InvalidVersion:
+            continue
+        if v.is_prerelease:
+            continue
+        versioned.append((v, name))
+    if not versioned:
+        return None
+    versioned.sort(key=lambda pair: pair[0])
+    return versioned[-1][1]
+
+
 def commits_since(cwd: Path, since: str | None) -> list[Commit]:
     """List commits between ``since`` (exclusive) and HEAD, in chronological order."""
     range_arg = f"{since}..HEAD" if since else "HEAD"

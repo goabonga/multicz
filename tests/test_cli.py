@@ -302,6 +302,59 @@ def test_bump_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner)
     assert "mutually exclusive" in result.output.lower()
 
 
+def test_finalize_consolidate_lists_all_commits_since_last_stable(repo: Path, runner: CliRunner):
+    # default strategy = consolidate
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: handle null")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    runner.invoke(app, ["bump", "--finalize"])
+
+    text = (repo / "CHANGELOG.md").read_text()
+    final_section = text.split("## [1.3.0-rc.2]")[0]
+    assert "## [1.3.0]" in final_section
+    # both commits accumulated since the last stable tag (none -> all)
+    assert "add login" in final_section
+    assert "handle null" in final_section
+    # RC sections still present below
+    assert "## [1.3.0-rc.1]" in text
+    assert "## [1.3.0-rc.2]" in text
+
+
+def test_finalize_promote_drops_intermediate_rcs(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + '\n[project]\nfinalize_strategy = "promote"\n')
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: handle null")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    runner.invoke(app, ["bump", "--finalize"])
+
+    text = (repo / "CHANGELOG.md").read_text()
+    assert "## [1.3.0]" in text
+    assert "## [1.3.0-rc.1]" not in text
+    assert "## [1.3.0-rc.2]" not in text
+    assert "add login" in text
+    assert "handle null" in text
+
+
+def test_finalize_annotate_uses_only_commits_since_last_rc(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + '\n[project]\nfinalize_strategy = "annotate"\n')
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix: handle null")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    # No commits between rc.2 and finalize -> annotate keeps the empty section
+    runner.invoke(app, ["bump", "--finalize"])
+
+    text = (repo / "CHANGELOG.md").read_text()
+    final_section = text.split("## [1.3.0-rc.2]")[0]
+    assert "## [1.3.0]" in final_section
+    assert "_No notable changes._" in final_section
+    # RC sections still present
+    assert "## [1.3.0-rc.1]" in text
+    assert "## [1.3.0-rc.2]" in text
+
+
 def test_bump_pre_creates_tag_with_rc_suffix(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
     runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])

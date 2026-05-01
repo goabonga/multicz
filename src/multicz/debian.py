@@ -214,6 +214,43 @@ def render_stanza(
     )
 
 
+def drop_prerelease_stanzas(text: str, base_version: str) -> str:
+    """Remove stanzas whose version matches ``<base_version>~<pre><n>``.
+
+    Used by the ``promote`` finalize strategy: once ``mypkg (1.3.0-1)`` has
+    been written, the now-superseded ``mypkg (1.3.0~rc1-1)``,
+    ``mypkg (1.3.0~rc2-1)``, … stanzas are removed.
+
+    Stanzas are split on the trailer line (``" -- "``) to keep parsing
+    robust against irregular blank-line spacing.
+    """
+    pre_re = re.compile(
+        r"^[a-z0-9][a-z0-9+\-.]*\s+\(" + re.escape(base_version) + r"~[A-Za-z]+\d+(-\d+)?\)\s+"
+    )
+    chunks: list[str] = []
+    current: list[str] = []
+    for line in text.splitlines(keepends=True):
+        current.append(line)
+        if line.startswith(_TRAILER_PREFIX):
+            chunks.append("".join(current))
+            current = []
+    if current:
+        chunks.append("".join(current))
+
+    kept: list[str] = []
+    for chunk in chunks:
+        first = chunk.lstrip("\n")
+        if not first or pre_re.match(first):
+            continue
+        kept.append(chunk)
+    if not kept:
+        return ""
+    out = "".join(kept)
+    if not out.endswith("\n"):
+        out += "\n"
+    return out
+
+
 def prepend_stanza(existing: str, stanza: str) -> str:
     """Insert ``stanza`` at the top of an existing changelog.
 

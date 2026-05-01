@@ -132,6 +132,7 @@ class ProjectSettings(BaseModel):
     )
     breaking_section_title: str = "Breaking changes"
     other_section_title: str = ""
+    finalize_strategy: Literal["consolidate", "promote", "annotate"] = "consolidate"
 
 
 class Config(BaseModel):
