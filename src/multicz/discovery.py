@@ -544,6 +544,19 @@ def render_config(
             section["triggers"] = list(comp.triggers)
         if comp.changelog is not None:
             section["changelog"] = str(comp.changelog)
+        if comp.format != "default":
+            section["format"] = comp.format
+        if comp.debian is not None:
+            debian_table = tomlkit.table()
+            debian_table["changelog"] = str(comp.debian.changelog)
+            debian_table["distribution"] = comp.debian.distribution
+            debian_table["urgency"] = comp.debian.urgency
+            debian_table["debian_revision"] = comp.debian.debian_revision
+            if comp.debian.maintainer is not None:
+                debian_table["maintainer"] = comp.debian.maintainer
+            if comp.debian.epoch is not None:
+                debian_table["epoch"] = comp.debian.epoch
+            section["debian"] = debian_table
         components_root.append(name, section)
     doc.append("components", components_root)
 

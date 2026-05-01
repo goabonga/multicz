@@ -34,6 +34,24 @@ class FileKey(BaseModel):
     key: str | None = None
 
 
+class DebianSettings(BaseModel):
+    """Per-component settings for ``format = "debian"`` packaging.
+
+    The component's version is read from the topmost stanza of
+    ``changelog`` (default ``debian/changelog``) and a new stanza is
+    *prepended* on every bump — older stanzas are never rewritten.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    changelog: Path = Path("debian/changelog")
+    distribution: str = "UNRELEASED"
+    urgency: str = "medium"
+    maintainer: str | None = None  # falls back to debian/control then git config
+    debian_revision: int = 1
+    epoch: int | None = None
+
+
 class Component(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,11 +61,39 @@ class Component(BaseModel):
     mirrors: list[FileKey] = Field(default_factory=list)
     triggers: list[str] = Field(default_factory=list)
     changelog: Path | None = None
+    format: Literal["default", "debian"] = "default"
+    debian: DebianSettings | None = None
 
     @field_validator("paths", "exclude_paths")
     @classmethod
     def _strip_globs(cls, value: list[str]) -> list[str]:
         return [v.strip() for v in value if v.strip()]
+
+    @model_validator(mode="after")
+    def _validate_format(self) -> Component:
+        if self.format == "debian":
+            if self.debian is None:
+                self.debian = DebianSettings()
+            if self.bump_files:
+                raise ValueError(
+                    "components with format='debian' read the version from "
+                    "debian/changelog; remove bump_files."
+                )
+            if self.mirrors:
+                raise ValueError(
+                    "mirrors are not supported on format='debian' components."
+                )
+            if self.changelog is not None:
+                raise ValueError(
+                    "use [components.<name>.debian].changelog instead of the "
+                    "top-level 'changelog' field for debian-format components."
+                )
+        elif self.debian is not None:
+            raise ValueError(
+                "the [components.<name>.debian] table is only valid when "
+                "format = 'debian'."
+            )
+        return self
 
 
 class ChangelogSection(BaseModel):

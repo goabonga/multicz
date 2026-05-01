@@ -175,6 +175,99 @@ def test_init_output_round_trips_through_array_form(tmp_path: Path):
     assert config.components["alpha"].bump_files[0].key is None
 
 
+def test_debian_format_requires_no_bump_files(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components.api]
+        paths = ["debian/**"]
+        format = "debian"
+        bump_files = [{ file = "debian/changelog" }]
+        """,
+    )
+    with pytest.raises(ValidationError) as exc:
+        load_config(target)
+    assert "bump_files" in str(exc.value)
+
+
+def test_debian_format_rejects_top_level_changelog(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components.api]
+        paths = ["debian/**"]
+        format = "debian"
+        changelog = "CHANGELOG.md"
+        """,
+    )
+    with pytest.raises(ValidationError) as exc:
+        load_config(target)
+    assert "components.<name>.debian" in str(exc.value)
+
+
+def test_debian_settings_only_with_debian_format(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components.api]
+        paths = ["src/**"]
+        bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+        [components.api.debian]
+        changelog = "debian/changelog"
+        """,
+    )
+    with pytest.raises(ValidationError) as exc:
+        load_config(target)
+    assert "format = 'debian'" in str(exc.value)
+
+
+def test_debian_format_with_defaults(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components.mypkg]
+        paths = ["debian/**", "src/**"]
+        format = "debian"
+        """,
+    )
+    config = load_config(target)
+    comp = config.components["mypkg"]
+    assert comp.format == "debian"
+    assert comp.debian is not None  # auto-filled
+    assert str(comp.debian.changelog) == "debian/changelog"
+    assert comp.debian.distribution == "UNRELEASED"
+    assert comp.debian.urgency == "medium"
+    assert comp.debian.debian_revision == 1
+
+
+def test_debian_format_with_overrides(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components.mypkg]
+        paths = ["debian/**"]
+        format = "debian"
+
+        [components.mypkg.debian]
+        changelog = "packaging/changelog"
+        distribution = "stable"
+        urgency = "high"
+        maintainer = "Chris <chris@example.com>"
+        debian_revision = 3
+        epoch = 2
+        """,
+    )
+    config = load_config(target)
+    settings = config.components["mypkg"].debian
+    assert str(settings.changelog) == "packaging/changelog"
+    assert settings.distribution == "stable"
+    assert settings.urgency == "high"
+    assert settings.maintainer == "Chris <chris@example.com>"
+    assert settings.debian_revision == 3
+    assert settings.epoch == 2
+
+
 def test_load_config_rejects_components_array_with_extra_fields(tmp_path: Path):
     """Component still has extra='forbid', so unknown fields fail even in array form."""
     target = _write(

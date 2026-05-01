@@ -122,6 +122,8 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
     Priority:
       1. the highest matching git tag (authoritative release state),
       2. the value stored in the primary bump_file (in-tree state),
+         or the top stanza of ``debian/changelog`` for debian-format
+         components,
       3. ``initial_version`` from the project settings (bootstrap).
     """
     prefix = tag_prefix(config.project.tag_format, name)
@@ -130,6 +132,21 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
         return tagged
 
     comp = config.components[name]
+    if comp.format == "debian" and comp.debian is not None:
+        from .debian import parse_top_version, upstream_version
+
+        changelog_path = repo / comp.debian.changelog
+        if changelog_path.is_file():
+            try:
+                top = parse_top_version(
+                    changelog_path.read_text(encoding="utf-8")
+                )
+                if top:
+                    return Version(upstream_version(top))
+            except (InvalidVersion, OSError):
+                pass
+        return Version(config.project.initial_version)
+
     if comp.bump_files:
         primary = comp.bump_files[0]
         try:

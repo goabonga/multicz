@@ -21,6 +21,7 @@ from .commits import (
 )
 from .components import ComponentMatcher
 from .config import CONFIG_FILENAME, find_config, load_config
+from .debian import format_debian_version, prepend_stanza, render_stanza
 from .discovery import discover_components, render_config
 from .planner import build_plan
 from .writers import read_value, write_value
@@ -164,6 +165,92 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout
 
 
+def _resolve_maintainer(repo: Path, configured: str | None) -> str:
+    """Pick a Debian-format maintainer string ``Name <email>``.
+
+    Priority: explicit config -> ``Maintainer:`` line in ``debian/control``
+    -> ``git config user.name`` + ``git config user.email`` -> placeholder.
+    """
+    if configured:
+        return configured
+    control = repo / "debian" / "control"
+    if control.is_file():
+        for line in control.read_text(encoding="utf-8").splitlines():
+            if line.startswith("Maintainer:"):
+                return line[len("Maintainer:"):].strip()
+    name_proc = subprocess.run(
+        ["git", "config", "user.name"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    email_proc = subprocess.run(
+        ["git", "config", "user.email"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    name = name_proc.stdout.strip()
+    email = email_proc.stdout.strip()
+    if name and email:
+        return f"{name} <{email}>"
+    return "Unknown <unknown@example.com>"
+
+
+def _bump_debian(
+    name: str,
+    comp,  # Component
+    config,  # Config
+    repo: Path,
+    matcher: ComponentMatcher,
+    new_version: str,
+    *,
+    dry_run: bool,
+    written: list[Path],
+    changelogs_updated: list[str],
+) -> str:
+    """Apply a debian-format bump: render and prepend a fresh stanza.
+
+    Returns the full Debian version string (with revision/epoch) to surface
+    in the bump summary.
+    """
+    settings = comp.debian
+    full_version = format_debian_version(
+        new_version,
+        debian_revision=settings.debian_revision,
+        epoch=settings.epoch,
+    )
+    if dry_run:
+        return full_version
+
+    prefix = tag_prefix(config.project.tag_format, name)
+    since = latest_tag(repo, prefix)
+    relevant = [
+        c
+        for c in commits_since(repo, since)
+        if c.is_conventional
+        and any(matcher.match(f) == name for f in c.files)
+    ]
+    maintainer = _resolve_maintainer(repo, settings.maintainer)
+    stanza = render_stanza(
+        package=name,
+        version=full_version,
+        distribution=settings.distribution,
+        urgency=settings.urgency,
+        commits=relevant,
+        maintainer=maintainer,
+    )
+
+    changelog_path = repo / settings.changelog
+    existing = (
+        changelog_path.read_text(encoding="utf-8")
+        if changelog_path.is_file()
+        else ""
+    )
+    changelog_path.parent.mkdir(parents=True, exist_ok=True)
+    changelog_path.write_text(prepend_stanza(existing, stanza), encoding="utf-8")
+    if changelog_path not in written:
+        written.append(changelog_path)
+    changelogs_updated.append(str(settings.changelog))
+    return full_version
+
+
 def _release_commit_message(applied: dict[str, dict[str, str]]) -> str:
     parts = [f"{name} {info['current']} -> {info['next']}" for name, info in applied.items()]
     summary = ", ".join(parts)
@@ -219,43 +306,58 @@ def bump(
     for planned in plan:
         comp = config.components[planned.component]
         new_version = str(planned.next)
-        targets: list[tuple[Path, str | None]] = []
-        for bump_file in comp.bump_files:
-            targets.append((repo / bump_file.file, bump_file.key))
-        for mirror in comp.mirrors:
-            targets.append((repo / mirror.file, mirror.key))
 
-        for file, key in targets:
-            if not dry_run:
-                write_value(file, key, new_version)
-                if file not in written:
-                    written.append(file)
-
-        if comp.changelog and not no_changelog and not dry_run:
-            prefix = tag_prefix(config.project.tag_format, planned.component)
-            since = latest_tag(repo, prefix)
-            relevant = [
-                c
-                for c in commits_since(repo, since)
-                if c.is_conventional
-                and any(matcher.match(f) == planned.component for f in c.files)
-            ]
-            changelog_path = repo / comp.changelog
-            update_changelog_file(
-                changelog_path,
+        if comp.format == "debian":
+            display_version = _bump_debian(
+                planned.component,
+                comp,
+                config,
+                repo,
+                matcher,
                 new_version,
-                relevant,
-                sections=config.project.changelog_sections,
-                breaking_title=config.project.breaking_section_title,
-                other_title=config.project.other_section_title,
+                dry_run=dry_run,
+                written=written,
+                changelogs_updated=changelogs_updated,
             )
-            if changelog_path not in written:
-                written.append(changelog_path)
-            changelogs_updated.append(str(comp.changelog))
+        else:
+            display_version = new_version
+            targets: list[tuple[Path, str | None]] = []
+            for bump_file in comp.bump_files:
+                targets.append((repo / bump_file.file, bump_file.key))
+            for mirror in comp.mirrors:
+                targets.append((repo / mirror.file, mirror.key))
+
+            for file, key in targets:
+                if not dry_run:
+                    write_value(file, key, new_version)
+                    if file not in written:
+                        written.append(file)
+
+            if comp.changelog and not no_changelog and not dry_run:
+                prefix = tag_prefix(config.project.tag_format, planned.component)
+                since = latest_tag(repo, prefix)
+                relevant = [
+                    c
+                    for c in commits_since(repo, since)
+                    if c.is_conventional
+                    and any(matcher.match(f) == planned.component for f in c.files)
+                ]
+                changelog_path = repo / comp.changelog
+                update_changelog_file(
+                    changelog_path,
+                    new_version,
+                    relevant,
+                    sections=config.project.changelog_sections,
+                    breaking_title=config.project.breaking_section_title,
+                    other_title=config.project.other_section_title,
+                )
+                if changelog_path not in written:
+                    written.append(changelog_path)
+                changelogs_updated.append(str(comp.changelog))
 
         applied[planned.component] = {
             "current": str(planned.current),
-            "next": new_version,
+            "next": display_version,
             "kind": planned.kind,
         }
 

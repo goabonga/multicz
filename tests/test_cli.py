@@ -260,6 +260,117 @@ def test_check_missing_file(repo: Path, runner: CliRunner):
     assert result.exit_code == 1
 
 
+def test_bump_debian_format_prepends_stanza(tmp_path: Path, runner: CliRunner):
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "config", "user.email", "deb@test.com")
+    _git(tmp_path, "config", "user.name", "Deb Maintainer")
+
+    files = {
+        "multicz.toml": """
+[components.mypkg]
+paths = ["debian/**", "src/**"]
+format = "debian"
+
+[components.mypkg.debian]
+changelog = "debian/changelog"
+distribution = "unstable"
+urgency = "medium"
+""",
+        "debian/changelog": (
+            "mypkg (1.2.0-1) unstable; urgency=medium\n"
+            "\n"
+            "  * Initial release.\n"
+            "\n"
+            " -- Deb Maintainer <deb@test.com>  Sun, 01 Jan 2023 00:00:00 +0000\n"
+        ),
+        "src/main.py": "x = 1\n",
+    }
+    _commit(tmp_path, files, "chore: init")
+
+    monkey = pytest.MonkeyPatch()
+    monkey.chdir(tmp_path)
+    try:
+        _commit(tmp_path, {"src/main.py": "x = 2\n"}, "feat: add login")
+        result = runner.invoke(app, ["bump"])
+        assert result.exit_code == 0, result.stdout
+
+        text = (tmp_path / "debian/changelog").read_text()
+        assert text.index("mypkg (1.3.0-1)") < text.index("mypkg (1.2.0-1)")
+        assert "mypkg (1.3.0-1) unstable; urgency=medium" in text
+        assert "  * feat: Add login" in text
+        assert "Deb Maintainer <deb@test.com>" in text
+    finally:
+        monkey.undo()
+
+
+def test_bump_debian_dry_run_does_not_modify(tmp_path: Path, runner: CliRunner):
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "config", "user.email", "deb@test.com")
+    _git(tmp_path, "config", "user.name", "Deb")
+
+    files = {
+        "multicz.toml": """
+[components.mypkg]
+paths = ["debian/**", "src/**"]
+format = "debian"
+""",
+        "debian/changelog": (
+            "mypkg (1.0.0-1) unstable; urgency=medium\n"
+            "\n  * Initial.\n\n"
+            " -- x <x@y>  Sun, 01 Jan 2023 00:00:00 +0000\n"
+        ),
+        "src/main.py": "x = 1\n",
+    }
+    _commit(tmp_path, files, "chore: init")
+
+    monkey = pytest.MonkeyPatch()
+    monkey.chdir(tmp_path)
+    try:
+        _commit(tmp_path, {"src/main.py": "x = 2\n"}, "feat: x")
+        before = (tmp_path / "debian/changelog").read_text()
+        result = runner.invoke(app, ["bump", "--dry-run"])
+        assert result.exit_code == 0
+        assert (tmp_path / "debian/changelog").read_text() == before
+        assert "1.1.0" in result.stdout
+    finally:
+        monkey.undo()
+
+
+def test_bump_debian_with_revision_3(tmp_path: Path, runner: CliRunner):
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "config", "user.email", "deb@test.com")
+    _git(tmp_path, "config", "user.name", "Deb")
+
+    files = {
+        "multicz.toml": """
+[components.mypkg]
+paths = ["debian/**", "src/**"]
+format = "debian"
+
+[components.mypkg.debian]
+debian_revision = 3
+""",
+        "debian/changelog": (
+            "mypkg (1.0.0-3) unstable; urgency=medium\n"
+            "\n  * Old.\n\n"
+            " -- x <x@y>  Sun, 01 Jan 2023 00:00:00 +0000\n"
+        ),
+        "src/main.py": "x = 1\n",
+    }
+    _commit(tmp_path, files, "chore: init")
+
+    monkey = pytest.MonkeyPatch()
+    monkey.chdir(tmp_path)
+    try:
+        _commit(tmp_path, {"src/main.py": "x = 2\n"}, "feat: x")
+        result = runner.invoke(app, ["bump"])
+        assert result.exit_code == 0, result.stdout
+        text = (tmp_path / "debian/changelog").read_text()
+        assert "mypkg (1.1.0-3)" in text
+    finally:
+        monkey.undo()
+
+
 def test_init_auto_detects_pyproject(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
