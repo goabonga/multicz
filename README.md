@@ -23,6 +23,63 @@ A change to `src/` is a new app release; a change only under
 Standard tools bump everything together or force you to script per-folder
 logic. `multicz` makes the rule explicit in `multicz.toml`.
 
+## Security
+
+Multicz is a release tool: it modifies version files, writes commits,
+creates tags, and (with `--push`) sends them to remote. The threat
+model is straightforward — the security guarantees should match.
+
+### Properties guaranteed by the implementation
+
+* **No network access by default.** Multicz only invokes `git`. There
+  are no HTTP calls, no fetching of registries, no auto-updates. The
+  network only enters the picture when *you* pass `--push`.
+* **Deterministic planning.** Same git history + same `multicz.toml`
+  yields the same plan. There's no implicit time-of-day, no remote
+  state lookup, no learned heuristic. Repeat runs are
+  byte-identical (modulo the timestamp written into `CHANGELOG.md` /
+  `debian/changelog` / `state.json`, which is wall-clock UTC).
+* **Explicit changed files from git.** Multicz uses
+  `git diff-tree --name-only` per commit — the exact set of paths
+  actually touched, not heuristics. A `path_overlap` finding from
+  `validate` reads from `git ls-files`; nothing is sniffed from a
+  watcher or filesystem scan.
+* **No code execution from config.** The TOML schema is
+  pydantic-validated with `extra="forbid"`. There are no callbacks,
+  no Python imports from data, no shell-out templates.
+
+### Hardening options
+
+| concern | option |
+|---|---|
+| Tampered release commits | `[project].sign_commits = true` or `multicz bump --sign` (passes `-S` to `git commit`) |
+| Tampered tags | `[project].sign_tags = true` or `multicz bump --sign` (passes `-s` to `git tag`) |
+| Manual edits bypassing the bump flow | `[project].state_file = ".multicz/state.json"` + `multicz validate` (drift detection) |
+| Non-conventional commits sneaking into a release | `[project].unknown_commit_policy = "error"` |
+| Overlapping component paths leaking changes silently | `[project].overlap_policy = "error"` (default) |
+| Path / mirror / trigger cycles | `multicz validate` — runs as a CI gate before `bump` |
+
+### CI hardening checklist
+
+1. **Pin `multicz`** by exact version in your CI install step
+   (`pip install multicz==1.2.0` or
+   `uv tool install --frozen multicz`).
+2. **Run `multicz validate --strict` first**. It catches misconfigured
+   `bump_files`, mirror cycles, and path overlaps before anything is
+   written.
+3. **Use `multicz plan --dry-run`** (or `multicz plan --output json`)
+   to inspect the bump in PR previews, not at release time.
+4. **Sign commits and tags** in CI. GitHub Actions accepts a GPG key
+   via `crazy-max/ghaction-import-gpg`; GitLab via `git config user.signingkey`
+   then enabling `sign_commits` / `sign_tags` in `multicz.toml`.
+5. **Limit who can `--push`**. Multicz never pushes unless asked.
+   Keep the release job behind a manual approval / protected branch.
+6. **Audit the state file** if you've enabled it. `git log -p .multicz/state.json`
+   gives a tamper-evident trail of every release.
+
+The example pipelines in [`examples/ci/`](examples/ci/) follow these
+recommendations.
+
 ## Where the config lives
 
 By default, `multicz` looks for a dedicated `multicz.toml` at the repo
@@ -192,6 +249,7 @@ helm package charts/myapp
 | `multicz bump --commit --tag` | release in one shot: write, commit, tag |
 | `multicz bump --commit --tag --push` | …and push commit + tags with `--follow-tags` |
 | `multicz bump --commit -m "..."` | verbatim release-commit message (overrides the template) |
+| `multicz bump --sign` | GPG-sign the release commit and tags (also via `[project].sign_commits/sign_tags`) |
 | `multicz bump --force api:patch` | manual bump for rebuilds without commits |
 | `multicz bump --force api:minor --force chart:major` | repeatable across components |
 | `multicz bump --output json` | emit `{"bumps": {...}, "git": {...}}` for CI |
