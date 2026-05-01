@@ -515,6 +515,51 @@ def test_explain_idle_component(repo: Path, runner: CliRunner):
     assert "no bump pending" in result.stdout
 
 
+def test_bump_pep440_scheme_writes_canonical_form(repo: Path, runner: CliRunner):
+    # api uses pep440 scheme; chart keeps semver default
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+version_scheme = "pep440"
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
+    result = runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    assert result.exit_code == 0, result.stdout
+
+    # api: PEP 440 canonical
+    assert 'version = "1.3.0rc1"' in (repo / "pyproject.toml").read_text()
+    # The mirror writes the same pep440 form into Chart.yaml:appVersion
+    chart_yaml = (repo / "charts/myapp/Chart.yaml").read_text()
+    assert "appVersion: 1.3.0rc1" in chart_yaml
+
+    # tag is also rendered in pep440 form for api
+    tags = _git(repo, "tag").split()
+    assert "api-v1.3.0rc1" in tags
+    # chart keeps its own (default semver) scheme
+    assert any(t.startswith("chart-v") for t in tags)
+
+
+def test_bump_pep440_scheme_finalizes_correctly(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+version_scheme = "pep440"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
+    assert 'version = "1.3.0rc1"' in (repo / "pyproject.toml").read_text()
+
+    runner.invoke(app, ["bump", "--finalize", "--commit", "--tag"])
+    assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
+
+
 def test_bump_pre_rc_enters_cycle(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
     result = runner.invoke(app, ["bump", "--pre", "rc"])

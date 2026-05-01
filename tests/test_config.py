@@ -473,6 +473,21 @@ def test_static_tag_format_without_component_placeholder(tmp_path: Path):
     assert config._render_tag_prefix("thing") == "release-"
 
 
+def test_pep440_scheme_with_debian_format_is_rejected(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [components.mypkg]
+        paths = ["debian/**"]
+        format = "debian"
+        version_scheme = "pep440"
+        """,
+    )
+    with pytest.raises(ValidationError) as exc:
+        load_config(target)
+    assert "version_scheme='semver'" in str(exc.value)
+
+
 def test_load_config_rejects_components_array_with_extra_fields(tmp_path: Path):
     """Component still has extra='forbid', so unknown fields fail even in array form."""
     target = _write(

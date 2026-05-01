@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from packaging.version import InvalidVersion, Version
 
@@ -72,24 +73,46 @@ def _norm_pre_label(label: str) -> str:
     return _PRE_ALIASES.get(label, label)
 
 
+VersionScheme = Literal["semver", "pep440"]
+
+# PEP 440 canonical labels: 'a' / 'b' / 'rc'. We accept both compact and
+# spelled-out forms on input; output uses canonical compact labels for
+# the pep440 scheme.
+_PEP440_COMPACT = {"alpha": "a", "beta": "b", "c": "rc", "pre": "rc", "preview": "rc"}
+
+
+def _render_pre(
+    base: str, label: str, num: int, scheme: VersionScheme
+) -> str:
+    """Render ``base + pre-release suffix`` in the requested scheme."""
+    if scheme == "pep440":
+        compact = _PEP440_COMPACT.get(label.lower(), label.lower())
+        return f"{base}{compact}{num}"
+    # semver default
+    return f"{base}-{label}.{num}"
+
+
 def compute_next(
     current: Version,
     kind: BumpKind,
     *,
     pre: str | None = None,
     finalize: bool = False,
+    scheme: VersionScheme = "semver",
 ) -> str:
     """Compute the next version string given ``kind`` and optional pre-release flags.
 
-    The result is rendered in a *semver-friendly* form (``1.3.0-rc.1``) so
-    it lands cleanly into ``pyproject.toml``, ``package.json`` and
-    ``Cargo.toml`` alike — :class:`packaging.version.Version` parses both
-    semver and PEP 440 spellings, so ordering is preserved.
+    Output is rendered in the chosen ``scheme``:
 
-    Behavior matrix:
+    * ``semver`` (default): ``1.3.0-rc.1`` — npm, Cargo, Helm, generic
+    * ``pep440``: ``1.3.0rc1`` — strict canonical Python form
+
+    Either form can be re-parsed by :class:`packaging.version.Version` so
+    ordering is preserved across both. The behavior matrix below uses
+    semver rendering for readability.
 
     +-------------+----------+-----------+------------------+----------------------+
-    | current     | --pre    | --finalize| result           | meaning              |
+    | current     | --pre    | --finalize| result (semver)  | meaning              |
     +-------------+----------+-----------+------------------+----------------------+
     | 1.2.3       | None     | False     | 1.3.0            | regular bump (feat)  |
     | 1.2.3       | rc       | False     | 1.3.0-rc.1       | enter RC cycle       |
@@ -104,13 +127,11 @@ def compute_next(
     if finalize:
         if current.is_prerelease:
             return base
-        # Already final: explicit --finalize is a no-op except for kind progression
         bumped = bump_version(current, kind)
         return f"{bumped.major}.{bumped.minor}.{bumped.micro}"
 
     if pre is None:
         if current.is_prerelease:
-            # Auto-finalize: shipping the in-progress pre-release as the release
             return base
         bumped = bump_version(current, kind)
         return f"{bumped.major}.{bumped.minor}.{bumped.micro}"
@@ -121,13 +142,14 @@ def compute_next(
         wanted = _norm_pre_label(pre)
         if existing == wanted:
             counter = (current.pre[1] or 0) + 1
-            return f"{base}-{pre}.{counter}"
+            return _render_pre(base, pre, counter, scheme)
         # Different label, same target version
-        return f"{base}-{pre}.1"
+        return _render_pre(base, pre, 1, scheme)
 
     # Currently a final release: bump first, then enter the pre cycle
     target = bump_version(current, kind)
-    return f"{target.major}.{target.minor}.{target.micro}-{pre}.1"
+    target_base = f"{target.major}.{target.minor}.{target.micro}"
+    return _render_pre(target_base, pre, 1, scheme)
 
 
 @dataclass(frozen=True)
@@ -233,12 +255,17 @@ class PlannedBump:
     reasons: list[Reason] = field(default_factory=list)
     pre: str | None = None
     finalize: bool = False
+    scheme: VersionScheme = "semver"
 
     @property
     def next(self) -> str:
-        """The new version, rendered as a semver-friendly string."""
+        """The new version, rendered in this component's :attr:`scheme`."""
         return compute_next(
-            self.current, self.kind, pre=self.pre, finalize=self.finalize
+            self.current,
+            self.kind,
+            pre=self.pre,
+            finalize=self.finalize,
+            scheme=self.scheme,
         )
 
     @property
@@ -485,5 +512,9 @@ def build_plan(
                     reasons=[ManualReason("explicit --finalize")],
                     finalize=True,
                 )
+
+    # Apply per-component version_scheme so .next renders correctly.
+    for name, bump in plan.bumps.items():
+        bump.scheme = config.components[name].version_scheme
 
     return plan

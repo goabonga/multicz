@@ -5,6 +5,43 @@ from packaging.version import Version
 from multicz.planner import compute_next
 
 
+def test_pep440_scheme_renders_canonical_form():
+    assert (
+        compute_next(Version("1.2.3"), "minor", pre="rc", scheme="pep440")
+        == "1.3.0rc1"
+    )
+    assert (
+        compute_next(Version("1.2.3"), "patch", pre="alpha", scheme="pep440")
+        == "1.2.4a1"
+    )
+    assert (
+        compute_next(Version("1.2.3"), "major", pre="beta", scheme="pep440")
+        == "2.0.0b1"
+    )
+
+
+def test_pep440_scheme_increments_in_canonical_form():
+    # current is 1.3.0rc1 (PEP 440), next pre rc -> 1.3.0rc2 (still PEP 440)
+    assert (
+        compute_next(Version("1.3.0rc1"), "minor", pre="rc", scheme="pep440")
+        == "1.3.0rc2"
+    )
+
+
+def test_pep440_scheme_finalizes_to_plain_version():
+    assert (
+        compute_next(Version("1.3.0rc1"), "minor", finalize=True, scheme="pep440")
+        == "1.3.0"
+    )
+
+
+def test_pep440_compact_label_aliases():
+    # 'alpha' -> 'a', 'beta' -> 'b', 'c' -> 'rc'
+    assert compute_next(Version("1.0.0"), "minor", pre="alpha", scheme="pep440") == "1.1.0a1"
+    assert compute_next(Version("1.0.0"), "minor", pre="beta", scheme="pep440") == "1.1.0b1"
+    assert compute_next(Version("1.0.0"), "minor", pre="c", scheme="pep440") == "1.1.0rc1"
+
+
 def test_no_pre_no_finalize_regular_bump():
     assert compute_next(Version("1.2.3"), "minor") == "1.3.0"
     assert compute_next(Version("1.2.3"), "patch") == "1.2.4"

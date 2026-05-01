@@ -71,6 +71,7 @@ class Component(BaseModel):
     tag_format: str | None = None  # overrides the project-level tag_format
     bump_policy: Literal["as-commit", "scoped"] = "as-commit"
     ignored_types: list[str] = Field(default_factory=list)
+    version_scheme: Literal["semver", "pep440"] = "semver"
 
     @field_validator("paths", "exclude_paths")
     @classmethod
@@ -95,6 +96,12 @@ class Component(BaseModel):
                 raise ValueError(
                     "use [components.<name>.debian].changelog instead of the "
                     "top-level 'changelog' field for debian-format components."
+                )
+            if self.version_scheme != "semver":
+                raise ValueError(
+                    "format='debian' requires version_scheme='semver' (the "
+                    "internal canonical form); the Debian changelog "
+                    "stanza renderer applies its own '~rc1' notation."
                 )
         elif self.debian is not None:
             raise ValueError(
