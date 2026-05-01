@@ -35,7 +35,8 @@ from pathlib import Path
 import tomlkit
 from ruamel.yaml import YAML
 
-from .config import Component, FileKey
+from .config import Component, DebianSettings, FileKey
+from .debian import parse_top_stanza
 
 _GRADLE_NAME_RE = re.compile(
     r"rootProject\.name\s*=\s*['\"]([^'\"]+)['\"]"
@@ -405,8 +406,34 @@ def discover_components(repo: Path) -> dict[str, Component]:
                         )
 
     _detect_node(repo, components, python_taken=bool(python_names))
+    _detect_debian(repo, components)
 
     return components
+
+
+def _detect_debian(repo: Path, components: dict[str, Component]) -> None:
+    """When ``debian/changelog`` exists, register a format='debian' component
+    named after the package declared on the top stanza."""
+    changelog = repo / "debian" / "changelog"
+    if not changelog.is_file():
+        return
+    try:
+        text = changelog.read_text(encoding="utf-8")
+    except OSError:
+        return
+    stanza = parse_top_stanza(text)
+    if stanza is None:
+        return
+    raw_name = stanza.package
+    comp_name = _unique(raw_name, set(components), suffix="deb")
+    paths = ["debian/**"]
+    if (repo / "src").is_dir():
+        paths.append("src/**")
+    components[comp_name] = Component(
+        paths=paths,
+        format="debian",
+        debian=DebianSettings(),
+    )
 
 
 def _detect_node(

@@ -464,6 +464,54 @@ def test_python_workspace_helm_mirrors_by_name(tmp_path: Path):
     assert "charts/worker/" in str(worker_mirrors[0].file)
 
 
+def test_debian_changelog_creates_debian_component(tmp_path: Path):
+    debian = tmp_path / "debian"
+    debian.mkdir()
+    (debian / "changelog").write_text(
+        "mypkg (1.2.3-1) unstable; urgency=medium\n"
+        "\n  * Initial.\n\n"
+        " -- John <john@example.com>  Mon, 15 Jan 2024 12:34:56 +0100\n"
+    )
+    comps = discover_components(tmp_path)
+    assert "mypkg" in comps
+    assert comps["mypkg"].format == "debian"
+    assert comps["mypkg"].debian is not None
+    assert "debian/**" in comps["mypkg"].paths
+    # No bump_files: format='debian' reads from debian/changelog
+    assert comps["mypkg"].bump_files == []
+
+
+def test_debian_changelog_with_python_alongside(tmp_path: Path):
+    """A repo that ships a Python project AND its Debian packaging.
+    Each is its own component with its own version source."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "mypkg"\nversion = "1.2.3"\n'
+    )
+    (tmp_path / "src").mkdir()
+    debian = tmp_path / "debian"
+    debian.mkdir()
+    (debian / "changelog").write_text(
+        "mypkg (1.2.3-1) unstable; urgency=medium\n"
+        "\n  * Initial.\n\n"
+        " -- x <x@y>  Mon, 15 Jan 2024 12:34:56 +0100\n"
+    )
+    comps = discover_components(tmp_path)
+    # Python python comp gets the bare name (added first)
+    assert "mypkg" in comps
+    # Debian comp gets the -deb suffix because of the collision
+    assert "mypkg-deb" in comps
+    assert comps["mypkg"].format == "default"
+    assert comps["mypkg-deb"].format == "debian"
+
+
+def test_debian_changelog_garbage_skipped(tmp_path: Path):
+    debian = tmp_path / "debian"
+    debian.mkdir()
+    (debian / "changelog").write_text("not a debian changelog at all\n")
+    comps = discover_components(tmp_path)
+    assert comps == {}
+
+
 def test_pyproject_without_version_is_skipped(tmp_path: Path):
     # A workspace orchestrator with [project] but no version
     (tmp_path / "pyproject.toml").write_text(
