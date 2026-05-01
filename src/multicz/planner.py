@@ -340,6 +340,7 @@ def _direct_pass(
     for name in config.components:
         prefix = tag_prefix(config.tag_format_for(name), name)
         since = latest_tag(repo, prefix)
+        ignored = config.ignored_types_for(name)
         for commit in commits_since(repo, since):
             header = (
                 f"{commit.type}({commit.scope}): {commit.subject}"
@@ -347,6 +348,8 @@ def _direct_pass(
                 else f"{commit.type}: {commit.subject}"
             )
             if release_re.match(header):
+                continue
+            if commit.type.lower() in ignored:
                 continue
             if commit.bump_kind is None:
                 continue

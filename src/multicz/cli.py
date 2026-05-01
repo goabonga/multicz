@@ -354,11 +354,16 @@ def _component_relevant_commits(
 ):
     """Conventional commits owning ``name`` since the component's last tag.
 
-    Release commits matching ``project.release_commit_pattern`` are filtered
-    out so they don't pollute the changelog body. When ``since_stable`` is
-    True, the range starts at the previous *stable* tag instead — used by
-    the ``consolidate`` and ``promote`` finalize strategies so the final
-    section enumerates everything since the last shipped release.
+    Filters applied:
+
+    * release commits matching ``project.release_commit_pattern`` are
+      skipped so the chore(release) lines don't pollute the changelog.
+    * commits whose type is in the component's effective ``ignored_types``
+      (project + component, union) are skipped entirely.
+
+    When ``since_stable`` is True, the range starts at the previous
+    *stable* tag instead — used by the ``consolidate`` and ``promote``
+    finalize strategies.
     """
     import re
 
@@ -369,11 +374,13 @@ def _component_relevant_commits(
         else latest_tag(repo, prefix)
     )
     release_re = re.compile(config.project.release_commit_pattern)
+    ignored = config.ignored_types_for(name)
     return [
         c
         for c in commits_since(repo, since)
         if c.is_conventional
         and not release_re.match(_commit_header(c))
+        and c.type.lower() not in ignored
         and any(matcher.match(f) == name for f in c.files)
     ]
 

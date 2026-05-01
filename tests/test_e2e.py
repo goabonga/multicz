@@ -113,6 +113,89 @@ def test_release_commits_are_skipped(repo: Path):
     assert "release" not in summaries.lower()
 
 
+def test_ignored_types_project_level_skips_commit_entirely(repo: Path):
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project]
+ignored_types = ["chore", "ci"]
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: real change")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "chore(deps): bump typer")
+    _commit(repo, {"src/main.py": "x = 4\n"}, "ci: tweak workflow")
+
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["api"].kind == "minor"
+    summaries = " ".join(plan.bumps["api"].reason_summaries())
+    assert "real change" in summaries
+    assert "chore(deps)" not in summaries
+    assert "ci:" not in summaries
+
+
+def test_ignored_types_component_level(repo: Path):
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+ignored_types = ["fix"]
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+""")
+    _commit(
+        repo,
+        {"src/main.py": "x = 2\n", "charts/myapp/values.yaml": "x: 1\n"},
+        "fix: cross cutting bug",
+    )
+    plan = build_plan(repo, load_config(cfg))
+    # api ignores 'fix' -> not in plan
+    assert "api" not in plan.bumps
+    # chart still patches
+    assert plan.bumps["chart"].kind == "patch"
+
+
+def test_ignored_types_unioned(repo: Path):
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project]
+ignored_types = ["docs"]
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+ignored_types = ["fix"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "fix: filtered-by-component")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "docs: filtered-by-project")
+    _commit(repo, {"src/main.py": "x = 4\n"}, "feat: kept")
+    plan = build_plan(repo, load_config(cfg))
+    summaries = " ".join(plan.bumps["api"].reason_summaries())
+    assert "filtered-by-component" not in summaries
+    assert "filtered-by-project" not in summaries
+    assert "kept" in summaries
+
+
+def test_ignored_types_does_not_drop_breaking_commits_implicitly(repo: Path):
+    """If `feat` is ignored, even feat! is filtered out — explicit user choice."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project]
+ignored_types = ["feat"]
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat!: drop py3.11")
+    plan = build_plan(repo, load_config(cfg))
+    assert "api" not in plan.bumps  # ignored even though it's breaking
+
+
 def test_bump_policy_default_propagates_kind_to_every_touched_component(repo: Path):
     """A feat commit touching both api and chart files bumps both as minor."""
     _commit(

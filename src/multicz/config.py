@@ -70,6 +70,7 @@ class Component(BaseModel):
     debian: DebianSettings | None = None
     tag_format: str | None = None  # overrides the project-level tag_format
     bump_policy: Literal["as-commit", "scoped"] = "as-commit"
+    ignored_types: list[str] = Field(default_factory=list)
 
     @field_validator("paths", "exclude_paths")
     @classmethod
@@ -141,6 +142,7 @@ class ProjectSettings(BaseModel):
     other_section_title: str = ""
     finalize_strategy: Literal["consolidate", "promote", "annotate"] = "consolidate"
     overlap_policy: Literal["error", "first-match", "allow", "all"] = "error"
+    ignored_types: list[str] = Field(default_factory=list)
 
 
 class Config(BaseModel):
@@ -219,6 +221,17 @@ class Config(BaseModel):
                     f"tag_format on at least one of them."
                 )
             seen[prefix] = name
+
+    def ignored_types_for(self, component: str) -> set[str]:
+        """Return the lowercased commit types ignored for ``component``.
+
+        Effective set is the union of project and component ignored types.
+        """
+        comp = self.components.get(component)
+        comp_set: set[str] = set()
+        if comp is not None:
+            comp_set = {t.lower() for t in comp.ignored_types}
+        return {t.lower() for t in self.project.ignored_types} | comp_set
 
     def tag_format_for(self, component: str) -> str:
         """Return the effective tag_format for ``component``.
