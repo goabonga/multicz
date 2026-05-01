@@ -396,6 +396,83 @@ def test_find_config_raises_with_helpful_message(tmp_path: Path):
     assert "package.json" in str(exc.value)
 
 
+def test_per_component_tag_format_override(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [project]
+        tag_format = "{component}-v{version}"
+
+        [components.api]
+        paths = ["src/**"]
+
+        [components.legacy]
+        paths = ["legacy/**"]
+        tag_format = "v{version}"
+        """,
+    )
+    config = load_config(target)
+    assert config.tag_format_for("api") == "{component}-v{version}"
+    assert config.tag_format_for("legacy") == "v{version}"
+
+
+def test_unique_prefix_per_component_is_required(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [project]
+        tag_format = "v{version}"
+
+        [components.foo]
+        paths = ["a/**"]
+
+        [components.bar]
+        paths = ["b/**"]
+        """,
+    )
+    with pytest.raises(ValueError) as exc:
+        load_config(target)
+    assert "tag prefix" in str(exc.value)
+    assert "collide" in str(exc.value)
+
+
+def test_collision_resolved_by_per_component_override(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+        [project]
+        tag_format = "v{version}"
+
+        [components.legacy]
+        paths = ["legacy/**"]
+
+        [components.api]
+        paths = ["src/**"]
+        tag_format = "api-v{version}"
+        """,
+    )
+    config = load_config(target)
+    config.validate_references()  # must not raise
+    assert config._render_tag_prefix("legacy") == "v"
+    assert config._render_tag_prefix("api") == "api-v"
+
+
+def test_static_tag_format_without_component_placeholder(tmp_path: Path):
+    """A literal format like 'release-{version}' works as long as it's
+    unique across components (here only one uses it)."""
+    target = _write(
+        tmp_path,
+        """
+        [components.thing]
+        paths = ["src/**"]
+        tag_format = "release-{version}"
+        """,
+    )
+    config = load_config(target)
+    config.validate_references()
+    assert config._render_tag_prefix("thing") == "release-"
+
+
 def test_load_config_rejects_components_array_with_extra_fields(tmp_path: Path):
     """Component still has extra='forbid', so unknown fields fail even in array form."""
     target = _write(

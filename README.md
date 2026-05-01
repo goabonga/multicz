@@ -371,6 +371,92 @@ Common noise dirs (`.git`, `node_modules`, `.venv`, `target`, `build`,
 See [`examples/fastapi-helm/multicz.toml`](examples/fastapi-helm/multicz.toml)
 for a fully commented example.
 
+## Tagging strategy
+
+Each component gets its own git tag whose name is built from
+`tag_format`, with two placeholders:
+
+| placeholder | substituted with |
+|---|---|
+| `{component}` | the component name (the dict key, or `name` in array form) |
+| `{version}` | the new version produced by the bump |
+
+The default is `tag_format = "{component}-v{version}"` so a typical
+release looks like:
+
+```
+api-v1.3.0
+api-v1.4.0-rc.1
+chart-v0.5.0
+frontend-v2.1.0
+mypkg-v1.3.0          # debian-format components keep semver in the tag
+```
+
+Tags are **annotated** (created with `-m`), which makes them work in
+environments that have `tag.gpgSign = true` and lets `git describe`
+land on them naturally.
+
+### Per-component override
+
+`tag_format` can be set on a component to override the project-wide
+default:
+
+```toml
+[project]
+tag_format = "{component}-v{version}"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+
+[components.legacy]
+paths = ["legacy/**"]
+tag_format = "v{version}"          # keep the historical scheme
+```
+
+Each component's rendered prefix (the bit before `{version}`) must be
+unique across the project — otherwise `git tag --list <prefix>*` would
+return tags from another component and the planner would read the
+wrong "current" version. multicz refuses to load a config where two
+components produce the same prefix and tells you which two to fix:
+
+```
+components 'foo' and 'bar' share the same tag prefix 'v'; tags would
+collide. Set a unique tag_format on at least one of them.
+```
+
+### Migration from a single-tag scheme
+
+A common starting point is a legacy repo with global tags like
+`v1.2.0`, `v1.3.0`. To adopt multicz:
+
+1. Decide whether the legacy tags belong to **one** of the new
+   components (typically the main app). Set `tag_format = "v{version}"`
+   on that component so its history continues seamlessly.
+2. Give every other component a different prefix (the default
+   `{component}-v{version}` does that for free).
+3. The planner reads the current version using this priority — git
+   tag matching the resolved `tag_format`, then the value in the
+   component's primary `bump_file` (`pyproject.toml`'s
+   `[project].version`, etc.), then `initial_version`. So even before
+   you cut your first multicz tag, the in-tree version is honoured.
+
+Concretely:
+
+```toml
+[project]
+tag_format = "{component}-v{version}"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+tag_format = "v{version}"          # legacy tags stay under "v" prefix
+
+[components.chart]
+paths = ["charts/**"]               # default "chart-v…" — fresh history
+```
+
+`multicz status` now shows `api` reading its version from the
+existing `v1.2.0` tag while `chart` starts at `initial_version`.
+
 ## Helm chart immutability
 
 Helm charts are content-addressed by `name-version.tgz`. If `chart-0.5.0`

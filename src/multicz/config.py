@@ -68,6 +68,7 @@ class Component(BaseModel):
     changelog: Path | None = None
     format: Literal["default", "debian"] = "default"
     debian: DebianSettings | None = None
+    tag_format: str | None = None  # overrides the project-level tag_format
 
     @field_validator("paths", "exclude_paths")
     @classmethod
@@ -193,7 +194,7 @@ class Config(BaseModel):
         return value
 
     def validate_references(self) -> None:
-        """Ensure ``triggers`` only references known components."""
+        """Cross-component validation: triggers and tag-prefix uniqueness."""
         names = set(self.components)
         for name, comp in self.components.items():
             unknown = set(comp.triggers) - names
@@ -202,6 +203,36 @@ class Config(BaseModel):
                     f"component {name!r} triggers unknown component(s): "
                     f"{', '.join(sorted(unknown))}"
                 )
+
+        # Each component must have a unique tag prefix; otherwise the
+        # git glob `git tag --list <prefix>*` returns tags from another
+        # component and the planner reads the wrong "current" version.
+        seen: dict[str, str] = {}
+        for name in self.components:
+            prefix = self._render_tag_prefix(name)
+            if prefix in seen:
+                raise ValueError(
+                    f"components {seen[prefix]!r} and {name!r} share the same "
+                    f"tag prefix {prefix!r}; tags would collide. Set a unique "
+                    f"tag_format on at least one of them."
+                )
+            seen[prefix] = name
+
+    def tag_format_for(self, component: str) -> str:
+        """Return the effective tag_format for ``component``.
+
+        Per-component override wins, then the project-level default.
+        """
+        comp = self.components.get(component)
+        if comp is not None and comp.tag_format:
+            return comp.tag_format
+        return self.project.tag_format
+
+    def _render_tag_prefix(self, component: str) -> str:
+        fmt = self.tag_format_for(component)
+        rendered = fmt.format(component=component, version="\x00V\x00")
+        head, _, _ = rendered.partition("\x00V\x00")
+        return head
 
 
 def _extract_section(path: Path) -> dict[str, Any] | None:

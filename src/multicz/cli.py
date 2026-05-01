@@ -217,7 +217,7 @@ def _component_relevant_commits(
     """
     import re
 
-    prefix = tag_prefix(config.project.tag_format, name)
+    prefix = tag_prefix(config.tag_format_for(name), name)
     since = (
         latest_stable_tag(repo, prefix)
         if since_stable
@@ -448,7 +448,7 @@ def bump(
     tags_created: list[str] = []
     if not dry_run and tag:
         for name, info in applied.items():
-            tag_name = config.project.tag_format.format(
+            tag_name = config.tag_format_for(name).format(
                 component=name, version=info["next"]
             )
             _git(repo, "tag", "-m", f"{name} {info['next']}", tag_name)
@@ -529,7 +529,7 @@ def changelog(
         if name not in config.components:
             err.print(f"[red]unknown component:[/] {name}")
             raise typer.Exit(code=1)
-        prefix = tag_prefix(config.project.tag_format, name)
+        prefix = tag_prefix(config.tag_format_for(name), name)
         since = latest_tag(repo, prefix)
         relevant = [
             c

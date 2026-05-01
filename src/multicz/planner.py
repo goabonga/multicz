@@ -205,7 +205,7 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
          components,
       3. ``initial_version`` from the project settings (bootstrap).
     """
-    prefix = tag_prefix(config.project.tag_format, name)
+    prefix = tag_prefix(config.tag_format_for(name), name)
     tagged = latest_version(repo, prefix)
     if tagged is not None:
         return tagged
@@ -246,7 +246,7 @@ def _direct_pass(
 
     release_re = re.compile(config.project.release_commit_pattern)
     for name in config.components:
-        prefix = tag_prefix(config.project.tag_format, name)
+        prefix = tag_prefix(config.tag_format_for(name), name)
         since = latest_tag(repo, prefix)
         for commit in commits_since(repo, since):
             header = (

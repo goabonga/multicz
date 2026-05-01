@@ -112,6 +112,41 @@ def test_release_commits_are_skipped(repo: Path):
     assert "release" not in " ".join(plan.bumps["api"].reasons).lower()
 
 
+def test_per_component_tag_format_is_honored(repo: Path):
+    # Re-write the config with a tag_format override on api only
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+tag_format = "api-{version}"
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+""")
+
+    # Existing tags from a previous release cycle
+    _git(repo, "tag", "-m", "api 1.4.0", "api-1.4.0")
+    _git(repo, "tag", "-m", "chart 0.7.0", "chart-v0.7.0")
+
+    # New commit after the tags so there's something to bump
+    _commit(
+        repo,
+        {"src/main.py": "x = 2\n", "charts/myapp/values.yaml": "x: 1\n"},
+        "feat: add stuff",
+    )
+
+    plan = build_plan(repo, load_config(cfg))
+
+    # api's current version is read from "api-1.4.0" via the OVERRIDE prefix
+    # ("api-"), not from a default "api-v…" tag (which does not exist here).
+    assert str(plan.bumps["api"].current) == "1.4.0"
+    assert str(plan.bumps["chart"].current) == "0.7.0"
+    assert str(plan.bumps["api"].next) == "1.5.0"
+
+
 def test_chart_only_change_after_api_tag(repo: Path):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: api change")
     _git(repo, "tag", "-m", "api 1.3.0", "api-v1.3.0")
