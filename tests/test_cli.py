@@ -232,6 +232,51 @@ def test_bump_commit_includes_changelog(repo: Path, runner: CliRunner):
     assert "charts/myapp/CHANGELOG.md" in files
 
 
+def test_validate_clean_repo_exits_zero(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 0
+    assert "no issues found" in result.output
+
+
+def test_validate_missing_bump_file_exits_one(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + "\n")
+    # delete the file the api bump_file points at
+    (repo / "pyproject.toml").unlink()
+    result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 1
+    assert "bump_file" in result.output
+    assert "does not exist" in result.output
+
+
+def test_validate_strict_exits_two_on_warnings(repo: Path, runner: CliRunner):
+    # Add a second component overlapping with api on src/**
+    (repo / "multicz.toml").write_text(CONFIG + """
+[components.lib]
+paths = ["src/**"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    result = runner.invoke(app, ["validate", "--strict"])
+    assert result.exit_code == 2
+    assert "path_overlap" in result.output
+
+
+def test_validate_json_output(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["validate", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert "findings" in payload
+    assert "summary" in payload
+    assert payload["summary"]["errors"] == 0
+
+
+def test_validate_check_accepts_conventional(tmp_path: Path, runner: CliRunner):
+    """rename of test_check_accepts_conventional kept here for clarity."""
+    msg = tmp_path / "msg"
+    msg.write_text("feat: x\n")
+    result = runner.invoke(app, ["check", str(msg)])
+    assert result.exit_code == 0
+
+
 def test_check_accepts_conventional(tmp_path: Path, runner: CliRunner):
     msg = tmp_path / "msg"
     msg.write_text("feat(api): add login\n")
