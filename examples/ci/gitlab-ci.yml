@@ -1,0 +1,67 @@
+# GitLab CI pipeline.
+#
+# Required CI/CD variables:
+#   PROJECT_ACCESS_TOKEN  - a Project Access Token with `write_repository` scope
+#                            (needed to push the release commit and tags back to
+#                            the protected `main` branch).
+#
+# Layout assumed:
+#   .gitlab-ci.yml      <- this file
+#   multicz.toml        <- multicz config
+
+stages:
+  - validate
+  - release
+  - publish
+
+default:
+  image: python:3.12-slim
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends git jq curl
+    - pip install --quiet multicz
+    - git config user.name  "gitlab-ci"
+    - git config user.email "ci@${CI_SERVER_HOST}"
+    - git remote set-url origin "https://oauth2:${PROJECT_ACCESS_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+
+validate:
+  stage: validate
+  script:
+    - multicz validate --strict
+
+release:
+  stage: release
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - |
+      multicz plan --output json > plan.json
+      if [ "$(jq '.bumps | length' plan.json)" = "0" ]; then
+        echo "no release pending"
+        exit 0
+      fi
+    - multicz bump --commit --tag --push --output json | tee release.json
+  artifacts:
+    paths:
+      - release.json
+    expire_in: 1 week
+
+# Optional: publish Docker artefacts using the JSON shape from `release.json`.
+docker:
+  stage: publish
+  image: docker:27
+  needs: [release]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  services:
+    - docker:27-dind
+  before_script:
+    - apk add --no-cache jq
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - |
+      [ -f release.json ] || { echo "no release.json — release stage was a no-op"; exit 0; }
+      jq -r '.bumps[].artifacts[] | select(.type == "docker") | .ref' release.json |
+      while read -r ref; do
+        docker build -t "$ref" .
+        docker push "$ref"
+      done

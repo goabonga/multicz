@@ -7,6 +7,7 @@ Each subdirectory shows a different way to set up `multicz`.
 | [`fastapi-helm/`](fastapi-helm/) | Python API + Helm chart with `appVersion` mirror cascade | `multicz.toml` (dedicated) |
 | [`inline-pyproject/`](inline-pyproject/) | FastAPI backend + React SPA, no separate config file | `pyproject.toml` `[tool.multicz]` |
 | [`inline-package-json/`](inline-package-json/) | npm-workspace monorepo (`web`, `mobile`, `shared`) | `package.json` `"multicz"` key |
+| [`ci/`](ci/) | Drop-in pipelines for GitHub Actions, GitLab CI, Azure Pipelines | n/a (CI files) |
 
 Search order at every directory level (walked up from `cwd`):
 

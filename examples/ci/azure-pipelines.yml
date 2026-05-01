@@ -1,0 +1,61 @@
+# Azure DevOps Pipelines release pipeline.
+#
+# The pipeline service connection needs `Allow scripts to access OAuth token`
+# enabled, OR a PAT in a secret variable to push the release commit back.
+#
+# Layout assumed:
+#   azure-pipelines.yml   <- this file
+#   multicz.toml          <- multicz config
+
+trigger:
+  branches:
+    include: [main]
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  PYTHON_VERSION: '3.12'
+
+steps:
+  - checkout: self
+    persistCredentials: true   # needed to push back
+    fetchDepth: 0              # full history for multicz tag detection
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: $(PYTHON_VERSION)
+
+  - script: pip install multicz
+    displayName: Install multicz
+
+  - script: |
+      git config user.name  "Azure Pipelines"
+      git config user.email "azure-pipelines@$(System.TeamProject)"
+    displayName: Configure git
+
+  - script: multicz validate --strict
+    displayName: Validate multicz config
+
+  - script: |
+      multicz plan --output json | tee /tmp/plan.json
+      if [ "$(jq '.bumps | length' /tmp/plan.json)" = "0" ]; then
+        echo "##vso[task.setvariable variable=hasRelease]false"
+        echo "no release pending"
+      else
+        echo "##vso[task.setvariable variable=hasRelease]true"
+      fi
+    displayName: Plan
+
+  - script: multicz bump --commit --tag --push --output json | tee /tmp/release.json
+    displayName: Bump, commit, tag, push
+    condition: and(succeeded(), eq(variables.hasRelease, 'true'))
+
+  - script: |
+      jq -r '.bumps[].artifacts[] | select(.type == "docker") | .ref' /tmp/release.json |
+      while read -r ref; do
+        docker build -t "$ref" .
+        docker push "$ref"
+      done
+    displayName: Build & push Docker artefacts
+    condition: and(succeeded(), eq(variables.hasRelease, 'true'))

@@ -374,10 +374,11 @@ def plan_cmd(
 
     if output == "json":
         payload = {
+            "schema_version": 1,
             "bumps": {
                 bump.component: {
-                    "current": str(bump.current),
-                    "next": bump.next,
+                    "current_version": str(bump.current),
+                    "next_version": bump.next,
                     "kind": bump.kind,
                     "reasons": [r.to_dict() for r in bump.reasons],
                     "artifacts": [
@@ -386,7 +387,7 @@ def plan_cmd(
                     ],
                 }
                 for bump in plan_obj
-            }
+            },
         }
         console.print_json(data=payload)
         return
@@ -1274,7 +1275,9 @@ def bump(
     if output == "json":
         bumps_payload = {
             name: {
-                **info,
+                "current_version": info["current"],
+                "next_version": info["next"],
+                "kind": info["kind"],
                 "artifacts": [
                     a.render(component=name, version=info["next"])
                     for a in config.components[name].artifacts
@@ -1284,6 +1287,7 @@ def bump(
         }
         console.print_json(
             data={
+                "schema_version": 1,
                 "bumps": bumps_payload,
                 "dry_run": dry_run,
                 "git": git_summary,

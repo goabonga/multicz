@@ -124,8 +124,8 @@ def test_bump_json_output(repo: Path, runner: CliRunner):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["dry_run"] is True
-    assert payload["bumps"]["api"]["next"] == "1.3.0"
-    assert payload["bumps"]["chart"]["next"] == "0.4.1"
+    assert payload["bumps"]["api"]["next_version"] == "1.3.0"
+    assert payload["bumps"]["chart"]["next_version"] == "0.4.1"
 
 
 def test_get_returns_current_version(repo: Path, runner: CliRunner):
@@ -360,9 +360,10 @@ def test_plan_json_emits_structured_reasons(repo: Path, runner: CliRunner):
     assert result.exit_code == 0, result.stdout
 
     payload = json.loads(result.stdout)
+    assert payload["schema_version"] == 1
     api = payload["bumps"]["api"]
-    assert api["current"] == "1.2.0"
-    assert api["next"] == "1.3.0"
+    assert api["current_version"] == "1.2.0"
+    assert api["next_version"] == "1.3.0"
     assert api["kind"] == "minor"
     [reason] = api["reasons"]
     assert reason["kind"] == "commit"
@@ -689,7 +690,7 @@ ref = "{component}-{version}.tgz"
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     api = payload["bumps"]["api"]
-    assert api["next"] == "1.3.0"
+    assert api["next_version"] == "1.3.0"
     assert api["artifacts"] == [{"type": "docker", "ref": "ghcr.io/foo/api:1.3.0"}]
     chart = payload["bumps"]["chart"]
     assert chart["artifacts"] == [{"type": "helm", "ref": "chart-0.4.1.tgz"}]
@@ -933,7 +934,7 @@ def test_plan_force_shows_manual_reason(repo: Path, runner: CliRunner):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     api = payload["bumps"]["api"]
-    assert api["next"] == "1.2.1"
+    assert api["next_version"] == "1.2.1"
     [reason] = api["reasons"]
     assert reason["kind"] == "manual"
     assert "force" in reason["note"]

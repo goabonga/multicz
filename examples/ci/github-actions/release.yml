@@ -1,0 +1,84 @@
+# GitHub Actions release workflow.
+#
+# Layout assumed:
+#   .github/workflows/release.yml   <- this file
+#   multicz.toml                    <- multicz config
+#
+# What it does, on every push to main:
+#   1. validate the multicz config (CI gate)
+#   2. plan the release (skip the rest if nothing pending)
+#   3. bump versions, write CHANGELOG.md, commit, tag, push
+#   4. build & push every Docker artefact declared in multicz.toml
+#   5. open a GitHub Release per new tag, with notes from `multicz release-notes`
+
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write    # to push the release commit and tags
+  packages: write    # to push images to ghcr.io
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # multicz needs the full history for tag detection
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: astral-sh/setup-uv@v3
+
+      - run: uv tool install multicz
+
+      - name: Configure git for the bot author
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate config (CI gate)
+        run: multicz validate --strict
+
+      - name: Plan
+        id: plan
+        run: |
+          multicz plan --output json > /tmp/plan.json
+          if [ "$(jq '.bumps | length' /tmp/plan.json)" = "0" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true"  >> "$GITHUB_OUTPUT"
+            jq '.' /tmp/plan.json
+          fi
+
+      - name: Bump, commit, tag, push
+        if: steps.plan.outputs.release == 'true'
+        run: |
+          multicz bump --commit --tag --push --output json > /tmp/release.json
+          jq '.' /tmp/release.json
+
+      - name: Build and push Docker artefacts
+        if: steps.plan.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          jq -r '.bumps[].artifacts[] | select(.type == "docker") | .ref' /tmp/release.json |
+          while read -r ref; do
+            docker build -t "$ref" .
+            docker push "$ref"
+          done
+
+      - name: Create GitHub Releases
+        if: steps.plan.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for tag in $(git tag --points-at HEAD); do
+            gh release create "$tag" \
+              --title "$tag" \
+              --notes "$(multicz release-notes --tag "$tag")"
+          done
