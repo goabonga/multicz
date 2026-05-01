@@ -16,6 +16,11 @@ name: release
 # required. If you prefer token-based publishing, swap the
 # pypa/gh-action-pypi-publish step for `uv publish` with
 # `UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}`.
+#
+# Optional GPG signing: define repository secrets `GPG_PRIVATE_KEY`
+# (ASCII-armored, e.g. `gpg --armor --export-secret-keys`) and
+# `GPG_PASSPHRASE` to sign the release commit and tag. When either
+# secret is missing the pipeline still runs, just unsigned.
 
 on:
   push:
@@ -55,6 +60,37 @@ jobs:
           git config user.name  "${NAME:-github-actions[bot]}"
           git config user.email "${EMAIL:-41898282+github-actions[bot]@users.noreply.github.com}"
 
+      - name: Detect GPG availability
+        # Secrets can't be referenced from `if:` directly, so we
+        # promote their presence to a step output.
+        id: gpg
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          if [ -n "$GPG_PRIVATE_KEY" ] && [ -n "$GPG_PASSPHRASE" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import and unlock GPG key
+        if: steps.gpg.outputs.available == 'true'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          # Pre-cache the passphrase in gpg-agent via a dummy sign so
+          # subsequent `git commit -S` / `git tag -s` don't prompt.
+          echo test | gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
+            --pinentry-mode loopback --sign > /dev/null
+          # Tell git which key to sign with — derived from the imported
+          # key so we don't need a separate KEY_ID secret.
+          KEY_ID=$(gpg --list-secret-keys --with-colons \
+            | awk -F: '/^sec/{print $5; exit}')
+          git config user.signingkey "$KEY_ID"
+
       - name: Validate
         run: uv run multicz validate --strict
 
@@ -70,8 +106,15 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Bump, commit, tag, push (signed)
+        if: steps.plan.outputs.release == 'true' && steps.gpg.outputs.available == 'true'
+        run: |
+          uv run multicz bump --commit --tag --push --sign \
+            --summary "$GITHUB_STEP_SUMMARY" --output json \
+            | tee /tmp/release.json
+
       - name: Bump, commit, tag, push
-        if: steps.plan.outputs.release == 'true'
+        if: steps.plan.outputs.release == 'true' && steps.gpg.outputs.available != 'true'
         run: |
           uv run multicz bump --commit --tag --push \
             --summary "$GITHUB_STEP_SUMMARY" --output json \
