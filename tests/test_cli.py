@@ -389,6 +389,63 @@ def test_plan_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner)
     assert result.exit_code == 1
 
 
+def test_changed_text_output_lists_changed_components(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["changed"])
+    assert result.exit_code == 0, result.stdout
+    # api was touched; chart wasn't (but chart is empty in the fixture; the
+    # mirror cascade is a release concept, not a "changed" one)
+    assert "api" in result.stdout.split()
+
+
+def test_changed_json_includes_unchanged(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["changed", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert "api" in payload["changed"]
+    assert "chart" in payload["unchanged"]
+
+
+def test_changed_against_explicit_since(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: api change")
+    _commit(repo, {"charts/myapp/values.yaml": "y: 1\n"}, "feat: chart change")
+    # baseline: HEAD before the two new commits = the init commit
+    sha = _git(repo, "rev-list", "--max-parents=0", "HEAD").strip()
+
+    result = runner.invoke(
+        app, ["changed", "--since", sha, "--output", "json"]
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert set(payload["changed"]) == {"api", "chart"}
+
+
+def test_changed_excludes_release_commits(repo: Path, runner: CliRunner):
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])  # creates a chore(release): commit
+
+    # No new content commits since the tag — only the release commit.
+    # Use --since on the init commit to span the entire history.
+    sha = _git(repo, "rev-list", "--max-parents=0", "HEAD").strip()
+    result = runner.invoke(
+        app, ["changed", "--since", sha, "--output", "json"]
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    # api genuinely changed (the feat commit). The chore(release) commit
+    # touched pyproject.toml too but was filtered out.
+    assert "api" in payload["changed"]
+
+
+def test_changed_returns_nothing_when_idle(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["changed", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["changed"] == []
+    assert set(payload["unchanged"]) == {"api", "chart"}
+
+
 def test_artifacts_text_output(repo: Path, runner: CliRunner):
     (repo / "multicz.toml").write_text("""
 [components.api]
