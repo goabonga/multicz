@@ -191,6 +191,7 @@ helm package charts/myapp
 | `multicz bump --dry-run` | plan without writing |
 | `multicz bump --commit --tag` | release in one shot: write, commit, tag |
 | `multicz bump --commit --tag --push` | …and push commit + tags with `--follow-tags` |
+| `multicz bump --commit -m "..."` | verbatim release-commit message (overrides the template) |
 | `multicz bump --output json` | emit `{"bumps": {...}, "git": {...}}` for CI |
 | `multicz get <component>` | read the current version from the primary bump file |
 | `multicz changelog [-c name]` | per-component conventional-commit log since the last tag |
@@ -257,6 +258,66 @@ re-reads stay correct across schemes.
 the Debian flow uses semver internally and applies its own
 `~rc1` notation at write time. Configs that combine the two are
 rejected at load.
+
+### Release commit message
+
+`multicz bump --commit` writes a single release commit. Its message
+is rendered from `[project].release_commit_message`, which defaults
+to:
+
+```
+chore(release): bump {summary}
+
+{body}
+```
+
+Producing the historical shape:
+
+```
+chore(release): bump api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.5.0
+
+- api: 1.2.0 -> 1.3.0 (minor)
+- chart: 0.4.0 -> 0.5.0 (patch)
+```
+
+Available placeholders:
+
+| placeholder | example |
+|---|---|
+| `{summary}` | `api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.5.0` |
+| `{components}` | `api v1.3.0, chart v0.5.0` |
+| `{body}` | bullet list with kind annotations |
+| `{count}` | `2` |
+
+Examples:
+
+```toml
+[project]
+# Compact one-liner
+release_commit_message = "chore(release): {components}"
+# -> chore(release): api v1.3.0, chart v0.5.0
+
+# Spell out the count
+release_commit_message = "release: {count} components ({summary})"
+# -> release: 2 components (api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.5.0)
+```
+
+Literal `{` and `}` must be escaped as `{{` / `}}`.
+
+For one-off releases, override the entire message with `-m`:
+
+```sh
+multicz bump --commit --tag -m "release: hotfix for the production outage"
+```
+
+`-m` is verbatim like `git commit -m` — no placeholders are expanded.
+
+> **If you change the prefix**, also update
+> `release_commit_pattern` so the auto-filter still matches:
+> ```toml
+> release_commit_pattern  = "^release"
+> release_commit_message  = "release: {components}"
+> ```
 
 ### Release candidates
 
