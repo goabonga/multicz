@@ -186,6 +186,9 @@ helm package charts/myapp
 | `multicz get <component>` | read the current version from the primary bump file |
 | `multicz changelog [-c name]` | per-component conventional-commit log since the last tag |
 | `multicz changelog --output md` | the same, grouped into Breaking / Features / Fixes / Perf / Other |
+| `multicz release-notes <comp>` | one-shot release notes for the upcoming bump (no file written) |
+| `multicz release-notes --tag <tag>` | retrospective notes for a past release tag |
+| `multicz release-notes --all --output md` | one block per bumping component, ready for `gh release create` |
 | `multicz bump --no-changelog` | bump versions without touching declared `CHANGELOG.md` files |
 | `multicz bump --pre rc` | enter / continue a release-candidate cycle (`1.2.3` → `1.3.0-rc.1` → `1.3.0-rc.2`) |
 | `multicz bump --finalize` | drop a pre-release suffix (`1.3.0-rc.2` → `1.3.0`) — works with no new commits |
@@ -333,6 +336,49 @@ Reasons:
         - src/auth.py
         - src/main.py
 ```
+
+### Release notes (`gh release create`)
+
+`multicz release-notes` is the single-shot, no-file-written counterpart
+to the persistent `CHANGELOG.md`. Designed to be piped into
+`gh release create` or pasted into a GitHub/GitLab Release UI.
+
+```sh
+gh release create api-v1.3.0 --notes "$(multicz release-notes --tag api-v1.3.0)"
+```
+
+Three modes:
+
+```sh
+# upcoming bump for one component (preview before `multicz bump --tag`)
+multicz release-notes api
+
+# upcoming bumps for every bumping component (one --all output to paste)
+multicz release-notes --all
+
+# retrospective: what shipped in a past tagged release
+multicz release-notes --tag api-v1.3.0
+```
+
+Critical detail for past tags: the previous-tag lookup is
+**stable-aware**. A stable release tag (`api-v1.3.0`) reads commits
+since the previous *stable* tag (`api-v1.2.0`) — not since the most
+recent RC — so the notes consolidate everything that shipped in 1.3.0
+over the whole RC cycle. A pre-release tag (`api-v1.3.0-rc.2`) reads
+commits since the immediately previous tag (`api-v1.3.0-rc.1`) so
+each RC only shows the delta.
+
+Output formats:
+
+- `md` (default) — sections (`### Features`, `### Fixes`, …) and bullets
+- `text` — plain ASCII, useful in `git log`-style scripts
+- `json` — `{"sections": [{"component": "...", "from_version": "...",
+  "to_version": "...", "commits": [...]}]}` for further processing
+
+The body honours every project-level rendering knob:
+`changelog_sections`, `breaking_section_title`, `other_section_title`,
+`ignored_types`. So whatever shape your `CHANGELOG.md` takes,
+`release-notes` produces identical sections.
 
 ### Per-component CHANGELOG.md
 
