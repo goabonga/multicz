@@ -23,6 +23,59 @@ A change to `src/` is a new app release; a change only under
 Standard tools bump everything together or force you to script per-folder
 logic. `multicz` makes the rule explicit in `multicz.toml`.
 
+## Where the config lives
+
+By default, `multicz` looks for a dedicated `multicz.toml` at the repo
+root. As a fallback (walked up the directory tree from the cwd), it
+also accepts:
+
+- `pyproject.toml` under `[tool.multicz]` — natural for Python projects
+- `package.json` under a `"multicz"` key — natural for Node.js projects
+
+Search order at each directory level:
+
+1. `multicz.toml` (always wins when present)
+2. `pyproject.toml` *with* a `[tool.multicz]` table
+3. `package.json` *with* a `"multicz"` key
+
+A `pyproject.toml` without `[tool.multicz]` is silently skipped — it's
+not treated as the multicz config — so projects that already have a
+pyproject for tooling reasons aren't hijacked.
+
+Examples:
+
+```toml
+# pyproject.toml
+[project]
+name = "myapp"
+version = "1.0.0"
+
+[tool.multicz.components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[tool.multicz.components.web]
+paths = ["frontend/**"]
+bump_files = [{ file = "frontend/package.json", key = "version" }]
+```
+
+```json
+{
+  "name": "monorepo",
+  "version": "1.0.0",
+  "multicz": {
+    "components": [
+      { "name": "web", "paths": ["frontend/**"] },
+      { "name": "mobile", "paths": ["mobile/**"] }
+    ]
+  }
+}
+```
+
+`multicz init` still writes a dedicated `multicz.toml`. To inline the
+config into `pyproject.toml` or `package.json`, copy the body of the
+generated `multicz.toml` under the appropriate parent key.
+
 ## Install
 
 ```sh
