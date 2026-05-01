@@ -49,7 +49,7 @@ jobs:
       ${{ github.event.workflow_run.conclusion == 'success' &&
           !startsWith(github.event.workflow_run.head_commit.message, 'chore(release)') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # workflow_run runs in the context of the default branch, but
           # we want the exact ref that just passed CI. `head_branch` is
@@ -58,7 +58,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v8
         with:
           python-version: "3.12"
 
