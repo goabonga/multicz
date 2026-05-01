@@ -389,6 +389,68 @@ def test_plan_pre_and_finalize_mutually_exclusive(repo: Path, runner: CliRunner)
     assert result.exit_code == 1
 
 
+def test_state_command_without_config(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["state"])
+    assert result.exit_code == 1
+    assert "no state_file configured" in result.output
+
+
+def test_state_written_on_bump_and_readable(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+state_file = ".multicz/state.json"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    result = runner.invoke(app, ["bump", "--commit", "--tag"])
+    assert result.exit_code == 0, result.stdout
+
+    state_path = repo / ".multicz" / "state.json"
+    assert state_path.is_file()
+
+    payload = json.loads(state_path.read_text())
+    assert payload["version"] == 1
+    assert "git_head" in payload
+    assert payload["components"]["api"]["version"] == "1.3.0"
+    assert payload["components"]["api"]["tag"] == "api-v1.3.0"
+
+    # The state command renders it
+    result = runner.invoke(app, ["state", "--output", "json"])
+    assert result.exit_code == 0
+    via_cli = json.loads(result.stdout)
+    assert via_cli["components"]["api"]["version"] == "1.3.0"
+
+
+def test_state_drift_detected_by_validate(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+state_file = ".multicz/state.json"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    # Manually edit pyproject.toml after the bump (simulating drift)
+    pp = repo / "pyproject.toml"
+    pp.write_text(pp.read_text().replace('version = "1.3.0"', 'version = "9.9.9"'))
+
+    result = runner.invoke(app, ["validate", "--strict"])
+    assert result.exit_code == 2
+    assert "state_drift" in result.output
+    assert "1.3.0" in result.output
+    assert "9.9.9" in result.output
+
+
+def test_state_no_drift_when_consistent(repo: Path, runner: CliRunner):
+    (repo / "multicz.toml").write_text(CONFIG + """
+[project]
+state_file = ".multicz/state.json"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    result = runner.invoke(app, ["validate", "--strict"])
+    assert result.exit_code == 0
+
+
 def test_status_since_overrides_commit_window(repo: Path, runner: CliRunner):
     # First commit lives "before" the override; second is "after" it.
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: pre-baseline change")

@@ -39,6 +39,14 @@ from .planner import (
     TriggerReason,
     build_plan,
 )
+from .state import (
+    STATE_SCHEMA_VERSION,
+    ComponentState,
+    State,
+    load_state,
+    now_iso,
+    write_state,
+)
 from .validation import validate as run_validation
 from .writers import read_value, write_value
 
@@ -256,6 +264,53 @@ def plan_cmd(
         for reason in bump.reasons:
             console.print(f"  • {reason.summary()}")
         console.print()
+
+
+@app.command()
+def state(
+    output: str = typer.Option("text", "--output", "-o", help="text | json"),
+) -> None:
+    """Inspect the optional state file written after each successful bump.
+
+    The state file is opt-in via ``[project].state_file = "..."``. It
+    records the per-component version, the expected tag name (when
+    ``--tag`` was used at bump time), the SHA the bump was computed
+    against, and a UTC timestamp.
+    """
+    repo, config = _load()
+    if config.project.state_file is None:
+        err.print(
+            "[red]no state_file configured[/] — set "
+            "[bold][project].state_file[/] in multicz.toml"
+        )
+        raise typer.Exit(code=1)
+
+    path = repo / config.project.state_file
+    state_obj = load_state(path)
+    if state_obj is None:
+        if output == "json":
+            console.print_json(data=None)
+        else:
+            console.print(
+                f"[dim]{config.project.state_file} not yet written[/]"
+            )
+        return
+
+    if output == "json":
+        console.print_json(data=state_obj.to_dict())
+        return
+
+    console.print(
+        f"[bold]state[/] {config.project.state_file} "
+        f"(schema v{state_obj.version})"
+    )
+    console.print(f"  git_head:  {state_obj.git_head_short or state_obj.git_head}")
+    console.print(f"  timestamp: {state_obj.timestamp}")
+    for name, comp in state_obj.components.items():
+        line = f"  [bold]{name}[/]: {comp.version}"
+        if comp.tag:
+            line += f"  [dim]({comp.tag})[/]"
+        console.print(line)
 
 
 @app.command()
@@ -969,6 +1024,37 @@ def bump(
         }
 
     git_summary: dict[str, str | list[str]] = {}
+    # Optional state file: written before the commit so it lands in the
+    # release commit alongside the version-file changes.
+    if not dry_run and config.project.state_file is not None:
+        state_path = repo / config.project.state_file
+        try:
+            head_before = _git(repo, "rev-parse", "HEAD").strip()
+        except Exception:
+            head_before = ""
+        components_state: dict[str, ComponentState] = {}
+        for name, info in applied.items():
+            tag_name: str | None = None
+            if tag:
+                tag_name = config.tag_format_for(name).format(
+                    component=name, version=info["next"]
+                )
+            components_state[name] = ComponentState(
+                version=info["next"],
+                tag=tag_name,
+                tag_sha=None,
+            )
+        state_obj = State(
+            version=STATE_SCHEMA_VERSION,
+            git_head=head_before,
+            git_head_short=head_before[:7] if head_before else "",
+            timestamp=now_iso(),
+            components=components_state,
+        )
+        write_state(state_path, state_obj)
+        if state_path not in written:
+            written.append(state_path)
+
     if not dry_run and commit and written:
         rel_paths = [str(p.relative_to(repo)) for p in written]
         _git(repo, "add", "--", *rel_paths)

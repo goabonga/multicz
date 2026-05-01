@@ -182,6 +182,7 @@ class ProjectSettings(BaseModel):
     finalize_strategy: Literal["consolidate", "promote", "annotate"] = "consolidate"
     overlap_policy: Literal["error", "first-match", "allow", "all"] = "error"
     ignored_types: list[str] = Field(default_factory=list)
+    state_file: Path | None = None  # opt-in JSON snapshot, written on bump
 
 
 class Config(BaseModel):
