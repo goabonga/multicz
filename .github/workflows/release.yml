@@ -2,8 +2,8 @@ name: release
 
 # Self-hosted release pipeline: multicz manages multicz.
 #
-# What it does on every push to main:
-#   1. validate the multicz config (CI gate)
+# Runs after the `ci` workflow finishes green on main:
+#   1. validate the multicz config (defense in depth)
 #   2. plan the release (skip the rest if nothing pending)
 #   3. bump pyproject.toml + CHANGELOG.md, commit, tag, push
 #   4. build the wheel + sdist (uv build)
@@ -23,7 +23,11 @@ name: release
 # secret is missing the pipeline still runs, just unsigned.
 
 on:
-  push:
+  # Trigger only after the `ci` workflow finishes on `main`. The `if:`
+  # below filters on success, so a red CI never produces a release.
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
     branches: [main]
 
 permissions:
@@ -33,11 +37,18 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Don't loop on the chore(release) commit we just pushed.
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    # Only run when CI was green AND the trigger wasn't our own
+    # `chore(release)` commit (which would loop forever).
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          !startsWith(github.event.workflow_run.head_commit.message, 'chore(release)') }}
     steps:
       - uses: actions/checkout@v4
         with:
+          # workflow_run runs in the context of the default branch, but
+          # we want the exact ref that just passed CI. `head_branch` is
+          # always "main" given the trigger filter above.
+          ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -49,14 +60,14 @@ jobs:
         run: uv sync --frozen
 
       - name: Configure git
-        # Attribute the release commit to whoever pushed the head commit,
-        # so the chain "Bob pushed feat: X" -> "Bob authored chore(release):
-        # bump X -> Y" is preserved on the timeline. Falls back to the
-        # github-actions[bot] noreply identity when the trigger isn't
-        # a push (manual dispatch, schedule, …).
+        # Attribute the release commit to whoever pushed the head commit
+        # that triggered CI, so the chain "Bob pushed feat: X" ->
+        # "Bob authored chore(release): bump X -> Y" is preserved on the
+        # timeline. Falls back to the github-actions[bot] noreply
+        # identity when the upstream payload doesn't carry an author.
         run: |
-          NAME="${{ github.event.head_commit.author.name }}"
-          EMAIL="${{ github.event.head_commit.author.email }}"
+          NAME="${{ github.event.workflow_run.head_commit.author.name }}"
+          EMAIL="${{ github.event.workflow_run.head_commit.author.email }}"
           git config user.name  "${NAME:-github-actions[bot]}"
           git config user.email "${EMAIL:-41898282+github-actions[bot]@users.noreply.github.com}"
 
