@@ -2,13 +2,22 @@
 
 Walks the working tree once and proposes a :class:`Config` populated with one
 :class:`Component` per detected manifest. Component names come from the
-manifest itself (``[project].name`` in ``pyproject.toml``, ``name`` in
-``Chart.yaml`` and ``package.json``) so the generated tags read naturally
-(``multicz-v1.3.0`` rather than ``api-v1.3.0``). Paths only include files
-whose change clearly warrants a version bump: ``Dockerfile`` is included
-when present (new base image / RUN step = new artifact), but
-``.dockerignore`` is not — it almost always signals build-context hygiene
-rather than an artifact change. Users who disagree can add it manually.
+manifest itself (``[project].name`` in ``pyproject.toml``, ``name`` in each
+``Chart.yaml`` and the root ``package.json``) so the generated tags read
+naturally (``multicz-v1.3.0`` rather than ``api-v1.3.0``).
+
+``Chart.yaml`` is searched recursively across the whole repo (excluding
+common noise directories like ``node_modules`` or ``.venv``) so charts
+under ``helm/``, ``deploy/``, ``infra/``, or any other layout are picked
+up. When multiple charts coexist with one python project, the auto-mirror
+only wires charts whose ``name`` matches the python project, so a
+``worker`` chart next to an ``api`` service stays independent. A single
+chart + single python project always pairs unambiguously.
+
+Paths only include files whose change clearly warrants a version bump:
+``Dockerfile`` is included when present (new base image / RUN step = new
+artifact), but ``.dockerignore`` is not — it almost always signals
+build-context hygiene rather than an artifact change.
 """
 
 from __future__ import annotations
@@ -67,6 +76,29 @@ def _unique(name: str, taken: set[str], suffix: str) -> str:
     return candidate
 
 
+# Directories never recursed into when scanning for manifests.
+_NOISE_DIRS = frozenset({
+    ".git", ".hg", ".svn",
+    "node_modules", ".venv", "venv", ".tox", ".nox",
+    "vendor", "third_party",
+    "target", "build", "dist",
+    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+})
+
+
+def _find_chart_yamls(repo: Path) -> list[Path]:
+    """Return every ``Chart.yaml`` under ``repo`` outside common noise dirs."""
+    found: list[Path] = []
+    for path in repo.rglob("Chart.yaml"):
+        if not path.is_file():
+            continue
+        rel_parts = path.relative_to(repo).parts
+        if any(part in _NOISE_DIRS for part in rel_parts):
+            continue
+        found.append(path)
+    return sorted(found)
+
+
 def discover_components(repo: Path) -> dict[str, Component]:
     """Return a fresh component map populated from manifests found under ``repo``."""
     components: dict[str, Component] = {}
@@ -90,7 +122,8 @@ def discover_components(repo: Path) -> dict[str, Component]:
         python_name = name
 
     chart_names: list[str] = []
-    for chart_yaml in sorted(repo.glob("charts/*/Chart.yaml")):
+    chart_raw_names: dict[str, str] = {}  # comp_name -> raw chart name (for matching)
+    for chart_yaml in _find_chart_yamls(repo):
         chart_dir = chart_yaml.parent
         rel_dir = chart_dir.relative_to(repo).as_posix()
         rel_chart = chart_yaml.relative_to(repo)
@@ -102,10 +135,19 @@ def discover_components(repo: Path) -> dict[str, Component]:
             changelog=Path(f"{rel_dir}/CHANGELOG.md"),
         )
         chart_names.append(comp_name)
+        chart_raw_names[comp_name] = raw
 
     if python_name and chart_names:
         py = components[python_name]
-        for chart_comp_name in chart_names:
+        # Single chart + single python project: unambiguous, mirror.
+        # Multiple charts: only mirror to the chart(s) whose name matches the
+        # python project, so a 'worker' chart next to an 'api' python project
+        # stays independent.
+        candidates = (
+            chart_names if len(chart_names) == 1
+            else [n for n in chart_names if chart_raw_names[n] == python_name]
+        )
+        for chart_comp_name in candidates:
             chart_yaml_path = components[chart_comp_name].bump_files[0].file
             py.mirrors.append(FileKey(file=chart_yaml_path, key="appVersion"))
 

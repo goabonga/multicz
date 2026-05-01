@@ -93,6 +93,80 @@ def test_chart_collision_suffixes(tmp_path: Path):
     assert comps["myapp-chart"].paths == ["charts/myapp/**"]
 
 
+def test_multiple_charts_independent(tmp_path: Path):
+    _chart(tmp_path, dirname="api")
+    _chart(tmp_path, dirname="worker")
+    _chart(tmp_path, dirname="cron")
+
+    comps = discover_components(tmp_path)
+    assert {"api", "worker", "cron"}.issubset(comps)
+    for name in ("api", "worker", "cron"):
+        assert comps[name].mirrors == []
+        assert comps[name].paths == [f"charts/{name}/**"]
+
+
+def test_multiple_charts_with_python_only_mirrors_matching_name(tmp_path: Path):
+    _python_project(tmp_path, name="api")
+    _chart(tmp_path, dirname="api")        # chart name matches -> mirror
+    _chart(tmp_path, dirname="worker")     # different name -> no mirror
+
+    comps = discover_components(tmp_path)
+    api_mirrors = comps["api"].mirrors
+    assert len(api_mirrors) == 1
+    assert "charts/api/Chart.yaml" in str(api_mirrors[0].file)
+
+
+def test_single_python_single_chart_mirrors_even_with_different_names(tmp_path: Path):
+    _python_project(tmp_path, name="myapp")
+    _chart(tmp_path, dirname="deployment")  # different name, but only one chart
+
+    comps = discover_components(tmp_path)
+    mirrors = comps["myapp"].mirrors
+    assert len(mirrors) == 1
+    assert "charts/deployment/Chart.yaml" in str(mirrors[0].file)
+
+
+def test_chart_under_helm_dir(tmp_path: Path):
+    helm_dir = tmp_path / "helm" / "myapp"
+    helm_dir.mkdir(parents=True)
+    (helm_dir / "Chart.yaml").write_text(
+        "apiVersion: v2\nname: myapp\nversion: 0.1.0\n"
+    )
+    comps = discover_components(tmp_path)
+    assert "myapp" in comps
+    assert comps["myapp"].paths == ["helm/myapp/**"]
+
+
+def test_chart_under_deploy_dir(tmp_path: Path):
+    deploy = tmp_path / "deploy" / "k8s" / "service-a"
+    deploy.mkdir(parents=True)
+    (deploy / "Chart.yaml").write_text(
+        "apiVersion: v2\nname: service-a\nversion: 0.1.0\n"
+    )
+    comps = discover_components(tmp_path)
+    assert "service-a" in comps
+
+
+def test_chart_in_node_modules_is_skipped(tmp_path: Path):
+    _python_project(tmp_path)
+    nm = tmp_path / "node_modules" / "some-pkg" / "Chart.yaml"
+    nm.parent.mkdir(parents=True)
+    nm.write_text("apiVersion: v2\nname: leaked\nversion: 0.1.0\n")
+
+    comps = discover_components(tmp_path)
+    assert "leaked" not in comps
+
+
+def test_chart_in_venv_is_skipped(tmp_path: Path):
+    _python_project(tmp_path)
+    venv = tmp_path / ".venv" / "some" / "Chart.yaml"
+    venv.parent.mkdir(parents=True)
+    venv.write_text("apiVersion: v2\nname: leaked\nversion: 0.1.0\n")
+
+    comps = discover_components(tmp_path)
+    assert "leaked" not in comps
+
+
 def test_no_components(tmp_path: Path):
     assert discover_components(tmp_path) == {}
 
