@@ -945,7 +945,13 @@ version_scheme = "pep440"
 def _capture_git_args(monkeypatch):
     """Spy that captures every (cwd, args) pair passed to subprocess.run
     for git, while still letting the real subprocess execute (so the
-    write side-effects happen)."""
+    write side-effects happen).
+
+    Signed `git commit -S` and `git tag -s` are stubbed: CI runners
+    don't have GPG configured, so the real call would fail and short-
+    circuit the rest of the bump pipeline before we can capture later
+    args. We only care about the arguments here, not the side effects.
+    """
     import subprocess as real_subprocess
     captured: list[list[str]] = []
     real_run = real_subprocess.run
@@ -953,6 +959,10 @@ def _capture_git_args(monkeypatch):
     def spy(args, *posargs, **kwargs):
         if args and args[0] == "git":
             captured.append(list(args[1:]))
+            if len(args) > 1 and args[1] in ("commit", "tag") and (
+                "-S" in args or "-s" in args
+            ):
+                return real_subprocess.CompletedProcess(args, 0, "", "")
         return real_run(args, *posargs, **kwargs)
 
     monkeypatch.setattr("multicz.cli.subprocess.run", spy)
