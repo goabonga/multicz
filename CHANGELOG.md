@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [0.3.0] - 2026-05-02
+
+### Features
+
+- **changelog**: render mirror/trigger cascades as Dependencies section (`4eab176`)
+
 ## [0.2.2] - 2026-05-01
 
 ### Fixes
