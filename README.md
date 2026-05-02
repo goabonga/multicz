@@ -932,6 +932,28 @@ exec multicz check "$1"
 * `.properties` — line-based `key=value` substitution (e.g. `gradle.properties`)
 * anything else — treated as a one-line `VERSION` file (`key = ` omitted)
 
+### Regex escape hatch (`key = "regex:..."`)
+
+For files no structured parser handles — Python `__version__`,
+TypeScript `export const VERSION`, Cargo `version = "..."` *outside*
+the `[package]` table, Makefile `VERSION := ...`, shell scripts,
+Dockerfile `LABEL version=...` — prefix the key with `regex:`:
+
+```toml
+[components.api]
+bump_files = [
+    { file = "pyproject.toml", key = "project.version" },
+    { file = "src/api/__init__.py", key = 'regex:^__version__\s*=\s*"([^"]+)"' },
+]
+```
+
+The pattern needs exactly one capture group locating the version
+literal. Matching uses `re.MULTILINE`, and only the *first* match's
+capture group is rewritten — surrounding text (quotes, indentation,
+comments, the rest of the file) is preserved byte-for-byte. Bad
+patterns (uncompilable, no group, no match in file) surface at
+`multicz validate --strict` rather than at bump time.
+
 ### Debian packages (`format = "debian"`)
 
 `multicz` writes a proper `debian/changelog` instead of a markdown

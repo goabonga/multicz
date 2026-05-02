@@ -118,3 +118,74 @@ def test_missing_key_raises(tmp_path: Path):
 def test_missing_file_on_write_raises(tmp_path: Path):
     with pytest.raises(WriterError):
         write_value(tmp_path / "nope.toml", "x.y", "1.0.0")
+
+
+def test_regex_key_python_dunder_version(tmp_path: Path):
+    """The regex escape hatch lets multicz bump `__version__` in
+    Python source files (and equivalently in TS/JS/Go/shell etc.)."""
+    p = tmp_path / "__init__.py"
+    p.write_text(
+        '"""api package."""\n'
+        '\n'
+        '__version__ = "0.1.0"\n'
+        '\n'
+        'def hello() -> str:\n'
+        '    return f"hi {__version__}"\n'
+    )
+    key = r'regex:^__version__\s*=\s*"([^"]+)"'
+    assert read_value(p, key) == "0.1.0"
+    write_value(p, key, "1.2.3")
+    text = p.read_text()
+    assert '__version__ = "1.2.3"' in text
+    assert '"""api package."""' in text  # docstring untouched
+    assert "def hello() -> str:" in text  # function untouched
+    assert read_value(p, key) == "1.2.3"
+
+
+def test_regex_key_typescript_export_const(tmp_path: Path):
+    p = tmp_path / "version.ts"
+    p.write_text("export const VERSION = '0.1.0';\n")
+    key = r"regex:export const VERSION = '([^']+)'"
+    write_value(p, key, "2.0.0")
+    assert "export const VERSION = '2.0.0';" in p.read_text()
+
+
+def test_regex_key_makefile(tmp_path: Path):
+    p = tmp_path / "Makefile"
+    p.write_text("VERSION := 0.1.0\nbuild:\n\techo $(VERSION)\n")
+    key = r"regex:^VERSION\s*:=\s*(.+)$"
+    write_value(p, key, "1.0.0")
+    assert "VERSION := 1.0.0\n" in p.read_text()
+    assert "echo $(VERSION)" in p.read_text()
+
+
+def test_regex_key_no_match_raises(tmp_path: Path):
+    p = tmp_path / "x.py"
+    p.write_text('VERSION = "0.1.0"\n')
+    with pytest.raises(WriterError, match="matched nothing"):
+        read_value(p, r"regex:^__version__\s*=\s*\"([^\"]+)\"")
+
+
+def test_regex_key_without_capture_group_raises(tmp_path: Path):
+    p = tmp_path / "x.py"
+    p.write_text('VERSION = "0.1.0"\n')
+    with pytest.raises(WriterError, match="capture group"):
+        read_value(p, r"regex:VERSION = \"[^\"]+\"")  # no group
+
+
+def test_regex_key_invalid_pattern_raises(tmp_path: Path):
+    p = tmp_path / "x.py"
+    p.write_text('x = "y"\n')
+    with pytest.raises(WriterError, match="invalid regex"):
+        read_value(p, r"regex:[unclosed")
+
+
+def test_regex_key_only_first_match_replaced(tmp_path: Path):
+    """Multiple matches: only the first capture group is rewritten,
+    so a build script with `OLD = "1.0"` and `NEW = "1.0"` won't
+    silently mass-rewrite."""
+    p = tmp_path / "version.txt"
+    p.write_text('A = "0.1.0"\nB = "0.1.0"\n')
+    key = r'regex:= "([^"]+)"'
+    write_value(p, key, "9.9.9")
+    assert p.read_text() == 'A = "9.9.9"\nB = "0.1.0"\n'
