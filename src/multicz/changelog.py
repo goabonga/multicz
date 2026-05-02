@@ -29,11 +29,23 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 from .commits import Commit
 from .config import ChangelogSection, _default_changelog_sections
+
+
+@dataclass(frozen=True)
+class CascadeEntry:
+    """A non-commit reason for a bump (mirror or trigger), surfaced in
+    the changelog so cascade-only releases describe what made them
+    happen instead of rendering ``_No notable changes._``.
+    """
+
+    upstream: str
+    upstream_version: str
 
 _PREAMBLE = (
     "# Changelog\n"
@@ -49,16 +61,34 @@ def render_body(
     sections: Sequence[ChangelogSection] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
+    cascades: Sequence[CascadeEntry] | None = None,
+    cascade_title: str = "Dependencies",
+    cascade_format: str = "Track `{upstream}` `{upstream_version}`",
 ) -> str:
     """Render the section bodies (no leading H2).
 
     Empty string ``breaking_title`` disables the breaking bucket (breaking
     commits then fall through to whichever section claims their type).
     Empty string ``other_title`` drops unmatched conventional commits.
+
+    ``cascades`` lists upstream bumps that pulled this component along
+    (mirror writes, trigger edges). When present and ``cascade_title``
+    is non-empty, they render as a dedicated H3 section; this also
+    suppresses the ``_No notable changes._`` placeholder when no
+    commits otherwise apply.
     """
     sections = list(sections) if sections is not None else _default_changelog_sections()
     relevant = [c for c in commits if c.is_conventional]
-    if not relevant:
+    cascade_lines: list[str] = []
+    if cascades and cascade_title:
+        for entry in cascades:
+            cascade_lines.append(
+                cascade_format.format(
+                    upstream=entry.upstream,
+                    upstream_version=entry.upstream_version,
+                )
+            )
+    if not relevant and not cascade_lines:
         return "_No notable changes._\n"
 
     breaking: list[Commit] = []
@@ -94,7 +124,7 @@ def render_body(
     if other_title and other_title in buckets:
         ordered.append((other_title, buckets[other_title]))
 
-    if not ordered:
+    if not ordered and not cascade_lines:
         return "_No notable changes._\n"
 
     lines: list[str] = []
@@ -104,6 +134,12 @@ def render_body(
         for commit in items:
             scope = f"**{commit.scope}**: " if commit.scope else ""
             lines.append(f"- {scope}{commit.subject} (`{commit.sha[:7]}`)")
+        lines.append("")
+    if cascade_lines:
+        lines.append(f"### {cascade_title}")
+        lines.append("")
+        for entry in cascade_lines:
+            lines.append(f"- {entry}")
         lines.append("")
     return "\n".join(lines)
 
@@ -116,6 +152,9 @@ def render_section(
     sections: Sequence[ChangelogSection] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
+    cascades: Sequence[CascadeEntry] | None = None,
+    cascade_title: str = "Dependencies",
+    cascade_format: str = "Track `{upstream}` `{upstream_version}`",
 ) -> str:
     """Render the markdown for a single release section."""
     when = (today or date.today()).isoformat()
@@ -124,6 +163,9 @@ def render_section(
         sections=sections,
         breaking_title=breaking_title,
         other_title=other_title,
+        cascades=cascades,
+        cascade_title=cascade_title,
+        cascade_format=cascade_format,
     )
     return f"## [{version}] - {when}\n\n" + body
 
@@ -174,6 +216,9 @@ def update_changelog_file(
     breaking_title: str = "Breaking changes",
     other_title: str = "",
     drop_prereleases: bool = False,
+    cascades: Sequence[CascadeEntry] | None = None,
+    cascade_title: str = "Dependencies",
+    cascade_format: str = "Track `{upstream}` `{upstream_version}`",
 ) -> None:
     """Render a new section and merge it into ``path`` (creating the file if needed).
 
@@ -188,6 +233,9 @@ def update_changelog_file(
         sections=sections,
         breaking_title=breaking_title,
         other_title=other_title,
+        cascades=cascades,
+        cascade_title=cascade_title,
+        cascade_format=cascade_format,
     )
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     if drop_prereleases:

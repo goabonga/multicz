@@ -86,6 +86,62 @@ def test_render_only_chore_means_no_notable_changes():
     assert "_No notable changes._" in body
 
 
+def test_render_cascades_replace_no_notable_placeholder():
+    """When a release has no commits but cascades from upstream, the
+    cascade entries replace the `_No notable changes._` placeholder."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [],
+        cascades=[CascadeEntry(upstream="api", upstream_version="0.1.1")],
+    )
+    assert "_No notable changes._" not in body
+    assert "### Dependencies" in body
+    assert "Track `api` `0.1.1`" in body
+
+
+def test_render_cascades_alongside_commits():
+    """Commits and cascades coexist — cascades land in their own H3
+    section after the commit-driven sections."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [parse_commit("a", "feat: ingress", ())],
+        cascades=[CascadeEntry(upstream="api", upstream_version="0.1.1")],
+    )
+    assert "### Features" in body
+    assert "### Dependencies" in body
+    # Features comes first, cascades after.
+    assert body.index("### Features") < body.index("### Dependencies")
+
+
+def test_cascade_section_title_empty_disables_rendering():
+    """An empty cascade title turns the feature off entirely (back to
+    `_No notable changes._` for cascade-only releases)."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [],
+        cascades=[CascadeEntry(upstream="api", upstream_version="0.1.1")],
+        cascade_title="",
+    )
+    assert "_No notable changes._" in body
+    assert "Track" not in body
+
+
+def test_cascade_format_is_templated():
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [],
+        cascades=[CascadeEntry(upstream="api", upstream_version="0.1.1")],
+        cascade_title="Image",
+        cascade_format="Image bumped to {upstream}@{upstream_version}",
+    )
+    assert "### Image" in body
+    assert "Image bumped to api@0.1.1" in body
+
+
 def test_render_no_commits():
     text = render_section("1.0.0", [], today=date(2026, 4, 30))
     assert "_No notable changes._" in text

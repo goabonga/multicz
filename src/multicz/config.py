@@ -231,6 +231,14 @@ class ProjectSettings(BaseModel):
     )
     breaking_section_title: str = "Breaking changes"
     other_section_title: str = ""
+    # Section + line format for cascade-only bumps (mirror or trigger).
+    # Replaces the legacy ``_No notable changes._`` placeholder when the
+    # only reason for a release is an upstream component bumping. Set
+    # ``cascade_section_title = ""`` to disable and fall back to the
+    # placeholder. ``cascade_changelog_format`` accepts ``{upstream}`` and
+    # ``{upstream_version}`` placeholders.
+    cascade_section_title: str = "Dependencies"
+    cascade_changelog_format: str = "Track `{upstream}` `{upstream_version}`"
     finalize_strategy: Literal["consolidate", "promote", "annotate"] = "consolidate"
     overlap_policy: Literal["error", "first-match", "allow", "all"] = "error"
     ignored_types: list[str] = Field(default_factory=list)

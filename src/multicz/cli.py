@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .changelog import render_body, update_changelog_file
+from .changelog import CascadeEntry, render_body, update_changelog_file
 from .commits import (
     DEFAULT_TYPES,
     commits_in_range,
@@ -1376,6 +1376,27 @@ def bump(
                     planned.component, config, repo, matcher,
                     since_stable=use_stable_since,
                 )
+                # Surface mirror/trigger cascades as a Dependencies
+                # section: when a release is purely cascade-driven
+                # (e.g. chart bumps because api updated appVersion),
+                # this is the only thing that explains *why* the
+                # release exists.
+                cascade_entries: list[CascadeEntry] = []
+                seen_upstreams: set[str] = set()
+                for reason in planned.reasons:
+                    if isinstance(reason, MirrorReason | TriggerReason):
+                        if reason.upstream in seen_upstreams:
+                            continue
+                        upstream_planned = plan.bumps.get(reason.upstream)
+                        if upstream_planned is None:
+                            continue
+                        cascade_entries.append(
+                            CascadeEntry(
+                                upstream=reason.upstream,
+                                upstream_version=upstream_planned.next,
+                            )
+                        )
+                        seen_upstreams.add(reason.upstream)
                 changelog_path = repo / comp.changelog
                 update_changelog_file(
                     changelog_path,
@@ -1385,6 +1406,9 @@ def bump(
                     breaking_title=config.project.breaking_section_title,
                     other_title=config.project.other_section_title,
                     drop_prereleases=is_final and strategy == "promote",
+                    cascades=cascade_entries,
+                    cascade_title=config.project.cascade_section_title,
+                    cascade_format=config.project.cascade_changelog_format,
                 )
                 if changelog_path not in written:
                     written.append(changelog_path)
