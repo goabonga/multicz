@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [0.4.0] - 2026-05-02
+
+### Features
+
+- **writers**: regex: prefix on bump_files key for arbitrary languages (`0c26457`)
+
 ## [0.3.0] - 2026-05-02
 
 ### Features
