@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Code of Conduct
+    url: https://github.com/goabonga/multicz/blob/main/CODE_OF_CONDUCT.md
+    about: Please read our Code of Conduct before contributing
