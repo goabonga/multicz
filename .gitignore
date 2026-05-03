@@ -36,3 +36,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .pyright/
+
+# Zensical
+site/
+.cache/
