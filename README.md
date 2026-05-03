@@ -4,6 +4,10 @@ Multi-component versioning for monorepos. Bump a Python app, its Docker image,
 and the Helm chart that deploys it from a single conventional-commit history —
 each with its own version line and its own git tag.
 
+<p align="center">
+  <img src="https://github.com/goabonga/multicz/raw/main/docs/demo.gif" alt="multicz demo" width="720">
+</p>
+
 ## The problem
 
 You have one repo with a few moving parts:
