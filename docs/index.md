@@ -1,173 +1,76 @@
----
-icon: lucide/rocket
----
+# multicz
 
-# Get started
+Multi-component versioning for monorepos. Bump a Python app, its Docker
+image, and the Helm chart that deploys it from a single conventional-commit
+history — each with its own version line and its own git tag.
 
-For full documentation visit [zensical.org](https://zensical.org/docs/).
+![multicz demo](demo.gif)
 
-## Commands
+## The problem
 
-* [`zensical new`][new] - Create a new project
-* [`zensical serve`][serve] - Start local web server
-* [`zensical build`][build] - Build your site
+You have one repo with a few moving parts:
 
-  [new]: https://zensical.org/docs/usage/new/
-  [serve]: https://zensical.org/docs/usage/preview/
-  [build]: https://zensical.org/docs/usage/build/
-
-## Examples
-
-### Admonitions
-
-> Go to [documentation](https://zensical.org/docs/authoring/admonitions/)
-
-!!! note
-
-    This is a **note** admonition. Use it to provide helpful information.
-
-!!! warning
-
-    This is a **warning** admonition. Be careful!
-
-### Details
-
-> Go to [documentation](https://zensical.org/docs/authoring/admonitions/#collapsible-blocks)
-
-??? info "Click to expand for more info"
-
-    This content is hidden until you click to expand it.
-    Great for FAQs or long explanations.
-
-## Code Blocks
-
-> Go to [documentation](https://zensical.org/docs/authoring/code-blocks/)
-
-``` python hl_lines="2" title="Code blocks"
-def greet(name):
-    print(f"Hello, {name}!") # (1)!
-
-greet("Python")
+```
+repo/
+├── src/                 # FastAPI app
+├── pyproject.toml       # → version 1.2.0
+├── Dockerfile           # built and tagged from the app version
+└── charts/myapp/
+    ├── Chart.yaml       # version: 0.4.0 / appVersion: 1.2.0
+    └── templates/       # kubernetes manifests
 ```
 
-1.  > Go to [documentation](https://zensical.org/docs/authoring/code-blocks/#code-annotations)
+A change to `src/` is a new app release; a change only under
+`charts/myapp/templates/` is a new chart release for the *same* app.
+Standard tools bump everything together or force you to script per-folder
+logic. `multicz` makes the rule explicit in `multicz.toml`.
 
-    Code annotations allow to attach notes to lines of code.
+## What it does
 
-Code can also be highlighted inline: `#!python print("Hello, Python!")`.
+- Reads conventional commits since each component's last tag.
+- Picks the strongest implied bump per component (`feat` → minor,
+  `fix`/`perf` → patch, `!`/`BREAKING CHANGE:` → major).
+- Cascades bumps through declared mirrors and dependencies (e.g. a Helm
+  chart's `appVersion` mirroring the API version).
+- Writes the new version into `pyproject.toml`, `Chart.yaml`,
+  `package.json`, `Cargo.toml`, `gradle.properties`, `debian/changelog`,
+  or any file matched by a regex.
+- Optionally creates a release commit and per-component annotated tags;
+  pushes only when asked.
 
-## Content tabs
+It does **not** build or push artifacts. CI does that, using the rendered
+plan as input.
 
-> Go to [documentation](https://zensical.org/docs/authoring/content-tabs/)
+## Quickstart
 
-=== "Python"
-
-    ``` python
-    print("Hello from Python!")
-    ```
-
-=== "Rust"
-
-    ``` rs
-    println!("Hello from Rust!");
-    ```
-
-## Diagrams
-
-> Go to [documentation](https://zensical.org/docs/authoring/diagrams/)
-
-``` mermaid
-graph LR
-  A[Start] --> B{Error?};
-  B -->|Yes| C[Hmm...];
-  C --> D[Debug];
-  D --> B;
-  B ---->|No| E[Yay!];
+```bash
+uv add --dev multicz        # or: pip install multicz
+multicz init                # writes a starter multicz.toml
+multicz status              # show which components would bump and why
+multicz bump --dry-run      # plan the bump without touching files
+multicz bump                # apply the plan
 ```
 
-## Footnotes
+A typical CI release step:
 
-> Go to [documentation](https://zensical.org/docs/authoring/footnotes/)
+```bash
+multicz validate --strict
+multicz bump --commit --tag --push
+```
 
-Here's a sentence with a footnote.[^1]
+## Where to go next
 
-Hover it, to see a tooltip.
+- New repo, new install? [Get started](get-started.md).
+- Want to understand the model — components, mirrors, cascades, bump
+  policy? [Concepts](concepts.md).
+- Looking up a config field? [Configuration reference](configuration.md).
+- Looking up a flag or command? [CLI reference](cli.md).
+- Concrete walkthroughs (FastAPI + Helm, CI matrix, RC cycle, manual
+  bump)? [Recipes](recipes.md).
+- Comparing to `semantic-release`, Commitizen, Changesets, or
+  `bump-my-version`? [Why multicz?](why.md).
+- Hardening for CI? [Security](security.md).
 
-[^1]: This is the footnote.
+## License
 
-
-## Formatting
-
-> Go to [documentation](https://zensical.org/docs/authoring/formatting/)
-
-- ==This was marked (highlight)==
-- ^^This was inserted (underline)^^
-- ~~This was deleted (strikethrough)~~
-- H~2~O
-- A^T^A
-- ++ctrl+alt+del++
-
-## Icons, Emojis
-
-> Go to [documentation](https://zensical.org/docs/authoring/icons-emojis/)
-
-* :sparkles: `:sparkles:`
-* :rocket: `:rocket:`
-* :tada: `:tada:`
-* :memo: `:memo:`
-* :eyes: `:eyes:`
-
-## Maths
-
-> Go to [documentation](https://zensical.org/docs/authoring/math/)
-
-$$
-\cos x=\sum_{k=0}^{\infty}\frac{(-1)^k}{(2k)!}x^{2k}
-$$
-
-!!! warning "Needs configuration"
-    Note that MathJax is included via a `script` tag on this page and is not
-    configured in the generated default configuration to avoid including it
-    in a pages that do not need it. See the documentation for details on how
-    to configure it on all your pages if they are more Maths-heavy than these
-    simple starter pages.
-
-<script id="MathJax-script" src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script>
-  window.MathJax = {
-    tex: {
-      inlineMath: [["\\(", "\\)"]],
-      displayMath: [["\\[", "\\]"]],
-      processEscapes: true,
-      processEnvironments: true
-    },
-    options: {
-      ignoreHtmlClass: ".*|",
-      processHtmlClass: "arithmatex"
-    }
-  };
-
-  document$.subscribe(() => {
-    MathJax.startup.output.clearCache()
-    MathJax.typesetClear()
-    MathJax.texReset()
-    MathJax.typesetPromise()
-  })
-</script>
-
-## Task Lists
-
-> Go to [documentation](https://zensical.org/docs/authoring/lists/#using-task-lists)
-
-* [x] Install Zensical
-* [x] Configure `zensical.toml`
-* [x] Write amazing documentation
-* [ ] Deploy anywhere
-
-## Tooltips
-
-> Go to [documentation](https://zensical.org/docs/authoring/tooltips/)
-
-[Hover me][example]
-
-  [example]: https://example.com "I'm a tooltip!"
+[MIT](https://github.com/goabonga/multicz/blob/main/LICENSE)
