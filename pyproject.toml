@@ -46,6 +46,9 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
 ]
+docs = [
+    "zensical>=0.0.39",
+]
 
 [tool.ruff]
 line-length = 100
