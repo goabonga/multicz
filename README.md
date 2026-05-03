@@ -1642,4 +1642,4 @@ the chart version moves with it.
 
 ## License
 
-MIT
+[MIT](https://github.com/goabonga/multicz/blob/main/LICENSE)
