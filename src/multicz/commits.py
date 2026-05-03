@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Conventional Commit parsing over a git history range.
 
 Resolves the latest tag matching a component's tag prefix, lists the commits

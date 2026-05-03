@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Render and insert per-component CHANGELOG.md sections.
 
 A *section* is the chunk of markdown describing a single release for one

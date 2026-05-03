@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Configuration schema for multicz.
 
 The config lives in ``multicz.toml`` at the repo root. It declares one or more

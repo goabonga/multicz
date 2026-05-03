@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Map repository file paths to declared components.
 
 Each component owns a set of gitignore-style glob ``paths`` and optional

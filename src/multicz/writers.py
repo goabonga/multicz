@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Read and write versions inside structured config files.
 
 Supports five formats, dispatched by file extension:

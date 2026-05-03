@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Optional persistent state file written after each successful bump.
 
 Multicz is normally stateless — every command recomputes from git tags

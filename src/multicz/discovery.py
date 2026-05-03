@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Repo-aware initial config generation.
 
 Walks the working tree once and proposes a :class:`Config` populated with

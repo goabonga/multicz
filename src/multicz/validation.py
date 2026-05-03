@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Configuration and repository sanity checks for multicz.
 
 The :func:`validate` function runs every check and returns a flat list of
