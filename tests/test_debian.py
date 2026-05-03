@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 from datetime import UTC, datetime
 
 from multicz.commits import parse_commit

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Scenario: Cargo workspace with a shared `[workspace.package].version`.
 
 When the workspace shares a single version across all members, multicz

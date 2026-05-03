@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Scenario: Debian source package.
 
 A repo with a ``debian/`` directory and a properly-formatted

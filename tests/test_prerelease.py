@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Tests for the --pre / --finalize release-candidate flow."""
 
 from packaging.version import Version

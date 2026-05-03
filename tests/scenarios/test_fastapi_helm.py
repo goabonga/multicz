@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Scenario: FastAPI service shipped with a Helm chart.
 
 The reference layout from `examples/fastapi-helm/`. A single feat

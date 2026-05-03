@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Tests focused on Config parsing semantics, including both supported
 syntaxes for declaring components."""
 

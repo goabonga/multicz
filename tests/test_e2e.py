@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """End-to-end planner tests against a real on-disk git repository."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Scenario: npm workspaces (the JS monorepo case).
 
 Root package.json declares ``"workspaces": ["packages/*"]``. Each

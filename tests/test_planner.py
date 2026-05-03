@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 from packaging.version import Version
 
 from multicz.planner import aggregate_kind, bump_version

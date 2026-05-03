@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Fixtures shared by all scenario tests.
 
 Scenarios describe end-to-end usage of multicz — a fixture repo, some

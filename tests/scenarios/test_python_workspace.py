@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Scenario: uv workspace at the root, two service packages as members.
 
 The root pyproject declares ``[tool.uv.workspace]``. Each member has

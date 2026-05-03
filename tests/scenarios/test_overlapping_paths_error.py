@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Scenario: two components claiming the same files.
 
 The default ``overlap_policy = "error"`` should refuse to plan

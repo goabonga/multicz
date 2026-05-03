@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
 """Scenario: cyclic triggers must be rejected by ``multicz validate``.
 
 When a -> b and b -> a (or longer chains), the planner would loop or
