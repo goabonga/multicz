@@ -6,7 +6,58 @@ on:
     branches: [main]
 
 jobs:
+  license-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Check SPDX license headers
+        run: |
+          uv run python scripts/add_license_header.py --path src --types py --check
+          uv run python scripts/add_license_header.py --path tests --types py --check
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check src tests
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # multicz validate needs the full history for tag detection
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Validate multicz.toml
+        run: uv run multicz validate --strict
+
   test:
+    needs: [license-headers, lint, validate]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -14,7 +65,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # multicz validate / plan need the full history for tag detection
           fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v8.1.0
@@ -26,9 +76,3 @@ jobs:
 
       - name: Run pytest
         run: uv run pytest -q
-
-      - name: Lint
-        run: uv run ruff check src tests
-
-      - name: Validate multicz.toml
-        run: uv run multicz validate --strict
