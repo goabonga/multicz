@@ -197,7 +197,13 @@ def test_debian_format_requires_no_bump_files(tmp_path: Path):
     assert "bump_files" in str(exc.value)
 
 
-def test_debian_format_rejects_top_level_changelog(tmp_path: Path):
+def test_debian_format_accepts_top_level_changelog_for_dual_rendering(
+    tmp_path: Path,
+):
+    """Debian-format components may declare a top-level `changelog`
+    alongside `[debian].changelog` — the markdown file becomes a
+    parallel human-readable rendering of every bump, while the Debian
+    stanza stays the version source of truth."""
     target = _write(
         tmp_path,
         """
@@ -205,11 +211,16 @@ def test_debian_format_rejects_top_level_changelog(tmp_path: Path):
         paths = ["debian/**"]
         format = "debian"
         changelog = "CHANGELOG.md"
+
+        [components.api.debian]
+        changelog = "debian/changelog"
         """,
     )
-    with pytest.raises(ValidationError) as exc:
-        load_config(target)
-    assert "components.<name>.debian" in str(exc.value)
+    config = load_config(target)
+    api = config.components["api"]
+    assert api.format == "debian"
+    assert str(api.changelog) == "CHANGELOG.md"
+    assert str(api.debian.changelog) == "debian/changelog"
 
 
 def test_debian_settings_only_with_debian_format(tmp_path: Path):

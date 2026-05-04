@@ -200,11 +200,13 @@ class Component(BaseModel):
                 raise ValueError(
                     "mirrors are not supported on format='debian' components."
                 )
-            if self.changelog is not None:
-                raise ValueError(
-                    "use [components.<name>.debian].changelog instead of the "
-                    "top-level 'changelog' field for debian-format components."
-                )
+            # The top-level `changelog` field is OPTIONAL for debian
+            # components: when set, multicz writes a parallel
+            # keep-a-changelog markdown file in addition to the Debian
+            # stanza. The Debian stanza (`[components.<name>.debian]
+            # .changelog`) remains the version source of truth; the
+            # markdown copy is for human readers (GitHub Releases, repo
+            # browsing).
             if self.version_scheme != "semver":
                 raise ValueError(
                     "format='debian' requires version_scheme='semver' (the "
