@@ -2,6 +2,17 @@
 
 All notable changes to this component are documented here.
 
+## [0.6.0] - 2026-05-04
+
+### Features
+
+- **config**: allow top-level changelog alongside debian.changelog (`437d8e1`)
+- **cli**: write markdown changelog in debian bump path when configured (`4700bdd`)
+
+### Fixes
+
+- **debian**: filter changelog stanzas by changelog_sections like CHANGELOG.md (`b20b433`)
+
 ## [0.5.1] - 2026-05-04
 
 ### Fixes
