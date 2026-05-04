@@ -303,6 +303,14 @@ version_scheme = "pep440"
 internal form); the Debian renderer applies its own `~rc1` notation
 at write time.
 
+A debian-format component may also declare a top-level `changelog`
+path. When set, multicz writes a parallel keep-a-changelog Markdown
+file at every bump, alongside the Debian stanza. The stanza remains
+the version source of truth; the Markdown copy is purely for human
+readers (GitHub Releases, repo browsing). See
+[`format` in the configuration reference](configuration.md#format) for
+the dual layout.
+
 ## Tags
 
 Each component gets its own annotated git tag, rendered from

@@ -229,12 +229,29 @@ opt out for a single bump.
 Default `"default"`. Set to `"debian"` for components built as `.deb`.
 With `format = "debian"`:
 
-- `bump_files`, `mirrors`, and the top-level `changelog` are forbidden
-  (the version is read from / written to `debian/changelog`),
+- `bump_files` and `mirrors` are forbidden (the version is read from /
+  written to `debian/changelog`),
+- the top-level `changelog` field becomes **optional** — when set,
+  multicz writes a parallel keep-a-changelog Markdown file at every
+  bump, alongside the Debian stanza. The Debian stanza
+  (`[components.<name>.debian].changelog`) remains the version source
+  of truth; the Markdown copy is for human readers (GitHub Releases,
+  repo browsing). Both files apply the same
+  [`changelog_sections`](#changelog_sections) filter.
 - `version_scheme` must remain `"semver"` (the renderer applies its
   own `~rc1` notation),
 - a `[components.<name>.debian]` table configures the stanza
   ([fields below](#debian-settings)).
+
+```toml
+[components.helloworld]
+paths     = ["src/**", "debian/**"]
+format    = "debian"
+changelog = "CHANGELOG.md"          # optional Markdown rendering
+
+[components.helloworld.debian]
+changelog = "debian/changelog"      # version source of truth
+```
 
 ### `tag_format` (component) { #tag_format_component }
 
