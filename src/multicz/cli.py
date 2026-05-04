@@ -873,6 +873,9 @@ def release_notes_cmd(
                 "from_version": str(bump.current),
                 "to_version": bump.next,
                 "commits": commits,
+                # Cascades only attach to upcoming bumps - past tag mode
+                # has no plan reasons to draw from.
+                "cascades": _cascade_entries_for(bump, plan_obj, config),
             })
 
     if not sections:
@@ -898,6 +901,15 @@ def release_notes_cmd(
                             "subject": c.subject,
                         }
                         for c in s["commits"]
+                    ],
+                    "cascades": [
+                        {
+                            "upstream": e.upstream,
+                            "upstream_version": e.upstream_version,
+                            "section": e.section,
+                            "format": e.format,
+                        }
+                        for e in s.get("cascades") or []
                     ],
                 }
                 for s in sections
@@ -932,6 +944,9 @@ def release_notes_cmd(
             sections=config.project.changelog_sections,
             breaking_title=config.project.breaking_section_title,
             other_title=config.project.other_section_title,
+            cascades=s.get("cascades"),
+            cascade_title=config.project.cascade_section_title,
+            cascade_format=config.project.cascade_changelog_format,
         )
         if multi:
             range_label = (
