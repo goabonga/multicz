@@ -186,9 +186,30 @@ text files. Prefix with `regex:` for regex-based substitution
 
 ### `mirrors` { #mirrors }
 
-Default `[]`. Same shape as `bump_files`. Each mirror is rewritten with
-the component's new version on every bump and may cascade a patch into
-another component if it falls inside that component's `paths`.
+Default `[]`. Each mirror is rewritten with the component's new version
+on every bump and may cascade a patch into another component if it falls
+inside that component's `paths`. The shape is `bump_files` (`file` /
+`key`) plus two optional changelog-customization fields.
+
+| field               | type                | default | description |
+|---------------------|---------------------|---------|-------------|
+| `file`              | path (required)     | -       | Target file to rewrite. |
+| `key`               | string \| null      | `null`  | Dotted path or `regex:<pattern>`. `null` = whole-file literal. |
+| `changelog_section` | string \| null      | `null`  | Routes the cascade line to this section title in the downstream component's CHANGELOG.md. Existing commit-driven sections (`Features`, `Fixes`, ...) are merged; unknown titles create a new H3. `null` = fall through to project-level [`cascade_section_title`](#cascade_section_title). |
+| `changelog_format`  | string \| null      | `null`  | Custom template for the cascade line. Placeholders: `{upstream}`, `{upstream_version}`. `null` = fall through to project-level [`cascade_changelog_format`](#cascade_changelog_format). |
+
+Example with all four fields:
+
+```toml
+[[components.chart-api.mirrors]]
+file = "charts/myapp/Chart.yaml"
+key  = "regex:- name: myapp-api\\s+version:\\s+(\\S+)"
+changelog_section = "Subchart updates"
+changelog_format  = "Bump `myapp-api` dependency to `{upstream_version}`"
+```
+
+See [Mirrors / Customizing the cascade line](concepts.md#customizing-the-cascade-line)
+for usage patterns.
 
 ### `depends_on` { #depends_on }
 
