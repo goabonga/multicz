@@ -1259,6 +1259,9 @@ def _bump_debian(
         urgency=settings.urgency,
         commits=relevant,
         maintainer=maintainer,
+        sections=config.project.changelog_sections,
+        breaking_title=config.project.breaking_section_title,
+        other_title=config.project.other_section_title,
     )
 
     changelog_path = repo / settings.changelog

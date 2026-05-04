@@ -27,12 +27,13 @@ configured Debian revision when writing a new stanza.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import format_datetime
 
 from .commits import Commit
+from .config import ChangelogSection, _default_changelog_sections
 
 _HEADER_RE = re.compile(
     r"^(?P<package>[a-z0-9][a-z0-9+\-.]*)\s+"
@@ -192,18 +193,53 @@ def render_stanza(
     commits: Iterable[Commit] = (),
     maintainer: str = "Unknown <unknown@example.com>",
     when: datetime | None = None,
+    sections: Sequence[ChangelogSection] | None = None,
+    breaking_title: str = "Breaking changes",
+    other_title: str = "",
 ) -> str:
     """Render a single Debian changelog stanza, ending with a trailing
     newline so concatenated stanzas are separated by a blank line.
+
+    The bullet list applies the same section-based filter as the
+    markdown ``CHANGELOG.md`` renderer (:func:`multicz.changelog.render_body`):
+
+    * commits whose type is in any ``sections[*].types`` are kept;
+    * breaking commits are always kept when ``breaking_title`` is
+      non-empty;
+    * leftovers (types that match no section, e.g. ``chore``, ``test``,
+      ``ci``) are dropped unless ``other_title`` is non-empty.
+
+    With the defaults, only ``feat`` / ``fix`` / ``perf`` / ``revert``
+    bullets reach the stanza — chores/test commits stay out, matching
+    the markdown changelog's behaviour. Pass ``sections=[]`` and
+    ``other_title="..."`` to keep every commit.
     """
     when = when or datetime.now(tz=UTC)
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)
 
-    relevant = [c for c in commits if c.is_conventional]
+    sections = list(sections) if sections is not None else _default_changelog_sections()
+    section_types = {t.lower() for s in sections for t in s.types}
+    keep_breaking = bool(breaking_title)
+    keep_leftovers = bool(other_title)
+
+    filtered: list[Commit] = []
+    for c in commits:
+        if not c.is_conventional:
+            continue
+        if keep_breaking and c.breaking:
+            filtered.append(c)
+            continue
+        if c.type.lower() in section_types:
+            filtered.append(c)
+            continue
+        if keep_leftovers:
+            filtered.append(c)
+            continue
+
     body = (
-        "\n".join(_bullet(c) for c in relevant)
-        if relevant
+        "\n".join(_bullet(c) for c in filtered)
+        if filtered
         else "  * No notable changes."
     )
 
