@@ -137,6 +137,79 @@ def test_render_stanza_breaking_marker():
     assert "  * feat!: Drop py3.11 support" in text
 
 
+def test_render_stanza_filters_chore_test_ci_by_default():
+    """By default, only commit types in the changelog_sections (feat /
+    fix / perf / revert) reach the stanza — chore, test, ci, docs etc.
+    are dropped, matching the markdown CHANGELOG.md filter."""
+    when = datetime(2024, 1, 15, tzinfo=UTC)
+    commits = [
+        parse_commit("a", "feat: add login", ()),
+        parse_commit("b", "chore: tidy imports", ()),
+        parse_commit("c", "test(api): add fixture", ()),
+        parse_commit("d", "ci: bump runner", ()),
+        parse_commit("e", "fix: null pointer", ()),
+        parse_commit("f", "docs: clarify readme", ()),
+    ]
+    text = render_stanza(
+        package="myapp", version="1.0.0-1",
+        commits=commits, maintainer="x <x@y>", when=when,
+    )
+    assert "* feat: Add login" in text
+    assert "* fix: Null pointer" in text
+    # Dropped: chore / test / ci / docs.
+    assert "tidy imports" not in text
+    assert "Add fixture" not in text
+    assert "Bump runner" not in text
+    assert "Clarify readme" not in text
+
+
+def test_render_stanza_other_title_keeps_leftovers():
+    """When other_title is non-empty (project.other_section_title set),
+    leftovers (types matching no section) are kept in the stanza."""
+    when = datetime(2024, 1, 15, tzinfo=UTC)
+    commits = [
+        parse_commit("a", "feat: x", ()),
+        parse_commit("b", "chore: y", ()),
+    ]
+    text = render_stanza(
+        package="myapp", version="1.0.0-1",
+        commits=commits, maintainer="x <x@y>", when=when,
+        other_title="Misc",
+    )
+    assert "* feat: X" in text
+    assert "* chore: Y" in text
+
+
+def test_render_stanza_breaking_kept_even_when_type_unknown():
+    """Breaking-marker commits are always kept (regardless of type)
+    when breaking_title is non-empty (the default)."""
+    when = datetime(2024, 1, 15, tzinfo=UTC)
+    commits = [
+        # `chore!:` — chore is normally dropped, but `!` should keep it.
+        parse_commit("a", "chore!: rip out legacy api", ()),
+    ]
+    text = render_stanza(
+        package="myapp", version="2.0.0-1",
+        commits=commits, maintainer="x <x@y>", when=when,
+    )
+    assert "* chore!: Rip out legacy api" in text
+
+
+def test_render_stanza_no_relevant_commits_says_no_notable():
+    """All commits filtered out → `* No notable changes.` placeholder
+    instead of an empty bullet list (would be invalid Debian)."""
+    when = datetime(2024, 1, 15, tzinfo=UTC)
+    commits = [
+        parse_commit("a", "chore: x", ()),
+        parse_commit("b", "test: y", ()),
+    ]
+    text = render_stanza(
+        package="myapp", version="1.0.0-1",
+        commits=commits, maintainer="x <x@y>", when=when,
+    )
+    assert "* No notable changes." in text
+
+
 def test_render_stanza_no_commits_uses_placeholder():
     when = datetime(2024, 1, 15, tzinfo=UTC)
     text = render_stanza(
