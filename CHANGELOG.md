@@ -2,6 +2,14 @@
 
 All notable changes to this component are documented here.
 
+## [0.5.0] - 2026-05-04
+
+### Features
+
+- **config**: add Mirror schema with optional changelog_section and changelog_format (`bd87a37`)
+- **changelog**: support per-cascade section and format overrides (`3deb283`)
+- **cli**: wire mirror changelog overrides into cascade entries (`93ea982`)
+
 ## [0.4.0] - 2026-05-02
 
 ### Features
