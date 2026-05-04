@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [0.5.1] - 2026-05-04
+
+### Fixes
+
+- **cli**: include cascade entries in release-notes for upcoming bumps (`ab9dd9d`)
+
 ## [0.5.0] - 2026-05-04
 
 ### Features
