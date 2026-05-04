@@ -113,6 +113,27 @@ def test_api_to_chart_api_uses_custom_format_in_features_section(
     assert "Track `api`" not in body
 
 
+def test_release_notes_renders_cascades_for_upcoming_bumps(
+    make_repo, commit, runner
+):
+    """`multicz release-notes <component>` must surface cascade lines for
+    upcoming bumps - same content as the bump-time CHANGELOG, so notes
+    piped into `gh release create` describe pure-cascade releases instead
+    of rendering `_No notable changes._`.
+    """
+    make_repo(_seed())
+    commit({"charts/myapp-api/templates/foo.yaml": "kind: ConfigMap\n"},
+           "feat(chart-api): add cm")
+
+    # The umbrella `chart` bumps purely from a cascade (chart-api's
+    # mirror writes into charts/myapp/Chart.yaml).
+    result = runner.invoke(app, ["release-notes", "chart"])
+    assert result.exit_code == 0, result.stdout
+    assert "_No notable changes._" not in result.stdout
+    assert "### Subchart updates" in result.stdout
+    assert "Bump `myapp-api` dependency to" in result.stdout
+
+
 def test_subchart_mirrors_share_custom_section_in_umbrella_changelog(
     make_repo, commit, runner
 ):
