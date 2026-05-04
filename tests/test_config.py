@@ -615,3 +615,64 @@ def test_load_config_rejects_components_array_with_extra_fields(tmp_path: Path):
     )
     with pytest.raises(ValidationError):
         load_config(target)
+
+
+def test_mirror_accepts_changelog_section_and_format(tmp_path: Path):
+    """Mirror gains optional changelog_section and changelog_format fields
+    used to customize how the cascade line shows up in the downstream
+    component's CHANGELOG.md."""
+    target = _write(
+        tmp_path,
+        """
+        [components.api]
+        paths = ["src/**"]
+        bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+        [[components.api.mirrors]]
+        file = "charts/myapp/Chart.yaml"
+        key = "appVersion"
+        changelog_section = "Features"
+        changelog_format = "Sync app to {upstream_version}"
+        """,
+    )
+    config = load_config(target)
+    mirror = config.components["api"].mirrors[0]
+    assert mirror.changelog_section == "Features"
+    assert mirror.changelog_format == "Sync app to {upstream_version}"
+
+
+def test_mirror_changelog_fields_default_to_none(tmp_path: Path):
+    """When the new fields are omitted, the mirror falls back to the
+    project-level cascade_title / cascade_format."""
+    target = _write(
+        tmp_path,
+        """
+        [components.api]
+        paths = ["src/**"]
+        bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+        mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+        """,
+    )
+    config = load_config(target)
+    mirror = config.components["api"].mirrors[0]
+    assert mirror.changelog_section is None
+    assert mirror.changelog_format is None
+
+
+def test_mirror_rejects_unknown_field(tmp_path: Path):
+    """Mirror still has extra='forbid' (inherited from FileKey)."""
+    target = _write(
+        tmp_path,
+        """
+        [components.api]
+        paths = ["src/**"]
+        bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+        [[components.api.mirrors]]
+        file = "charts/myapp/Chart.yaml"
+        key = "appVersion"
+        wat = "no"
+        """,
+    )
+    with pytest.raises(ValidationError):
+        load_config(target)
