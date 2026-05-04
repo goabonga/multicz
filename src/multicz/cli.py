@@ -1278,6 +1278,29 @@ def _bump_debian(
         written.append(changelog_path)
     changelogs_updated.append(str(settings.changelog))
 
+    # Optional parallel markdown rendering: when `[components.<name>]
+    # .changelog` is set on a debian-format component, multicz also
+    # writes a keep-a-changelog Markdown file alongside the Debian
+    # stanza. The Debian file stays the version source of truth; the
+    # Markdown copy is purely for human readers (GitHub Releases,
+    # repo browsing). Cascades don't apply here — debian-format
+    # components reject mirrors entirely.
+    if comp.changelog is not None:
+        md_path = repo / comp.changelog
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        update_changelog_file(
+            md_path,
+            new_version,
+            relevant,
+            sections=config.project.changelog_sections,
+            breaking_title=config.project.breaking_section_title,
+            other_title=config.project.other_section_title,
+            drop_prereleases=is_finalize and strategy == "promote",
+        )
+        if md_path not in written:
+            written.append(md_path)
+        changelogs_updated.append(str(comp.changelog))
+
 
 def _release_commit_message(
     applied: dict[str, dict[str, str]],
