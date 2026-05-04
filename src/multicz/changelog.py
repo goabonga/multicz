@@ -45,10 +45,22 @@ class CascadeEntry:
     """A non-commit reason for a bump (mirror or trigger), surfaced in
     the changelog so cascade-only releases describe what made them
     happen instead of rendering ``_No notable changes._``.
+
+    ``section`` and ``format`` are optional per-entry overrides for the
+    default ``cascade_title`` / ``cascade_format`` passed to
+    :func:`render_body`. When ``section`` matches an existing
+    commit-driven section (``Features``, ``Fixes``, ``Breaking
+    changes``, ...), the cascade line is appended to that section's
+    bucket. Otherwise it creates a new section under that name. An
+    explicit empty-string ``section`` (``""``) is **not** the disable
+    switch — to disable the cascade rendering entirely, leave
+    ``section=None`` and pass ``cascade_title=""`` to ``render_body``.
     """
 
     upstream: str
     upstream_version: str
+    section: str | None = None
+    format: str | None = None
 
 _PREAMBLE = (
     "# Changelog\n"
@@ -82,23 +94,32 @@ def render_body(
     """
     sections = list(sections) if sections is not None else _default_changelog_sections()
     relevant = [c for c in commits if c.is_conventional]
-    cascade_lines: list[str] = []
-    if cascades and cascade_title:
+
+    # Group cascades by their *resolved* section name. Per-entry overrides
+    # take precedence over the global cascade_title; an empty resolved
+    # section name means "drop this entry" (preserves the legacy
+    # cascade_title="" disable switch when no per-entry section is set).
+    cascade_groups: dict[str, list[str]] = {}
+    if cascades:
         for entry in cascades:
-            cascade_lines.append(
-                cascade_format.format(
-                    upstream=entry.upstream,
-                    upstream_version=entry.upstream_version,
-                )
+            section_name = entry.section if entry.section is not None else cascade_title
+            if not section_name:
+                continue
+            fmt = entry.format if entry.format is not None else cascade_format
+            line = fmt.format(
+                upstream=entry.upstream,
+                upstream_version=entry.upstream_version,
             )
-    if not relevant and not cascade_lines:
+            cascade_groups.setdefault(section_name, []).append(line)
+
+    if not relevant and not cascade_groups:
         return "_No notable changes._\n"
 
     breaking: list[Commit] = []
     if breaking_title:
         breaking = [c for c in relevant if c.breaking]
 
-    buckets: dict[str, list[Commit]] = {}
+    commit_buckets: dict[str, list[Commit]] = {}
     breaking_set = {id(c) for c in breaking}
     for section in sections:
         type_set = {t.lower() for t in section.types}
@@ -107,7 +128,7 @@ def render_body(
             if id(c) not in breaking_set and c.type.lower() in type_set
         ]
         if items:
-            buckets[section.title] = items
+            commit_buckets[section.title] = items
 
     if other_title:
         claimed = {t.lower() for s in sections for t in s.types}
@@ -116,35 +137,52 @@ def render_body(
             if id(c) not in breaking_set and c.type.lower() not in claimed
         ]
         if leftovers:
-            buckets[other_title] = leftovers
+            commit_buckets[other_title] = leftovers
 
-    ordered: list[tuple[str, list[Commit]]] = (
-        [(breaking_title, breaking)] if breaking else []
-    )
+    def _commit_line(commit: Commit) -> str:
+        scope = f"**{commit.scope}**: " if commit.scope else ""
+        return f"{scope}{commit.subject} (`{commit.sha[:7]}`)"
+
+    # Build the final ordered list of (title, lines). For each
+    # commit-driven section we render the commits first, then append any
+    # cascade lines targeting that same title — so a mirror routed to
+    # ``Features`` lands at the bottom of the existing ``### Features``
+    # bucket rather than creating a parallel one.
+    ordered: list[tuple[str, list[str]]] = []
+
+    if breaking:
+        merged = [_commit_line(c) for c in breaking]
+        merged.extend(cascade_groups.pop(breaking_title, []))
+        ordered.append((breaking_title, merged))
+
     for section in sections:
-        if section.title in buckets:
-            ordered.append((section.title, buckets[section.title]))
-    if other_title and other_title in buckets:
-        ordered.append((other_title, buckets[other_title]))
+        if section.title in commit_buckets:
+            merged = [_commit_line(c) for c in commit_buckets[section.title]]
+            merged.extend(cascade_groups.pop(section.title, []))
+            ordered.append((section.title, merged))
 
-    if not ordered and not cascade_lines:
+    if other_title and other_title in commit_buckets:
+        merged = [_commit_line(c) for c in commit_buckets[other_title]]
+        merged.extend(cascade_groups.pop(other_title, []))
+        ordered.append((other_title, merged))
+
+    # Whatever cascade sections are left have no matching commit bucket —
+    # render them after the commit-driven sections in their original
+    # insertion order.
+    for title, lines in cascade_groups.items():
+        ordered.append((title, list(lines)))
+
+    if not ordered:
         return "_No notable changes._\n"
 
-    lines: list[str] = []
+    out: list[str] = []
     for title, items in ordered:
-        lines.append(f"### {title}")
-        lines.append("")
-        for commit in items:
-            scope = f"**{commit.scope}**: " if commit.scope else ""
-            lines.append(f"- {scope}{commit.subject} (`{commit.sha[:7]}`)")
-        lines.append("")
-    if cascade_lines:
-        lines.append(f"### {cascade_title}")
-        lines.append("")
-        for entry in cascade_lines:
-            lines.append(f"- {entry}")
-        lines.append("")
-    return "\n".join(lines)
+        out.append(f"### {title}")
+        out.append("")
+        for item in items:
+            out.append(f"- {item}")
+        out.append("")
+    return "\n".join(out)
 
 
 def render_section(
