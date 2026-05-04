@@ -69,3 +69,76 @@ def test_pre_rc_uses_tilde_notation_in_debian_changelog(
     runner.invoke(app, ["bump", "--pre", "rc"])
     text = (repo / "debian/changelog").read_text()
     assert "mypkg (1.3.0~rc1-1)" in text
+
+
+CONFIG_DUAL = """\
+[components.mypkg]
+paths     = ["debian/**", "src/**"]
+format    = "debian"
+changelog = "CHANGELOG.md"
+
+[components.mypkg.debian]
+distribution = "unstable"
+urgency      = "medium"
+"""
+
+
+def test_dual_changelog_writes_both_debian_stanza_and_markdown(
+    make_repo, commit, runner
+):
+    """A debian-format component with a top-level `changelog` writes
+    BOTH the Debian stanza (version source of truth) and a
+    keep-a-changelog Markdown file at every bump."""
+    repo = make_repo({
+        "multicz.toml": CONFIG_DUAL,
+        "debian/changelog": INITIAL_CHANGELOG,
+        "debian/control": "Source: mypkg\nMaintainer: scenarios <scenarios@multicz>\n",
+        "src/main.py": "x = 1\n",
+    })
+    commit({"src/main.py": "x = 2\n"}, "feat: add login")
+
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 0, result.stdout
+
+    # Debian stanza updated as before.
+    deb = (repo / "debian/changelog").read_text()
+    assert "mypkg (1.3.0-1)" in deb
+    assert "feat: Add login" in deb
+
+    # Markdown CHANGELOG.md created in parallel with H2 + Features
+    # bucket (matching keep-a-changelog conventions used by the default
+    # format).
+    md = (repo / "CHANGELOG.md").read_text()
+    assert "## [1.3.0]" in md
+    assert "### Features" in md
+    assert "add login" in md
+    # Default cascade section must NOT appear (mirrors are forbidden in
+    # debian mode, so cascades are never relevant).
+    assert "### Dependencies" not in md
+
+
+def test_dual_changelog_filters_chore_in_both_files(
+    make_repo, commit, runner
+):
+    """The chore/test/ci filter applies symmetrically: both the Debian
+    stanza and the Markdown CHANGELOG.md drop non-section commit types
+    by default."""
+    repo = make_repo({
+        "multicz.toml": CONFIG_DUAL,
+        "debian/changelog": INITIAL_CHANGELOG,
+        "src/main.py": "x = 1\n",
+    })
+    commit({"src/main.py": "x = 2\n"}, "feat: add login")
+    commit({"src/main.py": "x = 3\n"}, "chore: tidy imports")
+    commit({"src/main.py": "x = 4\n"}, "test: add fixture")
+
+    runner.invoke(app, ["bump"])
+
+    deb = (repo / "debian/changelog").read_text()
+    md = (repo / "CHANGELOG.md").read_text()
+    for needle in ("Add login", "feat: Add login"):
+        assert needle in deb if needle.startswith("feat") else needle.lower() in md.lower()
+    assert "tidy imports" not in deb
+    assert "tidy imports" not in md
+    assert "Add fixture" not in deb
+    assert "fixture" not in md.lower()
