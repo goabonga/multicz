@@ -368,6 +368,55 @@ def _append_bump_summary(
     _append_step_summary(path, lines)
 
 
+def _cascade_entries_for(planned, plan, config) -> list[CascadeEntry]:
+    """Build cascade entries from a planned bump's mirror/trigger reasons.
+
+    Used by both ``bump`` (when writing the downstream CHANGELOG.md) and
+    ``release-notes`` (when rendering markdown for ``gh release create``)
+    so the two surfaces stay in sync.
+
+    For each ``MirrorReason``, looks up the matching mirror declaration
+    on the upstream component to pick up the optional
+    ``changelog_section`` / ``changelog_format`` overrides. Trigger
+    cascades have no such customization handle and always fall through
+    to the project-level defaults. The first reason wins per upstream
+    (existing dedup behavior).
+    """
+    entries: list[CascadeEntry] = []
+    seen_upstreams: set[str] = set()
+    for reason in planned.reasons:
+        if not isinstance(reason, MirrorReason | TriggerReason):
+            continue
+        if reason.upstream in seen_upstreams:
+            continue
+        upstream_planned = plan.bumps.get(reason.upstream)
+        if upstream_planned is None:
+            continue
+        section_override: str | None = None
+        format_override: str | None = None
+        if isinstance(reason, MirrorReason):
+            upstream_component = config.components.get(reason.upstream)
+            if upstream_component is not None:
+                for mirror in upstream_component.mirrors:
+                    if (
+                        str(mirror.file) == reason.file
+                        and mirror.key == reason.key
+                    ):
+                        section_override = mirror.changelog_section
+                        format_override = mirror.changelog_format
+                        break
+        entries.append(
+            CascadeEntry(
+                upstream=reason.upstream,
+                upstream_version=upstream_planned.next,
+                section=section_override,
+                format=format_override,
+            )
+        )
+        seen_upstreams.add(reason.upstream)
+    return entries
+
+
 def _build_plan_or_exit(repo, config, **kwargs):
     """Wrap build_plan() and surface NonConventionalCommitsError as a clean
     typer.Exit instead of a raw traceback."""
@@ -1384,45 +1433,7 @@ def bump(
                 # (e.g. chart bumps because api updated appVersion),
                 # this is the only thing that explains *why* the
                 # release exists.
-                cascade_entries: list[CascadeEntry] = []
-                seen_upstreams: set[str] = set()
-                for reason in planned.reasons:
-                    if isinstance(reason, MirrorReason | TriggerReason):
-                        if reason.upstream in seen_upstreams:
-                            continue
-                        upstream_planned = plan.bumps.get(reason.upstream)
-                        if upstream_planned is None:
-                            continue
-                        # When the cascade comes from a mirror, look up
-                        # the matching mirror declaration on the upstream
-                        # component to pick up its optional
-                        # `changelog_section` / `changelog_format`. Trigger
-                        # cascades have no such customization handle and
-                        # always use the project-level defaults.
-                        section_override: str | None = None
-                        format_override: str | None = None
-                        if isinstance(reason, MirrorReason):
-                            upstream_component = config.components.get(
-                                reason.upstream
-                            )
-                            if upstream_component is not None:
-                                for mirror in upstream_component.mirrors:
-                                    if (
-                                        str(mirror.file) == reason.file
-                                        and mirror.key == reason.key
-                                    ):
-                                        section_override = mirror.changelog_section
-                                        format_override = mirror.changelog_format
-                                        break
-                        cascade_entries.append(
-                            CascadeEntry(
-                                upstream=reason.upstream,
-                                upstream_version=upstream_planned.next,
-                                section=section_override,
-                                format=format_override,
-                            )
-                        )
-                        seen_upstreams.add(reason.upstream)
+                cascade_entries = _cascade_entries_for(planned, plan, config)
                 changelog_path = repo / comp.changelog
                 update_changelog_file(
                     changelog_path,
