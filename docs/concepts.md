@@ -130,6 +130,42 @@ When the mirror writes inside `chart`'s `paths`, `chart` cascades a
 patch bump because a file it owns changed. This keeps Helm chart
 immutability: `chart-0.5.0` always pins the same `appVersion`.
 
+### Customizing the cascade line
+
+By default a mirror cascade renders under a dedicated `### Dependencies`
+section in the downstream component's CHANGELOG.md, as a one-line
+`Track <upstream> <version>` bullet per upstream. Two optional fields
+on the mirror let you override that on a per-mirror basis:
+
+```toml
+[[components.api.mirrors]]
+file = "charts/myapp/Chart.yaml"
+key  = "appVersion"
+changelog_section = "Features"                          # any title
+changelog_format  = "Sync chart appVersion to {upstream_version}"
+```
+
+- **`changelog_section`** routes the line to a specific section. When
+  the title matches an existing commit-driven section
+  (`Features`, `Fixes`, `Breaking changes`, ...) the cascade line is
+  appended at the bottom of that section. Otherwise a new H3 is
+  created.
+- **`changelog_format`** overrides the default phrase. The template
+  accepts `{upstream}` (component name) and `{upstream_version}` (the
+  bumped version) placeholders.
+
+When several mirrors target the same `changelog_section`, their lines
+group under one shared H3 in declaration order. Useful when a single
+downstream component receives mirrors from multiple upstreams (an
+umbrella Helm chart with `dependencies` regex-mirrors from two
+subcharts, for example) and you want a unified `### Subchart updates`
+block instead of one line per upstream under `### Dependencies`.
+
+The project-level fallbacks
+([`cascade_section_title`](configuration.md#cascade_section_title) and
+[`cascade_changelog_format`](configuration.md#cascade_changelog_format))
+still apply when a mirror omits these fields.
+
 ## Triggers and dependencies
 
 `depends_on` declares an explicit upstream relationship: when the

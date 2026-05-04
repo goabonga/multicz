@@ -59,15 +59,15 @@ class Mirror(FileKey):
     the *downstream* component's CHANGELOG when this mirror triggers a
     bump there:
 
-    * ``changelog_section`` — routes the cascade line to a specific
+    * ``changelog_section`` - routes the cascade line to a specific
       section. Can be the title of an existing section
       (``Features``, ``Fixes``, ``Dependencies``, ...) or any custom
       name. When unset, the line falls under the project-level
-      ``cascade_title`` (default: ``Dependencies``).
-    * ``changelog_format`` — overrides the default cascade phrase for
+      ``cascade_section_title`` (default: ``Dependencies``).
+    * ``changelog_format`` - overrides the default cascade phrase for
       this specific mirror. The template accepts ``{upstream}`` and
       ``{upstream_version}`` placeholders. When unset, the project-level
-      ``cascade_format`` applies.
+      ``cascade_changelog_format`` applies.
     """
 
     changelog_section: str | None = None
