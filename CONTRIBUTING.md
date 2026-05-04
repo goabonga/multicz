@@ -2,7 +2,7 @@
 
 Thanks for taking the time to contribute. This guide covers the setup,
 development loop, and the conventions multicz uses for branches and
-commits — both of which drive the project's own release pipeline.
+commits - both of which drive the project's own release pipeline.
 
 ## Setup
 
@@ -61,7 +61,7 @@ uv run zensical serve            # http://localhost:8000
 uv run zensical build --strict   # validate links + render
 ```
 
-The doc site is the user-facing source of truth — when you change
+The doc site is the user-facing source of truth - when you change
 behavior, update the relevant page under `docs/`.
 
 ## Branch naming
@@ -91,7 +91,7 @@ because its own release pipeline reads them:
 
 <optional body explaining the why>
 
-<optional footer — BREAKING CHANGE: ..., refs, etc.>
+<optional footer - BREAKING CHANGE: ..., refs, etc.>
 ```
 
 How commit types map to releases (multicz uses itself for versioning):
@@ -118,7 +118,7 @@ Guidelines:
   commits.
 - **Atomic per file when reasonable.** It makes `git log --oneline` and
   bisects far more useful.
-- **Imperative mood** in the summary: "add", "fix", "remove" — not
+- **Imperative mood** in the summary: "add", "fix", "remove" - not
   "added", "fixes", "removing".
 - **No trailing period** on the summary.
 - **No `Co-Authored-By` footers** unless the work was actually
@@ -138,7 +138,7 @@ uv run pytest
 In your PR:
 
 - Title follows Conventional Commits.
-- One PR per logical change — bundling a refactor with a feature gets
+- One PR per logical change - bundling a refactor with a feature gets
   split on review.
 - Add tests for new behavior, or explain why a test isn't applicable.
 - Update the relevant doc page under `docs/` if user-visible behavior

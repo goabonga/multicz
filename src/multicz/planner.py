@@ -11,7 +11,7 @@ The planner is split into three passes:
 2. **Triggers**: a component declared in another's ``triggers`` list inherits
    that upstream's bump kind (clamped to at least patch).
 3. **Mirror cascade**: if component A writes its version into a file owned by
-   component B (a ``mirror``), B receives a patch bump — keeping Helm chart
+   component B (a ``mirror``), B receives a patch bump - keeping Helm chart
    immutability (option A from the design discussion).
 
 All three passes share a single :func:`_promote` helper so a component can be
@@ -107,8 +107,8 @@ def compute_next(
 
     Output is rendered in the chosen ``scheme``:
 
-    * ``semver`` (default): ``1.3.0-rc.1`` — npm, Cargo, Helm, generic
-    * ``pep440``: ``1.3.0rc1`` — strict canonical Python form
+    * ``semver`` (default): ``1.3.0-rc.1`` - npm, Cargo, Helm, generic
+    * ``pep440``: ``1.3.0rc1`` - strict canonical Python form
 
     Either form can be re-parsed by :class:`packaging.version.Version` so
     ordering is preserved across both. The behavior matrix below uses
@@ -589,10 +589,10 @@ def build_plan(
     ``since`` overrides the per-component "last tag" reference used to
     pick which commits are in scope. When set, every component reads
     commits from ``since`` to ``HEAD`` instead of from its own latest
-    tag — useful for PR-style 'what would bump if I merged this branch'
+    tag - useful for PR-style 'what would bump if I merged this branch'
     queries (``since=origin/main``) or for inspecting a different window
     (``since=HEAD~10``). The *current* version resolution (latest tag,
-    bump_file, initial_version) is unaffected — only the commit window
+    bump_file, initial_version) is unaffected - only the commit window
     moves.
     """
     matcher = ComponentMatcher(config.components)
@@ -608,7 +608,7 @@ def build_plan(
             bump.pre = pre
             bump.finalize = finalize
 
-    # `--finalize` is a release event in its own right — allow finalising a
+    # `--finalize` is a release event in its own right - allow finalising a
     # pre-release component even when no new commits landed since the rc tag.
     if finalize:
         for name in config.components:

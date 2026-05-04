@@ -3,7 +3,7 @@
 
 """Fixtures shared by all scenario tests.
 
-Scenarios describe end-to-end usage of multicz — a fixture repo, some
+Scenarios describe end-to-end usage of multicz - a fixture repo, some
 git activity, then a CLI invocation whose output is asserted against
 user-visible behaviour. They exist alongside the unit tests as a
 *functional contract*: a regression in a scenario means user-visible

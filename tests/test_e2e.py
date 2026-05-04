@@ -184,7 +184,7 @@ ignored_types = ["fix"]
 
 
 def test_ignored_types_does_not_drop_breaking_commits_implicitly(repo: Path):
-    """If `feat` is ignored, even feat! is filtered out — explicit user choice."""
+    """If `feat` is ignored, even feat! is filtered out - explicit user choice."""
     cfg = repo / "multicz.toml"
     cfg.write_text("""
 [project]
@@ -252,7 +252,7 @@ bump_policy = "scoped"
 
 
 def test_bump_policy_scoped_no_scope_propagates_normally(repo: Path):
-    """Commits without a scope are NOT demoted under scoped policy — no scope
+    """Commits without a scope are NOT demoted under scoped policy - no scope
     means 'applies broadly' rather than 'doesn't apply to me'."""
     cfg = repo / "multicz.toml"
     cfg.write_text("""

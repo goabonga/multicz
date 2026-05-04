@@ -67,7 +67,7 @@ err = Console(stderr=True)
 
 
 _BARE_CONFIG = """\
-# multicz.toml — generic stub. Edit paths and bump_files to match your repo.
+# multicz.toml - generic stub. Edit paths and bump_files to match your repo.
 # Run `multicz init` (without --bare) to scan the working tree and generate
 # a config tailored to the manifests it actually contains.
 
@@ -133,7 +133,7 @@ def init(
     ``charts/*/Chart.yaml``, ``package.json``, ``Cargo.toml``, ``go.mod``,
     ``gradle.properties`` and ``debian/changelog``; one component is
     emitted per detected manifest. ``--bare`` writes a generic
-    single-component stub instead — useful when bootstrapping a brand
+    single-component stub instead - useful when bootstrapping a brand
     new repo.
 
     \b
@@ -280,7 +280,7 @@ def _append_step_summary(path: Path, lines: list[str]) -> None:
 
     Mirrors GitHub Actions' ``$GITHUB_STEP_SUMMARY`` semantics: each
     step's content is appended; the runner concatenates everything into
-    the workflow's run-page summary. Safe to call from local shells —
+    the workflow's run-page summary. Safe to call from local shells -
     the file is just a text file.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -309,7 +309,7 @@ def _append_plan_summary(path: Path, plan_obj, *, header: str) -> None:
     lines.append("")
     for bump in plan_obj:
         lines.append(
-            f"### `{bump.component}` — {bump.current} → {bump.next} "
+            f"### `{bump.component}` - {bump.current} → {bump.next} "
             f"({bump.kind})"
         )
         lines.append("")
@@ -343,7 +343,7 @@ def _append_bump_summary(
     tag_index = {t.split("-v", 1)[0] if "-v" in t else None: t for t in tags}
     # Fall back to format string lookup when tag_format isn't `<comp>-v<ver>`.
     for name, info in applied.items():
-        tag = tag_index.get(name) or "—"
+        tag = tag_index.get(name) or "-"
         for t in tags:
             if config.tag_format_for(name).format(
                 component=name, version=info["next"]
@@ -445,7 +445,7 @@ def plan_cmd(
     force: list[str] = typer.Option(
         None, "--force",
         help="Force-bump <name>:<kind>. Repeatable. Bypasses commit "
-             "detection — use for manual rebuilds (CVE base image refresh, "
+             "detection - use for manual rebuilds (CVE base image refresh, "
              "weekly artefact rebuild, …).",
     ),
     summary: Path = typer.Option(
@@ -541,7 +541,7 @@ def state(
     repo, config = _load()
     if config.project.state_file is None:
         err.print(
-            "[red]no state_file configured[/] — set "
+            "[red]no state_file configured[/] - set "
             "[bold][project].state_file[/] in multicz.toml"
         )
         raise typer.Exit(code=1)
@@ -580,7 +580,7 @@ def changed(
         None, "--since",
         help="Reference to compare against (e.g. origin/main, HEAD~5). "
              "When omitted, each component is compared against its own "
-             "last tag — same window as the planner uses for bumps.",
+             "last tag - same window as the planner uses for bumps.",
     ),
     output: str = typer.Option(
         "text", "--output", "-o", help="text | json",
@@ -608,7 +608,7 @@ def changed(
               component: ${{ fromJson(needs.detect.outputs.changed) }}
 
     Without --since, the answer is per-component (same window as the
-    planner). With --since, every component shares the reference —
+    planner). With --since, every component shares the reference -
     ideal for "what changed in this PR vs main".
 
     Release commits matching ``project.release_commit_pattern`` are
@@ -747,7 +747,7 @@ def release_notes_cmd(
     notes.
 
     \b
-    Default (notes for the upcoming bump — same set as `plan`):
+    Default (notes for the upcoming bump - same set as `plan`):
       multicz release-notes api
       multicz release-notes --all
 
@@ -951,7 +951,7 @@ def explain(
     bump = plan_obj.bumps.get(component)
     if bump is None:
         console.print(
-            f"[bold]{component}[/]: [dim]no bump pending — "
+            f"[bold]{component}[/]: [dim]no bump pending - "
             "no relevant commits since the last tag[/]"
         )
         return
@@ -1016,7 +1016,7 @@ def _porcelain_paths(repo: Path) -> set[str]:
 
     Used to identify candidate paths to hash before/after running
     ``post_bump`` hooks. A pure set diff would miss a file that's
-    dirty both before and after with different content — the
+    dirty both before and after with different content - the
     canonical case being ``uv run`` itself silently re-syncing
     ``uv.lock`` before multicz even gets to run.
     """
@@ -1111,7 +1111,7 @@ def _component_relevant_commits(
       (project + component, union) are skipped entirely.
 
     When ``since_stable`` is True, the range starts at the previous
-    *stable* tag instead — used by the ``consolidate`` and ``promote``
+    *stable* tag instead - used by the ``consolidate`` and ``promote``
     finalize strategies.
     """
     import re
@@ -1220,10 +1220,10 @@ def _release_commit_message(
 
     Available placeholders:
 
-    * ``{summary}``    — ``api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.5.0``
-    * ``{components}`` — ``api v1.3.0, chart v0.5.0`` (versions only, ``v`` prefixed)
-    * ``{body}``       — bullet list with kind annotations
-    * ``{count}``      — number of components bumped
+    * ``{summary}``    - ``api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.5.0``
+    * ``{components}`` - ``api v1.3.0, chart v0.5.0`` (versions only, ``v`` prefixed)
+    * ``{body}``       - bullet list with kind annotations
+    * ``{count}``      - number of components bumped
 
     Literal ``{`` and ``}`` in a template should be escaped as ``{{`` / ``}}``.
     """
@@ -1287,12 +1287,12 @@ def bump(
         None, "--commit-message", "-m",
         help="Verbatim release commit message (overrides the project's "
              "release_commit_message template). Like 'git commit -m', no "
-             "placeholders are expanded — the string is used as-is.",
+             "placeholders are expanded - the string is used as-is.",
     ),
     force: list[str] = typer.Option(
         None, "--force",
         help="Force-bump <name>:<kind>. Repeatable. Bypasses commit "
-             "detection — use for manual rebuilds (e.g. weekly base "
+             "detection - use for manual rebuilds (e.g. weekly base "
              "image refresh: `--force api:patch`).",
     ),
     sign: bool = typer.Option(
@@ -1331,7 +1331,7 @@ def bump(
             console.print_json(data={"bumps": {}})
         else:
             console.print(
-                "[dim]no bumps pending — "
+                "[dim]no bumps pending - "
                 "use [bold]--force <name>:<kind>[/] for a manual bump[/]"
             )
         return
@@ -1465,7 +1465,7 @@ def bump(
     # Cargo.toml. Files modified by hooks are auto-detected and folded
     # into ``written`` so they ride the release commit.
     #
-    # Detection compares content hashes — not just the dirty-paths set —
+    # Detection compares content hashes - not just the dirty-paths set -
     # because the entry point is typically ``uv run multicz bump``, and
     # ``uv run`` re-syncs the venv (which can rewrite ``uv.lock``) before
     # multicz code runs at all. By the time we snapshot, uv.lock is

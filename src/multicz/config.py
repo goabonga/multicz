@@ -87,7 +87,7 @@ class DebianSettings(BaseModel):
 
     The component's version is read from the topmost stanza of
     ``changelog`` (default ``debian/changelog``) and a new stanza is
-    *prepended* on every bump — older stanzas are never rewritten.
+    *prepended* on every bump - older stanzas are never rewritten.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -313,12 +313,12 @@ class Config(BaseModel):
                     f"component name {name!r} is too long "
                     f"(max {COMPONENT_NAME_MAX_LEN} chars). Component names "
                     "appear in git tags, file paths, JSON output, and release "
-                    "notes — keep them short."
+                    "notes - keep them short."
                 )
             if not COMPONENT_NAME_RE.match(name):
                 raise ValueError(
                     f"invalid component name {name!r}: must match "
-                    f"{COMPONENT_NAME_RE.pattern} — "
+                    f"{COMPONENT_NAME_RE.pattern} - "
                     "no slashes, colons, spaces, or path-like characters; "
                     "must start and end with a letter or digit. Component "
                     "names land in git tags, file paths, JSON output, and "

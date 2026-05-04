@@ -6,7 +6,7 @@ icon: lucide/shield
 
 Multicz is a release tool: it modifies version files, writes commits,
 creates tags, and (with `--push`) sends them to a remote. The threat
-model is straightforward — the security guarantees should match.
+model is straightforward - the security guarantees should match.
 
 ## Properties guaranteed by the implementation
 
@@ -19,7 +19,7 @@ model is straightforward — the security guarantees should match.
   (modulo the timestamp written into `CHANGELOG.md`,
   `debian/changelog`, and `state.json`, which is wall-clock UTC).
 - **Explicit changed files from git.** Multicz uses
-  `git diff-tree --name-only` per commit — the exact set of paths
+  `git diff-tree --name-only` per commit - the exact set of paths
   actually touched, not heuristics. A `path_overlap` finding from
   `validate` reads from `git ls-files`; nothing is sniffed from a
   watcher or filesystem scan.
@@ -29,7 +29,7 @@ model is straightforward — the security guarantees should match.
 
 The single exception is `post_bump`: each entry is a shell command
 parsed via `shlex.split` and executed in the repo root. Treat
-`post_bump` like any other CI shell hook — review what's there, and
+`post_bump` like any other CI shell hook - review what's there, and
 keep `multicz.toml` itself under the same code-review process as the
 rest of the repo.
 
@@ -48,7 +48,7 @@ rest of the repo.
 [state_file]: configuration.md#state_file
 [unknown_commit_policy]: configuration.md#unknown_commit_policy
 [overlap_policy]: configuration.md#overlap_policy
-| Path / mirror / trigger cycles | [`multicz validate`](cli.md#validate) — runs as a CI gate before `bump` |
+| Path / mirror / trigger cycles | [`multicz validate`](cli.md#validate) - runs as a CI gate before `bump` |
 
 ## CI hardening checklist
 
@@ -78,18 +78,18 @@ follow these recommendations.
 
 When `[project].state_file` is set, `multicz validate` adds two checks:
 
-- **`state_drift`** (warning) — the recorded version doesn't match the
+- **`state_drift`** (warning) - the recorded version doesn't match the
   current value in the primary `bump_file`. Fires when someone edits
   `pyproject.toml`, `Chart.yaml`, or `package.json` manually without
   going through `multicz bump`:
 
   ```
   ! api: state recorded version '1.3.0' but pyproject.toml now reads
-    '9.9.9' — someone may have edited the file outside multicz bump
+    '9.9.9' - someone may have edited the file outside multicz bump
     (state_drift)
   ```
 
-- **`state_unknown_component`** (warning) — the state references a
+- **`state_unknown_component`** (warning) - the state references a
   name no longer declared in `multicz.toml` (typically after a
   component was renamed or removed without clearing state).
 
@@ -100,7 +100,7 @@ multicz validate --strict
 ```
 
 The state file is **opt-in**. The default stateless flow remains the
-recommended setup for most repos — the planner always re-derives from
+recommended setup for most repos - the planner always re-derives from
 git, which is the source of truth.
 
 ## Exit codes
@@ -110,8 +110,8 @@ git, which is the source of truth.
 | `validate` | 0 | clean (warnings/info don't fail) |
 | `validate` | 1 | at least one error |
 | `validate --strict` | 2 | at least one warning |
-| `bump` (no commits, no `--force`) | 0 | "nothing to do" — success |
+| `bump` (no commits, no `--force`) | 0 | "nothing to do" - success |
 | `plan` (with `unknown_commit_policy = "error"` and offenders) | 1 | refuses to plan, lists every offending SHA |
 
-Use these for explicit gating — e.g. fail the pipeline on `validate`
+Use these for explicit gating - e.g. fail the pipeline on `validate`
 warnings without merging the workflow logic with `bump` itself.

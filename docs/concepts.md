@@ -54,7 +54,7 @@ of them.
 `paths` is a list of gitignore-style globs declaring which files a
 component owns. A commit's changed files are matched against every
 component's `paths`; ownership decides which component the commit
-"belongs to" — and therefore which one bumps.
+"belongs to" - and therefore which one bumps.
 
 ```toml
 [components.api]
@@ -91,11 +91,11 @@ omit `key`. For files no structured parser handles (Python
 
 Supported file formats:
 
-- `.toml` — comments and key order preserved (`tomlkit`)
-- `.yaml` / `.yml` — comments and quote style preserved (`ruamel.yaml`)
-- `.json` — indent and key order preserved (`package.json`)
-- `.properties` — line-based `key=value` (`gradle.properties`)
-- anything else — treated as a one-line `VERSION` file
+- `.toml` - comments and key order preserved (`tomlkit`)
+- `.yaml` / `.yml` - comments and quote style preserved (`ruamel.yaml`)
+- `.json` - indent and key order preserved (`package.json`)
+- `.properties` - line-based `key=value` (`gradle.properties`)
+- anything else - treated as a one-line `VERSION` file
 
 ### Regex escape hatch
 
@@ -116,7 +116,7 @@ surface at `multicz validate --strict`.
 
 ## Mirrors
 
-A `mirror` writes a component's version into another file — typically a
+A `mirror` writes a component's version into another file - typically a
 sibling component's manifest. The canonical case is a Helm chart's
 `appVersion` mirroring the API version:
 
@@ -133,7 +133,7 @@ immutability: `chart-0.5.0` always pins the same `appVersion`.
 ## Triggers and dependencies
 
 `depends_on` declares an explicit upstream relationship: when the
-upstream bumps, the dependent bumps too — without writing a file.
+upstream bumps, the dependent bumps too - without writing a file.
 
 ```toml
 [components.chart]
@@ -156,7 +156,7 @@ The bump kind on the dependent is governed by
 
     Both create cascades, but they're different. `mirrors` writes a
     *version* into another component's *file* and the cascade fires
-    because the file content changed. `depends_on` is purely logical —
+    because the file content changed. `depends_on` is purely logical -
     no file is written. A chart with `appVersion` typically declares
     *both*; the mirror handles the field, and `depends_on = ["api"]`
     is then redundant (the cascade fires either way).
@@ -165,12 +165,12 @@ The bump kind on the dependent is governed by
 
 The planner runs three passes:
 
-1. **direct** — for each component, look at conventional commits since
+1. **direct** - for each component, look at conventional commits since
    its last tag whose changed files map to it; pick the strongest
    implied bump.
-2. **dependencies** — propagate bumps along declared `depends_on` edges
+2. **dependencies** - propagate bumps along declared `depends_on` edges
    (using `trigger_policy`).
-3. **mirror cascade** — when a component A writes its version into a
+3. **mirror cascade** - when a component A writes its version into a
    file owned by component B, B receives a patch bump.
 
 ```mermaid
@@ -188,7 +188,7 @@ graph LR
 | `feat!: …` or `BREAKING CHANGE:` footer | major |
 | `fix: …` | patch |
 | `perf: …` | patch |
-| `revert: …` | patch — user-visible activity |
+| `revert: …` | patch - user-visible activity |
 | `chore`, `docs`, `style`, `test`, `build`, `ci`, `refactor` | none |
 | anything not matching `<type>(<scope>)?: <subject>` | controlled by [`unknown_commit_policy`](configuration.md#unknown_commit_policy) |
 
@@ -209,7 +209,7 @@ bump_policy = "scoped"
 |---|---|---|
 | `feat: cross-cutting change` (no scope) | minor | minor |
 | `feat(api): rewrite contract` | minor | **patch** (demoted) |
-| `feat(chart): add value` | — | minor |
+| `feat(chart): add value` | - | minor |
 | `fix: typo` | patch | patch |
 
 `scoped` demotes `minor`/`major` to `patch` when the commit's scope
@@ -309,7 +309,7 @@ component per detected project:
 | Python | `**/pyproject.toml` | `[project].name` (PEP 621) or `[tool.poetry].name` |
 | Helm | `**/Chart.yaml` | `name:` field |
 | Rust | `**/Cargo.toml` | `[package].name`; workspaces collapse when `[workspace.package].version` is shared |
-| Go | `**/go.mod` | last segment of `module …` (strips `/vN`) — tag-driven, no version file |
+| Go | `**/go.mod` | last segment of `module …` (strips `/vN`) - tag-driven, no version file |
 | Gradle | root `gradle.properties` with `version=` | `rootProject.name` from `settings.gradle[.kts]` |
 | Node.js | root `package.json` (or workspace members) | `name` field (npm scopes stripped) |
 | Debian | `debian/changelog` | package name from the top stanza header |
@@ -319,7 +319,7 @@ Common noise dirs (`.git`, `node_modules`, `.venv`, `target`, `build`,
 
 ### Workspace rules
 
-A workspace orchestrator with no version is never a component — its
+A workspace orchestrator with no version is never a component - its
 job is to delegate, not to ship. A root that doubles as a package
 (common for Python and Cargo) is a component, alongside its members.
 Excluded members declared in `[tool.uv.workspace].exclude`,
@@ -338,12 +338,12 @@ from the cwd):
 2. `pyproject.toml` *with* a `[tool.multicz]` table
 3. `package.json` *with* a `"multicz"` key
 
-A `pyproject.toml` without `[tool.multicz]` is silently skipped — it's
+A `pyproject.toml` without `[tool.multicz]` is silently skipped - it's
 not treated as the multicz config.
 
 ## Optional state file
 
-Multicz is normally stateless — every command recomputes from git tags
+Multicz is normally stateless - every command recomputes from git tags
 and the in-tree manifests. For monorepos that want a persistent audit
 trail or **drift detection**, opt into a state file:
 
@@ -355,9 +355,9 @@ state_file = ".multicz/state.json"
 After every successful `multicz bump`, the file is written and lands in
 the release commit. `multicz validate` then adds two checks:
 
-- `state_drift` (warning) — recorded version doesn't match the current
+- `state_drift` (warning) - recorded version doesn't match the current
   primary `bump_file` value (someone edited it manually).
-- `state_unknown_component` (warning) — state references a name no
+- `state_unknown_component` (warning) - state references a name no
   longer declared.
 
 Inspect with `multicz state` (text or JSON).

@@ -15,7 +15,7 @@ name: release
 #      `multicz release-notes`
 #
 # Setup: configure PyPI trusted publishing for the repo
-# (https://docs.pypi.org/trusted-publishers/) — no PYPI_TOKEN secret
+# (https://docs.pypi.org/trusted-publishers/) - no PYPI_TOKEN secret
 # required. If you prefer token-based publishing, swap the
 # pypa/gh-action-pypi-publish step for `uv publish` with
 # `UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}`.
@@ -105,7 +105,7 @@ jobs:
           # subsequent `git commit -S` / `git tag -s` don't prompt.
           echo test | gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
             --pinentry-mode loopback --sign > /dev/null
-          # Tell git which key to sign with — derived from the imported
+          # Tell git which key to sign with - derived from the imported
           # key so we don't need a separate KEY_ID secret.
           KEY_ID=$(gpg --list-secret-keys --with-colons \
             | awk -F: '/^sec/{print $5; exit}')

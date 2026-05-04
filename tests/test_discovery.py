@@ -685,7 +685,7 @@ def test_subdir_package_json_in_node_modules_still_skipped(tmp_path: Path):
 
 def test_workspace_declaration_keeps_strict_member_list(tmp_path: Path):
     """When workspaces are declared, packages outside the listed globs
-    are NOT added — the user has been explicit about what is in scope."""
+    are NOT added - the user has been explicit about what is in scope."""
     (tmp_path / "package.json").write_text(
         '{"name": "monorepo", "workspaces": ["packages/*"]}\n'
     )

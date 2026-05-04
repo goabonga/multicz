@@ -1,7 +1,7 @@
 # multicz
 
 Multi-component versioning for monorepos. Bump a Python app, its Docker image,
-and the Helm chart that deploys it from a single conventional-commit history —
+and the Helm chart that deploys it from a single conventional-commit history -
 each with its own version line and its own git tag.
 
 <p align="center">
@@ -38,11 +38,11 @@ full configuration reference.
 
 ## What it does
 
-- **Per-component versions** — each component has its own version line and
+- **Per-component versions** - each component has its own version line and
   its own git tag (`api-v1.2.0`, `chart-v0.5.0`).
-- **Conventional-commit driven** — `feat:` → minor, `fix:` → patch,
+- **Conventional-commit driven** - `feat:` → minor, `fix:` → patch,
   `BREAKING CHANGE:` → major. Scopes route the bump to the right component.
-- **Mirrors and triggers** — bump api `1.2.0` → `1.3.0` and the Helm chart's
+- **Mirrors and triggers** - bump api `1.2.0` → `1.3.0` and the Helm chart's
   `appVersion` follows; the chart's own version cascades a patch.
 - **No network, no auto-updates.** Pure `git` + filesystem. Same input yields
   the same plan byte-for-byte.
@@ -51,13 +51,13 @@ full configuration reference.
 
 Published at **<https://goabonga.github.io/multicz/>**:
 
-- [Get started](https://goabonga.github.io/multicz/get-started/) — install, minimal config, first bump
-- [Concepts](https://goabonga.github.io/multicz/concepts/) — components, mirrors, triggers, cascades, bump policies
-- [Configuration](https://goabonga.github.io/multicz/configuration/) — full `multicz.toml` reference
-- [CLI](https://goabonga.github.io/multicz/cli/) — every command and flag
-- [Recipes](https://goabonga.github.io/multicz/recipes/) — FastAPI + Helm walkthrough, CI matrix gating, release candidates
-- [Why multicz?](https://goabonga.github.io/multicz/why/) — vs. semantic-release, Commitizen, Changesets, bump-my-version
-- [Security](https://goabonga.github.io/multicz/security/) — guarantees and CI hardening
+- [Get started](https://goabonga.github.io/multicz/get-started/) - install, minimal config, first bump
+- [Concepts](https://goabonga.github.io/multicz/concepts/) - components, mirrors, triggers, cascades, bump policies
+- [Configuration](https://goabonga.github.io/multicz/configuration/) - full `multicz.toml` reference
+- [CLI](https://goabonga.github.io/multicz/cli/) - every command and flag
+- [Recipes](https://goabonga.github.io/multicz/recipes/) - FastAPI + Helm walkthrough, CI matrix gating, release candidates
+- [Why multicz?](https://goabonga.github.io/multicz/why/) - vs. semantic-release, Commitizen, Changesets, bump-my-version
+- [Security](https://goabonga.github.io/multicz/security/) - guarantees and CI hardening
 
 ## License
 

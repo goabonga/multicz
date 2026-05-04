@@ -60,7 +60,7 @@ def test_pre_label_enters_cycle_from_release():
 def test_pre_label_increments_counter_in_same_cycle():
     assert compute_next(Version("1.3.0-rc.1"), "minor", pre="rc") == "1.3.0-rc.2"
     assert compute_next(Version("1.3.0-rc.5"), "patch", pre="rc") == "1.3.0-rc.6"
-    # kind is irrelevant within a cycle — target stays
+    # kind is irrelevant within a cycle - target stays
     assert compute_next(Version("1.3.0-rc.1"), "major", pre="rc") == "1.3.0-rc.2"
 
 
@@ -81,7 +81,7 @@ def test_pep440_aliases_collapse_into_same_cycle():
 def test_no_pre_on_prerelease_auto_finalizes():
     assert compute_next(Version("1.3.0-rc.1"), "minor") == "1.3.0"
     assert compute_next(Version("1.3.0-rc.5"), "patch") == "1.3.0"
-    # kind is ignored — finalising means dropping the suffix, period
+    # kind is ignored - finalising means dropping the suffix, period
     assert compute_next(Version("1.3.0-rc.1"), "major") == "1.3.0"
 
 

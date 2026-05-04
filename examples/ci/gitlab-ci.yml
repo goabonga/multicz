@@ -59,7 +59,7 @@ docker:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - |
-      [ -f release.json ] || { echo "no release.json — release stage was a no-op"; exit 0; }
+      [ -f release.json ] || { echo "no release.json - release stage was a no-op"; exit 0; }
       jq -r '.bumps[].artifacts[] | select(.type == "docker") | .ref' release.json |
       while read -r ref; do
         docker build -t "$ref" .

@@ -5,7 +5,7 @@
 
 When a -> b and b -> a (or longer chains), the planner would loop or
 make arbitrary choices. ``validate`` detects the cycle via DFS and
-returns the offending path — the test pins both the error level and
+returns the offending path - the test pins both the error level and
 the human-readable cycle representation.
 """
 

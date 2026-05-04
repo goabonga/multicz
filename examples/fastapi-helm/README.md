@@ -24,8 +24,8 @@ release is implicitly cut whenever the API version moves.
 |---|---|---|---|---|
 | `src/main.py` (`feat:`) | minor (e.g. 1.3.0) | follows api (`1.3.0`) | patch (cascade) | mirror (`1.3.0`) |
 | `Dockerfile` (`fix:` for a CVE) | patch | follows api | patch (cascade) | mirror |
-| `charts/myapp/templates/*.yaml` | — | — | patch | — |
-| `charts/myapp/values.yaml` (config) | — | — | patch | — |
+| `charts/myapp/templates/*.yaml` | - | - | patch | - |
+| `charts/myapp/values.yaml` (config) | - | - | patch | - |
 
 Two key invariants drive this layout:
 
@@ -35,7 +35,7 @@ Two key invariants drive this layout:
   artifact of `api`.
 * **Helm chart immutability.** `chart-0.5.0` always pins exactly one
   `appVersion`. Any time the mirror writes a new `appVersion` into
-  `Chart.yaml`, the chart's own `version` cascades a patch — so two
+  `Chart.yaml`, the chart's own `version` cascades a patch - so two
   pulls of the same chart-X.Y.Z tarball are guaranteed to be
   byte-identical.
 
@@ -49,7 +49,7 @@ multicz bump --dry-run
 
 `multicz` finds the dedicated `multicz.toml` next to `pyproject.toml`.
 The same setup also works inlined under `[tool.multicz]` inside
-`pyproject.toml` if you prefer one fewer file at the repo root — see
+`pyproject.toml` if you prefer one fewer file at the repo root - see
 [`../inline-pyproject/`](../inline-pyproject/).
 
 ## Release flow in CI

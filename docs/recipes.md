@@ -45,10 +45,10 @@ Behaviour:
 |---|---|---|---|---|
 | `src/main.py` (feat) | minor | follows api | patch (cascade) | mirror |
 | `Dockerfile` (CVE base) | patch | follows api | patch (cascade) | mirror |
-| `charts/myapp/templates/dep.yaml` | — | — | patch | — |
-| `charts/myapp/values.yaml` (config) | — | — | patch | — |
+| `charts/myapp/templates/dep.yaml` | - | - | patch | - |
+| `charts/myapp/values.yaml` (config) | - | - | patch | - |
 
-The Docker image tag is `api.version` itself — read it from CI:
+The Docker image tag is `api.version` itself - read it from CI:
 
 ```bash
 TAG=$(multicz get api)
@@ -126,13 +126,13 @@ multicz bump --pre rc --commit --tag      # → api-v1.3.0-rc.1
 # more fixes
 multicz bump --pre rc --commit --tag      # → api-v1.3.0-rc.2
 
-# QA approves — ship the final
+# QA approves - ship the final
 multicz bump --finalize --commit --tag    # → api-v1.3.0
 ```
 
 `--pre <label>` accepts any label (`rc`, `alpha`, `beta`, `dev`, …) and
 the counter resets when you switch labels. `--finalize` is allowed even
-when no commits landed since the last RC tag — finalising IS a release
+when no commits landed since the last RC tag - finalising IS a release
 event in its own right. Without either flag, a `multicz bump` from a
 pre-release version auto-finalises.
 
@@ -142,7 +142,7 @@ notation so `apt`'s ordering puts pre-releases *before* the final:
 semver form (`mypkg-v1.3.0-rc.1`).
 
 The output format on the changelog after `--finalize` is governed by
-[`finalize_strategy`](configuration.md#finalize_strategy) —
+[`finalize_strategy`](configuration.md#finalize_strategy) -
 `consolidate` (default) lists every commit since the previous stable
 tag, `promote` also drops the now-superseded RC sections, `annotate`
 keeps each tag's section dedicated.
@@ -154,10 +154,10 @@ no-op:
 
 ```
 $ multicz bump
-no bumps pending — use --force <name>:<kind> for a manual bump
+no bumps pending - use --force <name>:<kind> for a manual bump
 ```
 
-Exit code is `0` — "nothing to do" is success, not failure.
+Exit code is `0` - "nothing to do" is success, not failure.
 
 For releases without code changes (weekly base-image rebuild for
 security patches, dependency-only update, deliberate retag), use
@@ -257,7 +257,7 @@ For one-off releases, override the entire message with `-m`:
 multicz bump --commit --tag -m "release: hotfix for the production outage"
 ```
 
-`-m` is verbatim like `git commit -m` — no placeholders are expanded.
+`-m` is verbatim like `git commit -m` - no placeholders are expanded.
 
 ## Migrating from a single-tag scheme { #migrating-from-a-single-tag-scheme }
 
@@ -267,9 +267,9 @@ A common starting point is a legacy repo with global tags like
 1. Decide whether the legacy tags belong to one of the new components
    (typically the main app). Set `tag_format = "v{version}"` on that
    component so its history continues seamlessly.
-2. Give every other component a different prefix — the default
+2. Give every other component a different prefix - the default
    `{component}-v{version}` does that for free.
-3. The planner reads the current version with this priority — git tag
+3. The planner reads the current version with this priority - git tag
    matching the resolved `tag_format`, then the value in the
    component's primary `bump_file`, then `initial_version`. Even before
    you cut your first multicz tag, the in-tree version is honoured.
@@ -283,7 +283,7 @@ paths      = ["src/**", "pyproject.toml"]
 tag_format = "v{version}"          # legacy tags stay under "v" prefix
 
 [components.chart]
-paths = ["charts/**"]               # default "chart-v…" — fresh history
+paths = ["charts/**"]               # default "chart-v…" - fresh history
 ```
 
 `multicz status` now shows `api` reading its version from the existing

@@ -15,7 +15,7 @@ five-line shape::
 
 Multiple stanzas are stacked newest-first. ``multicz`` reads the
 *topmost* stanza for the canonical version and prepends a freshly
-rendered stanza on every bump — old stanzas are never rewritten,
+rendered stanza on every bump - old stanzas are never rewritten,
 matching the contract of ``dch(1)``.
 
 Debian version strings can include an ``epoch:``, an upstream component,
@@ -111,7 +111,7 @@ def to_debian_pre(upstream: str) -> str:
     """Convert a semver-style pre-release suffix to Debian's tilde form.
 
     Debian sorts ``~`` before nothing, so ``1.3.0~rc1 < 1.3.0`` in dpkg
-    ordering — exactly what you want for a release candidate. semver's
+    ordering - exactly what you want for a release candidate. semver's
     ``1.3.0-rc.1`` would sort *after* ``1.3.0`` in dpkg, which is wrong.
 
     >>> to_debian_pre("1.3.0")

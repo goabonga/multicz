@@ -2,7 +2,7 @@
 
 Multi-component versioning for monorepos. Bump a Python app, its Docker
 image, and the Helm chart that deploys it from a single conventional-commit
-history — each with its own version line and its own git tag.
+history - each with its own version line and its own git tag.
 
 ![multicz demo](demo.gif)
 
@@ -61,7 +61,7 @@ multicz bump --commit --tag --push
 ## Where to go next
 
 - New repo, new install? [Get started](get-started.md).
-- Want to understand the model — components, mirrors, cascades, bump
+- Want to understand the model - components, mirrors, cascades, bump
   policy? [Concepts](concepts.md).
 - Looking up a config field? [Configuration reference](configuration.md).
 - Looking up a flag or command? [CLI reference](cli.md).

@@ -21,7 +21,7 @@ multicz init --detect                  # summary of what would be picked up
 multicz init --detect --output json    # machine-readable detection
 ```
 
-`--print` and `--detect` are non-destructive — safe to run inside CI.
+`--print` and `--detect` are non-destructive - safe to run inside CI.
 `--detect` cannot combine with `--bare` or `--print`.
 
 See [auto-discovery](concepts.md#auto-discovery) for the manifest
@@ -122,7 +122,7 @@ multicz changed --output json
 
 Default text output is one component name per line, pipeable into
 shell loops. JSON output exposes both lists (`changed`,
-`unchanged`) — ideal for `fromJson` in GitHub Actions matrices. See
+`unchanged`) - ideal for `fromJson` in GitHub Actions matrices. See
 the [CI matrix recipe](recipes.md#ci-matrix-gating).
 
 Distinct from `plan`: `plan` says "would bump", `changed` says
@@ -152,21 +152,21 @@ multicz bump --summary $GITHUB_STEP_SUMMARY    # markdown summary to file
 
 Notable flags:
 
-- `--commit` (`-C`) — stage written files and create a release commit
+- `--commit` (`-C`) - stage written files and create a release commit
   using `[project].release_commit_message`. Together with `--commit-message` (`-m`),
   the verbatim string is used (no placeholders).
-- `--tag` (`-t`) — create one annotated git tag per bumped component.
-- `--push` — `git push --follow-tags`. Requires `--commit` or `--tag`
+- `--tag` (`-t`) - create one annotated git tag per bumped component.
+- `--push` - `git push --follow-tags`. Requires `--commit` or `--tag`
   to actually push something.
-- `--sign` — equivalent to setting `[project].sign_commits = true` and
+- `--sign` - equivalent to setting `[project].sign_commits = true` and
   `[project].sign_tags = true`. Either source enables signing; the CLI
   flag never disables.
-- `--pre <label>` / `--finalize` — mutually exclusive. See [release
+- `--pre <label>` / `--finalize` - mutually exclusive. See [release
   candidates](recipes.md#release-candidates).
-- `--force NAME:KIND` — repeatable. Bypasses commit detection. Validated
+- `--force NAME:KIND` - repeatable. Bypasses commit detection. Validated
   upfront ([details](recipes.md#manual-bump)).
 
-`bump` intentionally does **not** take `--since` — combining a custom
+`bump` intentionally does **not** take `--since` - combining a custom
 window with a write+tag can create tags that contradict actual history.
 
 ## `get`
@@ -186,7 +186,7 @@ docker build -t registry/myapp:$TAG .
 ```
 
 Reserved sub-fields (e.g. `multicz get api.image_tag`) are not
-implemented today — only `version` is exposed.
+implemented today - only `version` is exposed.
 
 ## `changelog`
 
@@ -226,9 +226,9 @@ since the immediately previous tag (each RC shows only its delta).
 
 Output formats:
 
-- `md` (default) — sections (`### Features`, `### Fixes`, …)
-- `text` — plain ASCII
-- `json` — `{"sections": [...]}`
+- `md` (default) - sections (`### Features`, `### Fixes`, …)
+- `text` - plain ASCII
+- `json` - `{"sections": [...]}`
 
 ## `artifacts`
 
@@ -244,7 +244,7 @@ multicz artifacts api --version 1.4.0-rc.1
 multicz artifacts --all --output json
 ```
 
-`multicz` does not build or push artifacts itself — this surfaces the
+`multicz` does not build or push artifacts itself - this surfaces the
 rendered refs. The same data is embedded inside
 `multicz plan --output json` and `multicz bump --output json` against
 the planned/applied version.

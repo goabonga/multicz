@@ -641,7 +641,7 @@ def test_changed_excludes_release_commits(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     runner.invoke(app, ["bump", "--commit", "--tag"])  # creates a chore(release): commit
 
-    # No new content commits since the tag — only the release commit.
+    # No new content commits since the tag - only the release commit.
     # Use --since on the init commit to span the entire history.
     sha = _git(repo, "rev-list", "--max-parents=0", "HEAD").strip()
     result = runner.invoke(
@@ -819,7 +819,7 @@ def test_release_notes_json_output(repo: Path, runner: CliRunner):
 
 def test_release_notes_for_past_tag_uses_previous_stable(repo: Path, runner: CliRunner):
     """When asking for notes on a stable tag, multicz looks at commits
-    since the previous *stable* tag — not since the most recent rc."""
+    since the previous *stable* tag - not since the most recent rc."""
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
     runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
     _commit(repo, {"src/main.py": "x = 3\n"}, "fix: bug")
@@ -979,7 +979,7 @@ def test_bump_sign_passes_signing_flags_to_git(
     captured = _capture_git_args(monkeypatch)
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
 
-    # Use --sign — the real `git commit -S` will likely fail in CI without
+    # Use --sign - the real `git commit -S` will likely fail in CI without
     # GPG, but we're inspecting the *args*, not the result.
     runner.invoke(app, ["bump", "--commit", "--tag", "--sign"])
 
@@ -1568,7 +1568,7 @@ def test_post_bump_failure_aborts_bump(
     repo: Path, runner: CliRunner
 ):
     """A non-zero post_bump exit aborts the bump pipeline before
-    committing or tagging — the working tree may have been written to,
+    committing or tagging - the working tree may have been written to,
     but no release commit is created."""
     (repo / "multicz.toml").write_text("""
 [components.api]
@@ -1638,7 +1638,7 @@ def test_post_bump_json_output_has_clean_stdout(
     repo: Path, runner: CliRunner, capsys: pytest.CaptureFixture[str]
 ):
     """`--output json` must keep stdout JSON-parseable even when a
-    post_bump hook fires — the hook header must go to stderr, otherwise
+    post_bump hook fires - the hook header must go to stderr, otherwise
     pipelines that pipe into `jq` choke."""
     (repo / "multicz.toml").write_text("""
 [components.api]
@@ -1662,7 +1662,7 @@ post_bump = ["sh -c 'echo lock > out.lock'"]
 def test_post_bump_runs_only_for_bumped_components(
     repo: Path, runner: CliRunner
 ):
-    """Hooks fire only for components that actually got bumped — a
+    """Hooks fire only for components that actually got bumped - a
     component with `post_bump` that didn't change must stay quiet."""
     (repo / "multicz.toml").write_text("""
 [components.api]

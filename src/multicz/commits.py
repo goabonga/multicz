@@ -91,7 +91,7 @@ class Commit:
         ``minor``: ``feat``.
         ``patch``: ``fix``, ``perf``, ``revert``. A revert is a
         user-visible change (something was removed or restored), and a
-        patch is the conservative answer — the next release isn't a
+        patch is the conservative answer - the next release isn't a
         feature or breaking change, but it isn't nothing either.
 
         Other types (``chore``, ``docs``, ``style``, ``refactor``,

@@ -141,7 +141,7 @@ def test_array_form_with_triggers_resolves(tmp_path: Path):
     )
     config = load_config(target)
     config.validate_references()  # must not raise
-    # 'triggers' is the legacy alias — it is merged into depends_on
+    # 'triggers' is the legacy alias - it is merged into depends_on
     # post-load, so the canonical field is what we assert against.
     assert config.components["downstream"].depends_on == ["base"]
     assert config.components["downstream"].triggers == []
@@ -476,7 +476,7 @@ def test_component_name_too_long_is_rejected(tmp_path: Path):
 
 
 def test_valid_component_names(tmp_path: Path):
-    """The accepted forms — all common naming conventions.
+    """The accepted forms - all common naming conventions.
 
     Dots in TOML keys need quoting (otherwise the parser reads them as
     nested tables), but the *resolved* component name still passes.

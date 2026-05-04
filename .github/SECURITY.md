@@ -6,7 +6,7 @@
 
 Use one of these private channels:
 
-- **Preferred:** GitHub's private vulnerability reporting —
+- **Preferred:** GitHub's private vulnerability reporting -
   <https://github.com/goabonga/multicz/security/advisories/new>
 - Email: <goabonga@pm.me>
 

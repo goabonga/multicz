@@ -3,7 +3,7 @@
 
 """Optional persistent state file written after each successful bump.
 
-Multicz is normally stateless — every command recomputes from git tags
+Multicz is normally stateless - every command recomputes from git tags
 and the in-tree manifests. For monorepos that benefit from a recorded
 "last release" snapshot (audit trail, drift detection between manual
 edits and the planner's view, faster CI gates), opt into a state file

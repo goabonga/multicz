@@ -10,7 +10,7 @@ Three drop-in pipelines wiring `multicz` into a release flow:
 
 All three follow the same five-step flow:
 
-1. **Validate** the multicz config (`multicz validate --strict`) — fail
+1. **Validate** the multicz config (`multicz validate --strict`) - fail
    fast on misconfigured `bump_files`, mirror cycles, etc.
 2. **Plan** (`multicz plan --output json`) and skip the rest when the
    plan is empty.

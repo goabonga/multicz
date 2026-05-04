@@ -9,7 +9,7 @@ Multicz isn't trying to replace
 [Commitizen](https://commitizen-tools.github.io/commitizen/),
 [Changesets](https://github.com/changesets/changesets), or
 [`bump-my-version`](https://github.com/callowayproject/bump-my-version)
-— they're better than multicz at what they're designed for. Multicz
+- they're better than multicz at what they're designed for. Multicz
 exists because none of them cleanly modelled the same shape of
 repository: multiple deliverables, mirrors between them, commits
 driving bumps without writing release notes by hand.
@@ -28,7 +28,7 @@ publishing is left to CI.
 
 ### Commitizen
 
-Has two faces — `cz commit` (interactive wizard for writing
+Has two faces - `cz commit` (interactive wizard for writing
 conventional commits) and `cz bump` (semver bumper). Multicz cares
 about the second; for the first, use `cz commit` *or*
 [`multicz check`](cli.md#check) as a `commit-msg` hook.
@@ -40,7 +40,7 @@ about the second; for the first, use `cz commit` *or*
 
 The state of the art for JS monorepos: each PR adds a "changeset" file
 declaring the intended bump, and the release tool aggregates them.
-That model excels when the team writes the changeset by hand — the
+That model excels when the team writes the changeset by hand - the
 intent is encoded explicitly, not inferred from commits.
 
 It's less natural when you also have a Helm chart that should mirror
@@ -51,14 +51,14 @@ workspace member.
 
 Successor to `bump2version`. Great for the "many files, one version"
 problem: pattern-based replacements across version strings that need
-to stay in sync. It doesn't read commits — you tell it the bump kind
+to stay in sync. It doesn't read commits - you tell it the bump kind
 explicitly. Multicz keeps the multi-file substitution and adds commit
 detection plus per-component independence.
 
 ### Other related tools
 
 `release-please`, `poetry-bumpversion`, `knope`, `cargo-release`,
-`hatch version` — each solves a slice of the problem. None I tried can
+`hatch version` - each solves a slice of the problem. None I tried can
 express *"a commit touching `src/` bumps `api` minor; the chart
 cascades a patch because its `appVersion` mirrors api"* in a single
 config without scripting around the tool.
@@ -67,8 +67,8 @@ config without scripting around the tool.
 
 - **Components, not packages.** Everything is keyed by component name
   (`api`, `chart`, `frontend`). A component can be backed by any
-  manifest — `pyproject.toml`, `Chart.yaml`, `package.json`,
-  `Cargo.toml`, `go.mod`, `gradle.properties`, `debian/changelog` —
+  manifest - `pyproject.toml`, `Chart.yaml`, `package.json`,
+  `Cargo.toml`, `go.mod`, `gradle.properties`, `debian/changelog` -
   or none at all (tag-driven Go modules).
 - **File ownership via globs.** `paths = ["src/**", "Dockerfile"]`
   declares what a component owns, gitignore-style. Multiple components
@@ -105,4 +105,4 @@ config without scripting around the tool.
 
 If your repo has multiple deliverables, mirrors between them, and you
 want commits to drive the bumps without writing release notes by hand
-— that's the case multicz exists for.
+- that's the case multicz exists for.

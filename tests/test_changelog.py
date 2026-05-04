@@ -77,7 +77,7 @@ def test_render_breaking_disabled_falls_through():
     sections = [ChangelogSection(title="Features", types=["feat"])]
     commits = [parse_commit("a", "feat!: rewrite", ())]
     body = render_body(commits, sections=sections, breaking_title="")
-    # no Breaking changes header — the breaking commit lands in Features
+    # no Breaking changes header - the breaking commit lands in Features
     assert "### Breaking" not in body
     assert "### Features" in body
     assert "rewrite" in body
@@ -104,7 +104,7 @@ def test_render_cascades_replace_no_notable_placeholder():
 
 
 def test_render_cascades_alongside_commits():
-    """Commits and cascades coexist — cascades land in their own H3
+    """Commits and cascades coexist - cascades land in their own H3
     section after the commit-driven sections."""
     from multicz.changelog import CascadeEntry
 

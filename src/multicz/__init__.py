@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-"""multicz — multi-component versioning for monorepos."""
+"""multicz - multi-component versioning for monorepos."""
 
 from importlib.metadata import PackageNotFoundError, version
 

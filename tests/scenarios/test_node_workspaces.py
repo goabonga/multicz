@@ -66,7 +66,7 @@ bump_files = [{ file = "packages/keep/package.json", key = "version" }]
         "packages/legacy/package.json": '{"name": "legacy", "version": "0.1.0"}\n',
         "packages/legacy/src/index.ts": "export const a = 1;\n",
     })
-    # Touch BOTH packages — only `keep` should appear in the plan.
+    # Touch BOTH packages - only `keep` should appear in the plan.
     commit(
         {
             "packages/keep/src/index.ts": "export const a = 2;\n",

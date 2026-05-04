@@ -19,8 +19,8 @@ component:
 The list of section buckets and their titles is configurable via
 ``ProjectSettings.changelog_sections`` so each project can pick its own
 vocabulary (Features/Fixes vs. keep-a-changelog's Added/Changed/Fixed,
-etc.). Commits whose type matches no section are silently dropped — keep
-the changelog focused on user-visible changes — unless
+etc.). Commits whose type matches no section are silently dropped - keep
+the changelog focused on user-visible changes - unless
 ``other_section_title`` is set, which buckets them under that title.
 
 When written into an existing file the new section lands directly after
@@ -226,7 +226,7 @@ def update_changelog_file(
     """Render a new section and merge it into ``path`` (creating the file if needed).
 
     ``drop_prereleases=True`` removes any prior ``## [<version>-<pre>.<n>]``
-    sections from the file before inserting the new release section —
+    sections from the file before inserting the new release section -
     used by the ``promote`` finalize strategy.
     """
     section = render_section(

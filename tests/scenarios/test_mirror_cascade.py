@@ -6,7 +6,7 @@
 A single api commit must:
 
   - bump api (direct, from the commit's bump_kind)
-  - cause the chart to bump as patch (mirror cascade — the mirror
+  - cause the chart to bump as patch (mirror cascade - the mirror
     writes into a file owned by the chart, the chart's own version
     therefore needs to move)
   - record both an explicit ``mirror`` reason on the chart and the

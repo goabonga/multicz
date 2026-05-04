@@ -86,7 +86,7 @@ recipe](recipes.md#fastapi-helm) for the full flow.
 ## First bump
 
 Make sure git history has at least one conventional commit (`feat:`,
-`fix:`, `perf:`) since the component's initial tag — or its initial
+`fix:`, `perf:`) since the component's initial tag - or its initial
 version if no tags exist yet.
 
 ```bash
@@ -96,7 +96,7 @@ multicz bump --dry-run      # plan without writing
 multicz bump                # apply (no commit, no tag)
 ```
 
-To release in one shot — write, commit, tag, push:
+To release in one shot - write, commit, tag, push:
 
 ```bash
 multicz bump --commit --tag --push
@@ -140,8 +140,8 @@ existing manifest:
     }
     ```
 
-A `pyproject.toml` without `[tool.multicz]` is silently skipped — it's
-not treated as the multicz config — so projects that already have a
+A `pyproject.toml` without `[tool.multicz]` is silently skipped - it's
+not treated as the multicz config - so projects that already have a
 pyproject for tooling reasons aren't hijacked. See [config
 discovery](concepts.md#config-discovery).
 

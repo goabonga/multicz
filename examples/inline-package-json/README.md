@@ -1,7 +1,7 @@
 # Inline config in `package.json`
 
 An npm-workspace monorepo where `multicz` reads its config from the
-top-level `"multicz"` key inside `package.json` — no separate
+top-level `"multicz"` key inside `package.json` - no separate
 `multicz.toml` file.
 
 ```
@@ -76,5 +76,5 @@ multicz status
 multicz bump --dry-run
 ```
 
-`multicz` finds `"multicz"` inside `package.json` automatically — no
+`multicz` finds `"multicz"` inside `package.json` automatically - no
 arguments needed.

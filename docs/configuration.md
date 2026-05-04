@@ -140,7 +140,7 @@ Default `"ignore"`. How to treat a commit that doesn't match
 
 | value | planner behaviour |
 |---|---|
-| `ignore` (default) | silent skip — backwards-compatible |
+| `ignore` (default) | silent skip - backwards-compatible |
 | `patch` | the commit produces a `NonConventionalReason` at patch level, visible in plan / explain / JSON |
 | `error` | refuse to plan, list every offending SHA with a remediation hint |
 
@@ -245,7 +245,7 @@ output. Incompatible with `format = "debian"`.
 ### `artifacts` { #artifacts }
 
 Default `[]`. Declares what CI should build/push for this component.
-`multicz` does not build or push — it surfaces the rendered refs.
+`multicz` does not build or push - it surfaces the rendered refs.
 
 ```toml
 [[components.api.artifacts]]

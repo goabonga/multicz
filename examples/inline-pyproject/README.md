@@ -1,7 +1,7 @@
 # Inline config in `pyproject.toml`
 
 A FastAPI backend + React SPA monorepo where `multicz` reads its config
-from `[tool.multicz]` inside the existing `pyproject.toml` — no
+from `[tool.multicz]` inside the existing `pyproject.toml` - no
 separate `multicz.toml` file.
 
 ```
@@ -34,5 +34,5 @@ multicz status
 multicz bump --dry-run
 ```
 
-`multicz` finds `[tool.multicz]` in `pyproject.toml` automatically — no
+`multicz` finds `[tool.multicz]` in `pyproject.toml` automatically - no
 arguments needed.

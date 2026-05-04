@@ -5,15 +5,15 @@
 
 Supports five formats, dispatched by file extension:
 
-* ``.toml`` via :mod:`tomlkit` — preserves comments, key order, whitespace.
-* ``.yaml`` / ``.yml`` via :mod:`ruamel.yaml` — preserves comments and style.
-* ``.json`` via :mod:`json` — preserves key order and detected indentation.
-* ``.properties`` — line-based key=value substitution, preserves comments.
-* anything else — treated as a plain text file holding only the version.
+* ``.toml`` via :mod:`tomlkit` - preserves comments, key order, whitespace.
+* ``.yaml`` / ``.yml`` via :mod:`ruamel.yaml` - preserves comments and style.
+* ``.json`` via :mod:`json` - preserves key order and detected indentation.
+* ``.properties`` - line-based key=value substitution, preserves comments.
+* anything else - treated as a plain text file holding only the version.
 
 A ``key`` is a dotted path (``project.version``, ``image.tag``). Passing
 ``None`` means the whole file is one version literal. For ``.properties``
-files the dotted-path interpretation is disabled — the key is taken
+files the dotted-path interpretation is disabled - the key is taken
 verbatim, since properties files routinely use dotted keys (``a.b.c``)
 that are *not* nested.
 

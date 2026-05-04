@@ -81,7 +81,7 @@ def _check_bump_files_exist(repo: Path, config: Config) -> Iterator[Finding]:
 def _check_path_overlaps(repo: Path, config: Config) -> Iterator[Finding]:
     """Detect when multiple components claim the same file.
 
-    The reported level — and whether the finding is reported at all —
+    The reported level - and whether the finding is reported at all -
     depends on ``project.overlap_policy``:
 
     * ``error`` (default): refuse to plan/bump until the user resolves
@@ -143,7 +143,7 @@ def _check_path_overlaps(repo: Path, config: Config) -> Iterator[Finding]:
     else:  # all
         level = "info"
         suffix = (
-            "overlap_policy = 'all' is in effect — every claiming "
+            "overlap_policy = 'all' is in effect - every claiming "
             "component bumps when the shared file changes."
         )
 
@@ -303,7 +303,7 @@ def _check_state_drift(repo: Path, config: Config) -> Iterator[Finding]:
                 component=name,
                 message=(
                     f"state recorded version {comp_state.version!r} but "
-                    f"{primary.file.as_posix()} now reads {current!r} — "
+                    f"{primary.file.as_posix()} now reads {current!r} - "
                     "someone may have edited the file outside multicz bump"
                 ),
             )
