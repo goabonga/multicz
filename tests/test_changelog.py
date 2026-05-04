@@ -132,6 +132,123 @@ def test_cascade_section_title_empty_disables_rendering():
     assert "Track" not in body
 
 
+def test_cascade_per_entry_format_overrides_default():
+    """A CascadeEntry.format takes precedence over the global cascade_format."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [],
+        cascades=[
+            CascadeEntry(
+                upstream="api",
+                upstream_version="0.1.1",
+                format="Sync app to {upstream_version}",
+            )
+        ],
+    )
+    assert "### Dependencies" in body
+    assert "Sync app to 0.1.1" in body
+    assert "Track" not in body
+
+
+def test_cascade_per_entry_section_creates_new_section():
+    """A custom section name that doesn't match any commit-driven section
+    renders as a fresh H3 after the commit sections."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [parse_commit("a", "feat: ingress", ())],
+        cascades=[
+            CascadeEntry(
+                upstream="api",
+                upstream_version="0.1.1",
+                section="Subchart updates",
+            )
+        ],
+    )
+    assert "### Features" in body
+    assert "### Subchart updates" in body
+    assert "### Dependencies" not in body
+    # Features (commits) before Subchart updates (cascade-only).
+    assert body.index("### Features") < body.index("### Subchart updates")
+
+
+def test_cascade_per_entry_section_merges_into_existing_bucket():
+    """When a cascade entry targets an existing commit-driven section,
+    the line is appended at the bottom of that section instead of
+    creating a parallel one."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [parse_commit("a", "feat: ingress", ())],
+        cascades=[
+            CascadeEntry(
+                upstream="api",
+                upstream_version="0.1.1",
+                section="Features",
+                format="Ship api {upstream_version}",
+            )
+        ],
+    )
+    assert body.count("### Features") == 1
+    # Both the commit line and the cascade line are under the same H3.
+    features_idx = body.index("### Features")
+    next_section_idx = body.find("### ", features_idx + 1)
+    block = body[features_idx:next_section_idx if next_section_idx != -1 else len(body)]
+    assert "ingress" in block
+    assert "Ship api 0.1.1" in block
+
+
+def test_cascades_grouped_by_resolved_section():
+    """Multiple cascade entries pointing at the same custom section land
+    under one shared H3, in the order they were declared."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [],
+        cascades=[
+            CascadeEntry(
+                upstream="chart-api",
+                upstream_version="0.4.1",
+                section="Subchart updates",
+                format="Bump `myapp-api` dependency to `{upstream_version}`",
+            ),
+            CascadeEntry(
+                upstream="chart-web",
+                upstream_version="0.4.1",
+                section="Subchart updates",
+                format="Bump `myapp-web` dependency to `{upstream_version}`",
+            ),
+        ],
+    )
+    assert body.count("### Subchart updates") == 1
+    assert "Bump `myapp-api` dependency to `0.4.1`" in body
+    assert "Bump `myapp-web` dependency to `0.4.1`" in body
+    # Insertion order preserved.
+    assert body.index("myapp-api") < body.index("myapp-web")
+
+
+def test_cascades_with_mixed_default_and_custom_sections():
+    """Some entries default (Dependencies), others routed to a custom
+    section — both render side by side."""
+    from multicz.changelog import CascadeEntry
+
+    body = render_body(
+        [],
+        cascades=[
+            CascadeEntry(upstream="api", upstream_version="0.1.1"),  # default
+            CascadeEntry(
+                upstream="lib",
+                upstream_version="2.0.0",
+                section="Subchart updates",
+            ),
+        ],
+    )
+    assert "### Dependencies" in body
+    assert "### Subchart updates" in body
+    assert "Track `api` `0.1.1`" in body
+
+
 def test_cascade_format_is_templated():
     from multicz.changelog import CascadeEntry
 
