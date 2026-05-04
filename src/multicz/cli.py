@@ -1393,10 +1393,33 @@ def bump(
                         upstream_planned = plan.bumps.get(reason.upstream)
                         if upstream_planned is None:
                             continue
+                        # When the cascade comes from a mirror, look up
+                        # the matching mirror declaration on the upstream
+                        # component to pick up its optional
+                        # `changelog_section` / `changelog_format`. Trigger
+                        # cascades have no such customization handle and
+                        # always use the project-level defaults.
+                        section_override: str | None = None
+                        format_override: str | None = None
+                        if isinstance(reason, MirrorReason):
+                            upstream_component = config.components.get(
+                                reason.upstream
+                            )
+                            if upstream_component is not None:
+                                for mirror in upstream_component.mirrors:
+                                    if (
+                                        str(mirror.file) == reason.file
+                                        and mirror.key == reason.key
+                                    ):
+                                        section_override = mirror.changelog_section
+                                        format_override = mirror.changelog_format
+                                        break
                         cascade_entries.append(
                             CascadeEntry(
                                 upstream=reason.upstream,
                                 upstream_version=upstream_planned.next,
+                                section=section_override,
+                                format=format_override,
                             )
                         )
                         seen_upstreams.add(reason.upstream)
