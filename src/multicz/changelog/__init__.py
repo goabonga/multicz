@@ -36,8 +36,9 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from .commits import Commit
-from .config import ChangelogSection, _default_changelog_sections
+from ..commits import Commit
+from ..config import ChangelogSection, _default_changelog_sections
+from .bucket import BucketedCommits, bucket_commits, filter_commits
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,12 @@ def render_body(
     commits otherwise apply.
     """
     sections = list(sections) if sections is not None else _default_changelog_sections()
-    relevant = [c for c in commits if c.is_conventional]
+    bucketed = bucket_commits(
+        commits,
+        sections=sections,
+        breaking_title=breaking_title,
+        other_title=other_title,
+    )
 
     # Group cascades by their *resolved* section name. Per-entry overrides
     # take precedence over the global cascade_title; an empty resolved
@@ -112,32 +118,8 @@ def render_body(
             )
             cascade_groups.setdefault(section_name, []).append(line)
 
-    if not relevant and not cascade_groups:
+    if bucketed.is_empty and not cascade_groups:
         return "_No notable changes._\n"
-
-    breaking: list[Commit] = []
-    if breaking_title:
-        breaking = [c for c in relevant if c.breaking]
-
-    commit_buckets: dict[str, list[Commit]] = {}
-    breaking_set = {id(c) for c in breaking}
-    for section in sections:
-        type_set = {t.lower() for t in section.types}
-        items = [
-            c for c in relevant
-            if id(c) not in breaking_set and c.type.lower() in type_set
-        ]
-        if items:
-            commit_buckets[section.title] = items
-
-    if other_title:
-        claimed = {t.lower() for s in sections for t in s.types}
-        leftovers = [
-            c for c in relevant
-            if id(c) not in breaking_set and c.type.lower() not in claimed
-        ]
-        if leftovers:
-            commit_buckets[other_title] = leftovers
 
     def _commit_line(commit: Commit) -> str:
         scope = f"**{commit.scope}**: " if commit.scope else ""
@@ -150,19 +132,19 @@ def render_body(
     # bucket rather than creating a parallel one.
     ordered: list[tuple[str, list[str]]] = []
 
-    if breaking:
-        merged = [_commit_line(c) for c in breaking]
+    if bucketed.breaking:
+        merged = [_commit_line(c) for c in bucketed.breaking]
         merged.extend(cascade_groups.pop(breaking_title, []))
         ordered.append((breaking_title, merged))
 
     for section in sections:
-        if section.title in commit_buckets:
-            merged = [_commit_line(c) for c in commit_buckets[section.title]]
+        if section.title in bucketed.by_section:
+            merged = [_commit_line(c) for c in bucketed.by_section[section.title]]
             merged.extend(cascade_groups.pop(section.title, []))
             ordered.append((section.title, merged))
 
-    if other_title and other_title in commit_buckets:
-        merged = [_commit_line(c) for c in commit_buckets[other_title]]
+    if other_title and bucketed.leftovers:
+        merged = [_commit_line(c) for c in bucketed.leftovers]
         merged.extend(cascade_groups.pop(other_title, []))
         ordered.append((other_title, merged))
 

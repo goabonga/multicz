@@ -32,8 +32,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import format_datetime
 
+from .changelog.bucket import filter_commits
 from .commits import Commit
-from .config import ChangelogSection, _default_changelog_sections
+from .config import ChangelogSection
 
 _HEADER_RE = re.compile(
     r"^(?P<package>[a-z0-9][a-z0-9+\-.]*)\s+"
@@ -218,25 +219,12 @@ def render_stanza(
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)
 
-    sections = list(sections) if sections is not None else _default_changelog_sections()
-    section_types = {t.lower() for s in sections for t in s.types}
-    keep_breaking = bool(breaking_title)
-    keep_leftovers = bool(other_title)
-
-    filtered: list[Commit] = []
-    for c in commits:
-        if not c.is_conventional:
-            continue
-        if keep_breaking and c.breaking:
-            filtered.append(c)
-            continue
-        if c.type.lower() in section_types:
-            filtered.append(c)
-            continue
-        if keep_leftovers:
-            filtered.append(c)
-            continue
-
+    filtered = filter_commits(
+        commits,
+        sections=sections,
+        breaking_title=breaking_title,
+        other_title=other_title,
+    )
     body = (
         "\n".join(_bullet(c) for c in filtered)
         if filtered
