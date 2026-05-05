@@ -38,8 +38,9 @@ from pathlib import Path
 import tomlkit
 from ruamel.yaml import YAML
 
-from .changelog import parse_top_stanza
-from .config import Component, DebianSettings, FileKey
+from ..changelog import parse_top_stanza
+from ..config import Component, DebianSettings, FileKey
+from .context import DiscoveryContext, DiscoveryResult  # noqa: F401
 
 _GRADLE_NAME_RE = re.compile(
     r"rootProject\.name\s*=\s*['\"]([^'\"]+)['\"]"
