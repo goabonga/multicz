@@ -20,314 +20,29 @@ upgraded (e.g. patch → minor) but never downgraded.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
 
 from packaging.version import InvalidVersion, Version
 
-from .commits import (
+from ..commits import (
     BumpKind,
     commits_since,
     latest_tag,
     latest_version,
     tag_prefix,
 )
-from .config import ComponentMatcher, Config
-from .formats import FormatError, read_value
-
-_KIND_ORDER: dict[BumpKind, int] = {"patch": 1, "minor": 2, "major": 3}
-
-
-def _stronger(a: BumpKind | None, b: BumpKind | None) -> BumpKind | None:
-    if a is None:
-        return b
-    if b is None:
-        return a
-    return a if _KIND_ORDER[a] >= _KIND_ORDER[b] else b
-
-
-def aggregate_kind(kinds: Iterable[BumpKind | None]) -> BumpKind | None:
-    result: BumpKind | None = None
-    for kind in kinds:
-        result = _stronger(result, kind)
-    return result
-
-
-def bump_version(version: Version, kind: BumpKind) -> Version:
-    major, minor, patch = version.major, version.minor, version.micro
-    if kind == "major":
-        return Version(f"{major + 1}.0.0")
-    if kind == "minor":
-        return Version(f"{major}.{minor + 1}.0")
-    return Version(f"{major}.{minor}.{patch + 1}")
-
-
-# PEP 440 normalises 'a'/'b'/'c' into 'alpha'/'beta'/'rc' shapes; we keep a
-# dictionary of common aliases so 1.3.0-rc.1 and 1.3.0-c.1 collapse to the
-# same cycle.
-_PRE_ALIASES = {"a": "alpha", "b": "beta", "c": "rc", "pre": "rc", "preview": "rc"}
-
-
-def _norm_pre_label(label: str) -> str:
-    label = label.lower()
-    return _PRE_ALIASES.get(label, label)
-
-
-VersionScheme = Literal["semver", "pep440"]
-
-# PEP 440 canonical labels: 'a' / 'b' / 'rc'. We accept both compact and
-# spelled-out forms on input; output uses canonical compact labels for
-# the pep440 scheme.
-_PEP440_COMPACT = {"alpha": "a", "beta": "b", "c": "rc", "pre": "rc", "preview": "rc"}
-
-
-def _render_pre(
-    base: str, label: str, num: int, scheme: VersionScheme
-) -> str:
-    """Render ``base + pre-release suffix`` in the requested scheme."""
-    if scheme == "pep440":
-        compact = _PEP440_COMPACT.get(label.lower(), label.lower())
-        return f"{base}{compact}{num}"
-    # semver default
-    return f"{base}-{label}.{num}"
-
-
-def compute_next(
-    current: Version,
-    kind: BumpKind,
-    *,
-    pre: str | None = None,
-    finalize: bool = False,
-    scheme: VersionScheme = "semver",
-) -> str:
-    """Compute the next version string given ``kind`` and optional pre-release flags.
-
-    Output is rendered in the chosen ``scheme``:
-
-    * ``semver`` (default): ``1.3.0-rc.1`` - npm, Cargo, Helm, generic
-    * ``pep440``: ``1.3.0rc1`` - strict canonical Python form
-
-    Either form can be re-parsed by :class:`packaging.version.Version` so
-    ordering is preserved across both. The behavior matrix below uses
-    semver rendering for readability.
-
-    +-------------+----------+-----------+------------------+----------------------+
-    | current     | --pre    | --finalize| result (semver)  | meaning              |
-    +-------------+----------+-----------+------------------+----------------------+
-    | 1.2.3       | None     | False     | 1.3.0            | regular bump (feat)  |
-    | 1.2.3       | rc       | False     | 1.3.0-rc.1       | enter RC cycle       |
-    | 1.3.0-rc.1  | None     | False     | 1.3.0            | auto-finalize        |
-    | 1.3.0-rc.1  | None     | True      | 1.3.0            | explicit finalize    |
-    | 1.3.0-rc.1  | rc       | False     | 1.3.0-rc.2       | next RC              |
-    | 1.3.0-rc.1  | beta     | False     | 1.3.0-beta.1     | switch label         |
-    +-------------+----------+-----------+------------------+----------------------+
-    """
-    base = f"{current.major}.{current.minor}.{current.micro}"
-
-    if finalize:
-        if current.is_prerelease:
-            return base
-        bumped = bump_version(current, kind)
-        return f"{bumped.major}.{bumped.minor}.{bumped.micro}"
-
-    if pre is None:
-        if current.is_prerelease:
-            return base
-        bumped = bump_version(current, kind)
-        return f"{bumped.major}.{bumped.minor}.{bumped.micro}"
-
-    # pre is set: entering or continuing a pre-release cycle
-    if current.is_prerelease and current.pre is not None:
-        existing = _norm_pre_label(current.pre[0])
-        wanted = _norm_pre_label(pre)
-        if existing == wanted:
-            counter = (current.pre[1] or 0) + 1
-            return _render_pre(base, pre, counter, scheme)
-        # Different label, same target version
-        return _render_pre(base, pre, 1, scheme)
-
-    # Currently a final release: bump first, then enter the pre cycle
-    target = bump_version(current, kind)
-    target_base = f"{target.major}.{target.minor}.{target.micro}"
-    return _render_pre(target_base, pre, 1, scheme)
-
-
-@dataclass(frozen=True)
-class CommitReason:
-    """A planned bump driven by a conventional commit landing on this component."""
-
-    sha: str
-    type: str
-    scope: str | None
-    breaking: bool
-    subject: str
-    files: tuple[str, ...]  # files matched into THIS component (subset of commit.files)
-    bump_kind: BumpKind
-    # When ``bump_policy = "scoped"`` demotes this commit's natural kind
-    # (e.g. minor -> patch because the scope points at another component),
-    # ``original_kind`` records what would have been used otherwise.
-    # ``None`` means no demotion happened.
-    original_kind: BumpKind | None = None
-
-    def summary(self) -> str:
-        bang = "!" if self.breaking else ""
-        scope = f"({self.scope})" if self.scope else ""
-        head = f"{self.sha[:7]} {self.type}{scope}{bang}: {self.subject}"
-        if self.original_kind is not None:
-            head += f" [demoted: {self.original_kind} -> {self.bump_kind}]"
-        return head
-
-    def to_dict(self) -> dict:
-        return {
-            "kind": "commit",
-            "sha": self.sha,
-            "type": self.type,
-            "scope": self.scope,
-            "breaking": self.breaking,
-            "subject": self.subject,
-            "files": list(self.files),
-            "bump_kind": self.bump_kind,
-            "original_kind": self.original_kind,
-        }
-
-
-@dataclass(frozen=True)
-class TriggerReason:
-    """A planned bump cascaded from a declared upstream component."""
-
-    upstream: str
-    upstream_kind: BumpKind
-
-    def summary(self) -> str:
-        return f"triggered by {self.upstream} ({self.upstream_kind})"
-
-    def to_dict(self) -> dict:
-        return {
-            "kind": "trigger",
-            "upstream": self.upstream,
-            "upstream_kind": self.upstream_kind,
-        }
-
-
-@dataclass(frozen=True)
-class MirrorReason:
-    """A planned bump cascaded from a mirror writing into this component's path."""
-
-    upstream: str
-    file: str
-    key: str | None
-
-    def summary(self) -> str:
-        target = self.file if self.key is None else f"{self.file}:{self.key}"
-        return f"mirror cascade from {self.upstream} ({target})"
-
-    def to_dict(self) -> dict:
-        return {
-            "kind": "mirror",
-            "upstream": self.upstream,
-            "file": self.file,
-            "key": self.key,
-        }
-
-
-@dataclass(frozen=True)
-class ManualReason:
-    """A planned bump that came from a CLI flag (``--finalize``, force-bump,
-    …) rather than a commit, trigger, or mirror."""
-
-    note: str
-
-    def summary(self) -> str:
-        return self.note
-
-    def to_dict(self) -> dict:
-        return {"kind": "manual", "note": self.note}
-
-
-@dataclass(frozen=True)
-class NonConventionalReason:
-    """A planned bump driven by a commit that did NOT match the conventional
-    commit grammar. Only produced when
-    ``project.unknown_commit_policy = "patch"``.
-    """
-
-    sha: str
-    subject: str  # the commit's first line, verbatim
-    files: tuple[str, ...]
-    bump_kind: BumpKind = "patch"
-
-    def summary(self) -> str:
-        return f"{self.sha[:7]} (non-conventional): {self.subject}"
-
-    def to_dict(self) -> dict:
-        return {
-            "kind": "non_conventional",
-            "sha": self.sha,
-            "subject": self.subject,
-            "files": list(self.files),
-            "bump_kind": self.bump_kind,
-        }
-
-
-Reason = (
-    CommitReason | TriggerReason | MirrorReason | ManualReason | NonConventionalReason
+from ..config import ComponentMatcher, Config
+from ..formats import FormatError, read_value
+from .plan import Plan, PlannedBump, _stronger
+from .reasons import (
+    CommitReason,
+    ManualReason,
+    MirrorReason,
+    NonConventionalCommitsError,
+    NonConventionalReason,
+    Reason,
+    TriggerReason,
 )
-
-
-class NonConventionalCommitsError(RuntimeError):
-    """Raised when ``unknown_commit_policy = "error"`` and the planner
-    encountered at least one non-conventional commit in scope.
-    """
-
-    def __init__(self, offenders: list[tuple[str, str]]) -> None:
-        # offenders: list of (sha, first_line)
-        self.offenders = offenders
-        super().__init__(
-            f"{len(offenders)} non-conventional commit(s) blocking the plan"
-        )
-
-
-@dataclass
-class PlannedBump:
-    component: str
-    current: Version
-    kind: BumpKind
-    reasons: list[Reason] = field(default_factory=list)
-    pre: str | None = None
-    finalize: bool = False
-    scheme: VersionScheme = "semver"
-
-    @property
-    def next(self) -> str:
-        """The new version, rendered in this component's :attr:`scheme`."""
-        return compute_next(
-            self.current,
-            self.kind,
-            pre=self.pre,
-            finalize=self.finalize,
-            scheme=self.scheme,
-        )
-
-    @property
-    def next_version(self) -> Version:
-        """Parsed Version of :attr:`next` (for ordering)."""
-        return Version(self.next)
-
-    def reason_summaries(self) -> list[str]:
-        return [r.summary() for r in self.reasons]
-
-
-@dataclass
-class Plan:
-    bumps: dict[str, PlannedBump] = field(default_factory=dict)
-
-    def __bool__(self) -> bool:
-        return bool(self.bumps)
-
-    def __iter__(self):
-        return iter(self.bumps.values())
 
 
 def _promote(
@@ -372,7 +87,7 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
 
     comp = config.components[name]
     if comp.format == "debian" and comp.debian is not None:
-        from .changelog import from_debian_pre, parse_top_version, upstream_version
+        from ..changelog import from_debian_pre, parse_top_version, upstream_version
 
         changelog_path = repo / comp.debian.changelog
         if changelog_path.is_file():
