@@ -34,8 +34,7 @@ from .commits import (
     latest_version,
     tag_prefix,
 )
-from .components import ComponentMatcher
-from .config import Config
+from .config import ComponentMatcher, Config
 from .formats import FormatError, read_value
 
 _KIND_ORDER: dict[BumpKind, int] = {"patch": 1, "minor": 2, "major": 3}

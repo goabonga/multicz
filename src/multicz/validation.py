@@ -21,8 +21,7 @@ from typing import Literal
 
 import pathspec
 
-from .components import ComponentMatcher
-from .config import Config
+from .config import ComponentMatcher, Config
 
 Level = Literal["error", "warning", "info"]
 

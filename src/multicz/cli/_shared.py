@@ -17,8 +17,7 @@ from ..commits import (
     latest_tag,
     tag_prefix,
 )
-from ..components import ComponentMatcher
-from ..config import find_config, load_config
+from ..config import ComponentMatcher, find_config, load_config
 from ..planner import (
     MirrorReason,
     NonConventionalCommitsError,

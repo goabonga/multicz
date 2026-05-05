@@ -17,7 +17,7 @@ from ...commits import (
     previous_tag,
     tag_prefix,
 )
-from ...components import ComponentMatcher
+from ...config import ComponentMatcher
 from .. import app, err, presenters
 from .._shared import (
     _build_plan_or_exit,

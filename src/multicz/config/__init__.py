@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-"""multicz config: schema (models.py) + source loading (sources.py)."""
+"""multicz config: schema (models.py) + source loading (sources.py) +
+path-to-component matching (components.py)."""
 
 from __future__ import annotations
 
+from .components import ComponentMatcher
 from .models import (
     Artifact,
     ChangelogSection,
@@ -33,6 +35,7 @@ __all__ = [
     "Artifact",
     "ChangelogSection",
     "Component",
+    "ComponentMatcher",
     "Config",
     "ConfigSource",
     "DebianSettings",

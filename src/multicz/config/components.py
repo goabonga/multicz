@@ -16,7 +16,7 @@ from collections.abc import Iterable
 
 import pathspec
 
-from .config import Component
+from .models import Component
 
 
 class ComponentMatcher:

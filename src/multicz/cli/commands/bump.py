@@ -19,7 +19,7 @@ from ...changelog import (
     render_stanza,
     update_changelog_file,
 )
-from ...components import ComponentMatcher
+from ...config import ComponentMatcher
 from ...formats import write_value
 from ...state import (
     STATE_SCHEMA_VERSION,

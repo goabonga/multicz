@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-from multicz.components import ComponentMatcher
-from multicz.config import Component
+from multicz.config import Component, ComponentMatcher
 
 
 def test_first_match_wins():

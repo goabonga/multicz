@@ -8,7 +8,7 @@ from __future__ import annotations
 import typer
 
 from ...commits import commits_since, latest_tag, tag_prefix
-from ...components import ComponentMatcher
+from ...config import ComponentMatcher
 from .. import app, err, presenters
 from .._shared import _build_plan_or_exit, _load
 from ..results import ChangelogEntry

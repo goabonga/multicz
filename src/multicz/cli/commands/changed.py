@@ -10,7 +10,7 @@ import re
 import typer
 
 from ...commits import commits_since, latest_tag, tag_prefix
-from ...components import ComponentMatcher
+from ...config import ComponentMatcher
 from .. import app, presenters
 from .._shared import _commit_header, _load
 from ..results import ChangedReport
