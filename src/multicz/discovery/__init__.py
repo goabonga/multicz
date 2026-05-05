@@ -60,11 +60,24 @@ __all__ = [
 ]
 
 
-def discover_components(repo: Path) -> dict[str, Component]:
-    """Return a fresh component map populated from manifests found under ``repo``."""
+def discover_components(
+    repo: Path,
+    *,
+    skip: set[str] | None = None,
+) -> dict[str, Component]:
+    """Return a fresh component map populated from manifests found under ``repo``.
+
+    ``skip`` filters out discovery strategies whose ``name`` matches any
+    entry in the set (e.g. ``{"helm", "gradle"}`` to ignore those two
+    ecosystems entirely). Relations always run — when a strategy was
+    skipped its components simply aren't there and the relation no-ops.
+    """
+    skip = skip or set()
     context = DiscoveryContext(repo=repo)
 
     for discoverer in DISCOVERERS:
+        if discoverer.name in skip:
+            continue
         for result in discoverer.discover(repo, context):
             name = context.unique(result.raw_name, result.suffix)
             context.register(name, result)

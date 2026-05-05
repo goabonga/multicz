@@ -128,6 +128,12 @@ def init(
         "text", "--output", "-o",
         help="text | json (only meaningful with --detect)",
     ),
+    skip: str = typer.Option(
+        "", "--skip",
+        help="Comma-separated list of discovery strategies to disable "
+             "(e.g. 'helm,gradle'). Recognised names: python, cargo, "
+             "gradle, go, helm.",
+    ),
 ) -> None:
     """Generate a multicz.toml tailored to the working tree.
 
@@ -153,10 +159,12 @@ def init(
 
     target_dir = path or Path.cwd()
 
+    skip_set = {s.strip() for s in skip.split(",") if s.strip()}
+
     # Compute components (or skip when --bare)
     components: dict[str, Component] | None = None
     if not bare:
-        components = discover_components(target_dir)
+        components = discover_components(target_dir, skip=skip_set)
         if not components:
             err.print(
                 "[yellow]no manifests detected[/] under "
