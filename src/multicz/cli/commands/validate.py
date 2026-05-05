@@ -8,7 +8,7 @@ from __future__ import annotations
 import typer
 
 from ...validation import validate as run_validation
-from .. import app, console
+from .. import app, presenters
 from .._shared import _load
 
 
@@ -51,47 +51,7 @@ def validate_cmd(
     warnings = [f for f in findings if f.level == "warning"]
     infos = [f for f in findings if f.level == "info"]
 
-    if output == "json":
-        console.print_json(data={
-            "findings": [f.to_dict() for f in findings],
-            "summary": {
-                "errors": len(errors),
-                "warnings": len(warnings),
-                "info": len(infos),
-            },
-        })
-    else:
-        if not findings:
-            console.print("[green]✓ no issues found[/]")
-        else:
-            colors = {"error": "red", "warning": "yellow", "info": "blue"}
-            tags = {"error": "✗", "warning": "!", "info": "i"}
-            for finding in findings:
-                color = colors[finding.level]
-                tag = tags[finding.level]
-                comp = (
-                    f"[bold]{finding.component}[/]: "
-                    if finding.component
-                    else ""
-                )
-                console.print(
-                    f"[{color}]{tag}[/] {comp}{finding.message}  "
-                    f"[dim]({finding.check})[/]"
-                )
-            console.print()
-            counts: list[str] = []
-            if errors:
-                counts.append(
-                    f"[red]{len(errors)} error{'s' if len(errors) != 1 else ''}[/]"
-                )
-            if warnings:
-                counts.append(
-                    f"[yellow]{len(warnings)} "
-                    f"warning{'s' if len(warnings) != 1 else ''}[/]"
-                )
-            if infos:
-                counts.append(f"[blue]{len(infos)} info[/]")
-            console.print(", ".join(counts))
+    presenters.render_validate(findings, errors, warnings, infos, output=output)
 
     if errors:
         raise typer.Exit(code=1)

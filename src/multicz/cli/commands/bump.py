@@ -28,9 +28,8 @@ from ...state import (
     write_state,
 )
 from ...writers import write_value
-from .. import app, console, err
+from .. import app, err, presenters
 from .._shared import (
-    _append_step_summary,
     _build_plan_or_exit,
     _cascade_entries_for,
     _component_relevant_commits,
@@ -269,55 +268,6 @@ def _release_commit_message(
     return rendered
 
 
-def _append_bump_summary(
-    path: Path,
-    applied: dict,
-    config,
-    git_summary: dict,
-    *,
-    dry_run: bool,
-) -> None:
-    """Render the applied bump (post-write) as a markdown summary."""
-    header = "Released" if not dry_run else "Would release"
-    lines = [f"## {header}", ""]
-    if not applied:
-        lines.append("_No bumps pending._")
-        _append_step_summary(path, lines)
-        return
-
-    lines.extend([
-        "| component | current | next | kind | tag |",
-        "|---|---|---|---|---|",
-    ])
-    tags = git_summary.get("tags") or []
-    tag_index = {t.split("-v", 1)[0] if "-v" in t else None: t for t in tags}
-    # Fall back to format string lookup when tag_format isn't `<comp>-v<ver>`.
-    for name, info in applied.items():
-        tag = tag_index.get(name) or "-"
-        for t in tags:
-            if config.tag_format_for(name).format(
-                component=name, version=info["next"]
-            ) == t:
-                tag = t
-                break
-        lines.append(
-            f"| `{name}` | `{info['current']}` | `{info['next']}` | "
-            f"{info['kind']} | `{tag}` |"
-        )
-    lines.append("")
-    if git_summary.get("commit"):
-        lines.append(f"**Release commit:** `{git_summary['commit'][:12]}`")
-    if tags:
-        lines.append(f"**Tags created:** {', '.join(f'`{t}`' for t in tags)}")
-    if git_summary.get("pushed"):
-        lines.append("**Pushed:** yes")
-    if git_summary.get("signed_commit"):
-        lines.append("**Signed commit:** yes")
-    if git_summary.get("signed_tags"):
-        lines.append("**Signed tags:** yes")
-    _append_step_summary(path, lines)
-
-
 @app.command()
 def bump(
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Plan only, do not write."),
@@ -396,13 +346,7 @@ def bump(
         plan.bumps = {n: b for n, b in plan.bumps.items() if n in set(component)}
 
     if not plan:
-        if output == "json":
-            console.print_json(data={"bumps": {}})
-        else:
-            console.print(
-                "[dim]no bumps pending - "
-                "use [bold]--force <name>:<kind>[/] for a manual bump[/]"
-            )
+        presenters.render_bump_empty(output=output)
         return
 
     matcher = ComponentMatcher(config.components)
@@ -594,45 +538,16 @@ def bump(
     # so a CI step can simultaneously capture JSON for jq AND populate
     # $GITHUB_STEP_SUMMARY in the same invocation.
     if summary is not None:
-        _append_bump_summary(
+        presenters.append_bump_summary(
             summary, applied, config, git_summary, dry_run=dry_run
         )
 
-    if output == "json":
-        bumps_payload = {
-            name: {
-                "current_version": info["current"],
-                "next_version": info["next"],
-                "kind": info["kind"],
-                "artifacts": [
-                    a.render(component=name, version=info["next"])
-                    for a in config.components[name].artifacts
-                ],
-            }
-            for name, info in applied.items()
-        }
-        console.print_json(
-            data={
-                "schema_version": 1,
-                "bumps": bumps_payload,
-                "dry_run": dry_run,
-                "git": git_summary,
-                "changelogs": changelogs_updated,
-            }
-        )
-        return
-
-    verb = "would bump" if dry_run else "bumped"
-    for name, info in applied.items():
-        console.print(
-            f"[green]{verb}[/] [bold]{name}[/] {info['current']} → {info['next']} "
-            f"([cyan]{info['kind']}[/])"
-        )
-    if changelogs_updated:
-        console.print(f"[green]updated changelog[/] {', '.join(changelogs_updated)}")
-    if git_summary.get("commit"):
-        console.print(f"[green]committed[/] {git_summary['commit'][:7]}")
-    if tags_created:
-        console.print(f"[green]tagged[/] {', '.join(tags_created)}")
-    if git_summary.get("pushed"):
-        console.print("[green]pushed[/]")
+    presenters.render_bump_result(
+        applied,
+        config,
+        git_summary,
+        changelogs_updated,
+        tags_created,
+        output=output,
+        dry_run=dry_run,
+    )

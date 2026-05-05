@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import typer
 
-from .. import app, console, err
+from .. import app, err, presenters
 from .._shared import _load
 
 
@@ -65,14 +65,4 @@ def artifacts(
         ]
         payload[name] = {"version": version, "artifacts": rendered}
 
-    if output == "json":
-        console.print_json(data=payload)
-        return
-
-    for name, data in payload.items():
-        if not data["artifacts"]:
-            console.print(f"[dim]{name}: no artifacts declared[/]")
-            continue
-        console.print(f"[bold]{name}[/] ({data['version']})")
-        for a in data["artifacts"]:
-            console.print(f"  [{a['type']}] {a['ref']}")
+    presenters.render_artifacts(payload, output=output)

@@ -11,7 +11,7 @@ import typer
 
 from ...config import CONFIG_FILENAME, Component
 from ...discovery import discover_components, render_config
-from .. import app, console, err
+from .. import app, err, presenters
 
 _BARE_CONFIG = """\
 # multicz.toml - generic stub. Edit paths and bump_files to match your repo.
@@ -107,44 +107,7 @@ def init(
     if detect:
         # `components` is non-None here because --detect+--bare is rejected
         assert components is not None
-        if output == "json":
-            payload = {
-                name: {
-                    "paths": list(c.paths),
-                    "format": c.format,
-                    "bump_files": [
-                        {"file": str(b.file), "key": b.key}
-                        for b in c.bump_files
-                    ],
-                    "mirrors": [
-                        {"file": str(m.file), "key": m.key}
-                        for m in c.mirrors
-                    ],
-                    "changelog": str(c.changelog) if c.changelog else None,
-                }
-                for name, c in components.items()
-            }
-            console.print_json(data=payload)
-            return
-        console.print(f"[bold]Detected {len(components)} component(s):[/]")
-        for name, comp in components.items():
-            primary = comp.bump_files[0].file if comp.bump_files else None
-            line = f"  • [bold]{name}[/]"
-            if primary is not None:
-                line += f" [dim]({primary.as_posix()})[/]"
-            elif comp.format == "debian":
-                line += " [dim](debian/changelog)[/]"
-            else:
-                line += " [dim](tag-driven)[/]"
-            if comp.format != "default":
-                line += f" [yellow]format={comp.format}[/]"
-            if comp.mirrors:
-                targets = ", ".join(
-                    f"{m.file.as_posix()}:{m.key}" if m.key else m.file.as_posix()
-                    for m in comp.mirrors
-                )
-                line += f"\n      mirrors → {targets}"
-            console.print(line)
+        presenters.render_init_detect(components, output=output)
         return
 
     content = _BARE_CONFIG if bare else render_config(components)  # type: ignore[arg-type]
@@ -160,6 +123,4 @@ def init(
         err.print(f"[red]{target} already exists.[/] Use --force to overwrite.")
         raise typer.Exit(code=1)
     target.write_text(content, encoding="utf-8")
-    console.print(f"[green]wrote[/] {target}{' [dim](bare stub)[/]' if bare else ''}")
-    if components is not None:
-        console.print(f"[dim]detected:[/] {', '.join(components)}")
+    presenters.render_init_wrote(target, bare=bare, components=components)

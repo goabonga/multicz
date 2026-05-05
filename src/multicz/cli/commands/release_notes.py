@@ -11,7 +11,6 @@ from pathlib import Path
 import typer
 from packaging.version import Version
 
-from ...changelog import render_body
 from ...commits import (
     commits_in_range,
     previous_stable_tag,
@@ -19,7 +18,7 @@ from ...commits import (
     tag_prefix,
 )
 from ...components import ComponentMatcher
-from .. import app, console, err
+from .. import app, err, presenters
 from .._shared import (
     _build_plan_or_exit,
     _cascade_entries_for,
@@ -148,9 +147,7 @@ def release_notes_cmd(
             bump = plan_obj.bumps.get(name)
             if bump is None:
                 if not all_:
-                    console.print(
-                        f"[dim]no pending bump for {name}[/]"
-                    )
+                    presenters.render_release_notes_no_pending(name)
                     return
                 continue
             commits = _component_relevant_commits(name, config, repo, matcher)
@@ -166,82 +163,8 @@ def release_notes_cmd(
             })
 
     if not sections:
-        if output == "json":
-            console.print_json(data={"sections": []})
-        else:
-            console.print("[dim]nothing to release[/]")
+        presenters.render_release_notes_empty(output=output)
         return
 
-    if output == "json":
-        console.print_json(data={
-            "sections": [
-                {
-                    "component": s["component"],
-                    "from_version": s["from_version"],
-                    "to_version": s["to_version"],
-                    "commits": [
-                        {
-                            "sha": c.sha,
-                            "type": c.type,
-                            "scope": c.scope,
-                            "breaking": c.breaking,
-                            "subject": c.subject,
-                        }
-                        for c in s["commits"]
-                    ],
-                    "cascades": [
-                        {
-                            "upstream": e.upstream,
-                            "upstream_version": e.upstream_version,
-                            "section": e.section,
-                            "format": e.format,
-                        }
-                        for e in s.get("cascades") or []
-                    ],
-                }
-                for s in sections
-            ]
-        })
-        return
-
-    if output == "text":
-        for s in sections:
-            range_label = (
-                f"{s['from_version']} → {s['to_version']}"
-                if s["from_version"]
-                else s["to_version"]
-            )
-            console.print(f"[bold]{s['component']}[/] {range_label}")
-            for c in s["commits"]:
-                bang = "!" if c.breaking else ""
-                scope = f"({c.scope})" if c.scope else ""
-                console.print(
-                    f"  - {c.type}{scope}{bang}: {c.subject}  "
-                    f"[dim]({c.sha[:7]})[/]"
-                )
-            console.print()
-        return
-
-    # md (default)
-    chunks: list[str] = []
     multi = len(sections) > 1 or all_
-    for s in sections:
-        body = render_body(
-            s["commits"],
-            sections=config.project.changelog_sections,
-            breaking_title=config.project.breaking_section_title,
-            other_title=config.project.other_section_title,
-            cascades=s.get("cascades"),
-            cascade_title=config.project.cascade_section_title,
-            cascade_format=config.project.cascade_changelog_format,
-        )
-        if multi:
-            range_label = (
-                f"{s['from_version']} → {s['to_version']}"
-                if s["from_version"]
-                else s["to_version"]
-            )
-            chunks.append(f"## {s['component']} {range_label}\n\n{body}".rstrip() + "\n")
-        else:
-            chunks.append(body.rstrip() + "\n")
-    print("\n".join(chunks).rstrip() + "\n")
+    presenters.render_release_notes(sections, config, output=output, multi=multi)

@@ -8,7 +8,7 @@ from __future__ import annotations
 import typer
 
 from ...state import load_state
-from .. import app, console, err
+from .. import app, err, presenters
 from .._shared import _load
 
 
@@ -34,26 +34,9 @@ def state(
     path = repo / config.project.state_file
     state_obj = load_state(path)
     if state_obj is None:
-        if output == "json":
-            console.print_json(data=None)
-        else:
-            console.print(
-                f"[dim]{config.project.state_file} not yet written[/]"
-            )
+        presenters.render_state_missing(
+            str(config.project.state_file), output=output
+        )
         return
 
-    if output == "json":
-        console.print_json(data=state_obj.to_dict())
-        return
-
-    console.print(
-        f"[bold]state[/] {config.project.state_file} "
-        f"(schema v{state_obj.version})"
-    )
-    console.print(f"  git_head:  {state_obj.git_head_short or state_obj.git_head}")
-    console.print(f"  timestamp: {state_obj.timestamp}")
-    for name, comp in state_obj.components.items():
-        line = f"  [bold]{name}[/]: {comp.version}"
-        if comp.tag:
-            line += f"  [dim]({comp.tag})[/]"
-        console.print(line)
+    presenters.render_state(state_obj, str(config.project.state_file), output=output)

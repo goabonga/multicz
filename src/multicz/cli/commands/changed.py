@@ -11,7 +11,7 @@ import typer
 
 from ...commits import commits_since, latest_tag, tag_prefix
 from ...components import ComponentMatcher
-from .. import app, console
+from .. import app, presenters
 from .._shared import _commit_header, _load
 
 
@@ -84,11 +84,4 @@ def changed(
         else:
             unchanged_list.append(name)
 
-    if output == "json":
-        console.print_json(
-            data={"changed": changed_list, "unchanged": unchanged_list}
-        )
-        return
-
-    for name in changed_list:
-        print(name)
+    presenters.render_changed(changed_list, unchanged_list, output=output)

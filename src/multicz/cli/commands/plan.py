@@ -9,43 +9,12 @@ from pathlib import Path
 
 import typer
 
-from .. import app, console, err
+from .. import app, err, presenters
 from .._shared import (
-    _append_step_summary,
     _build_plan_or_exit,
     _load,
     _parse_force_specs,
 )
-
-
-def _append_plan_summary(path: Path, plan_obj, *, header: str) -> None:
-    """Render a plan as a markdown summary and append it."""
-    lines = [f"## {header}", ""]
-    if not plan_obj:
-        lines.append("_No bumps pending._")
-        _append_step_summary(path, lines)
-        return
-
-    lines.extend([
-        "| component | current | next | kind |",
-        "|---|---|---|---|",
-    ])
-    for bump in plan_obj:
-        lines.append(
-            f"| `{bump.component}` | `{bump.current}` | "
-            f"`{bump.next}` | {bump.kind} |"
-        )
-    lines.append("")
-    for bump in plan_obj:
-        lines.append(
-            f"### `{bump.component}` - {bump.current} → {bump.next} "
-            f"({bump.kind})"
-        )
-        lines.append("")
-        for reason in bump.reasons:
-            lines.append(f"- {reason.summary()}")
-        lines.append("")
-    _append_step_summary(path, lines)
 
 
 @app.command(name="plan")
@@ -113,39 +82,6 @@ def plan_cmd(
     )
 
     if summary is not None:
-        _append_plan_summary(summary, plan_obj, header="Release plan")
+        presenters.append_plan_summary(summary, plan_obj, header="Release plan")
 
-    if output == "json":
-        payload = {
-            "schema_version": 1,
-            "bumps": {
-                bump.component: {
-                    "current_version": str(bump.current),
-                    "next_version": bump.next,
-                    "kind": bump.kind,
-                    "reasons": [r.to_dict() for r in bump.reasons],
-                    "artifacts": [
-                        a.render(component=bump.component, version=bump.next)
-                        for a in config.components[bump.component].artifacts
-                    ],
-                }
-                for bump in plan_obj
-            },
-        }
-        console.print_json(data=payload)
-        return
-
-    if not plan_obj:
-        console.print("[dim]no bumps pending[/]")
-        return
-
-    for bump in plan_obj:
-        header = (
-            f"[bold]{bump.component}[/]: "
-            f"{bump.current} → {bump.next} "
-            f"[cyan]({bump.kind})[/]"
-        )
-        console.print(header)
-        for reason in bump.reasons:
-            console.print(f"  • {reason.summary()}")
-        console.print()
+    presenters.render_plan(plan_obj, config, output=output)
