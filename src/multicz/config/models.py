@@ -1,30 +1,21 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-"""Configuration schema for multicz.
+"""Pydantic schema for the multicz configuration.
 
-The config lives in ``multicz.toml`` at the repo root. It declares one or more
-*components*, each owning a set of glob paths, version files to bump, and
-optional mirrors that propagate the component's version into other files
-(typically ``Chart.yaml:appVersion``).
-
-A modification to a file owned by component A bumps A. If A has a mirror that
-writes into a file owned by component B, B cascades a patch bump (option A:
-strict Helm chart immutability).
+This module owns the *shape* of the config (Component, ProjectSettings,
+Config, ...). Source-loading (TOML / JSON, search-up-the-tree) lives in
+``sources.py``.
 """
 
 from __future__ import annotations
 
-import json
 import re
 import shlex
 from pathlib import Path
 from typing import Any, Literal
 
-import tomlkit
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
-CONFIG_FILENAME = "multicz.toml"
 
 # Component names land in git tag names, file paths (CHANGELOG.md location),
 # JSON output, release-notes headings, and CLI arguments
@@ -32,10 +23,6 @@ CONFIG_FILENAME = "multicz.toml"
 # downstream uses can break unexpectedly.
 COMPONENT_NAME_RE = re.compile(r"^[a-zA-Z0-9](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9])?$")
 COMPONENT_NAME_MAX_LEN = 64
-
-# Alternate hosts for the config, in precedence order. The dedicated
-# multicz.toml always wins when present.
-_ALT_HOSTS: tuple[str, ...] = ("pyproject.toml", "package.json")
 
 
 class FileKey(BaseModel):
@@ -403,83 +390,3 @@ class Config(BaseModel):
         rendered = fmt.format(component=component, version="\x00V\x00")
         head, _, _ = rendered.partition("\x00V\x00")
         return head
-
-
-def _extract_section(path: Path) -> dict[str, Any] | None:
-    """Return the multicz config dict embedded in ``path``, or ``None``.
-
-    For ``pyproject.toml`` the section is ``[tool.multicz]``.
-    For ``package.json`` the section is the top-level ``"multicz"`` key.
-    For ``multicz.toml`` the whole document is the config.
-    """
-    name = path.name
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-
-    if name == CONFIG_FILENAME:
-        try:
-            return tomlkit.parse(text).unwrap()
-        except Exception:
-            return None
-    if name == "pyproject.toml":
-        try:
-            doc = tomlkit.parse(text).unwrap()
-        except Exception:
-            return None
-        tool = doc.get("tool")
-        if isinstance(tool, dict):
-            section = tool.get("multicz")
-            if isinstance(section, dict):
-                return section
-        return None
-    if name == "package.json":
-        try:
-            data = json.loads(text)
-        except Exception:
-            return None
-        section = data.get("multicz") if isinstance(data, dict) else None
-        return section if isinstance(section, dict) else None
-    return None
-
-
-def load_config(path: Path) -> Config:
-    """Load and validate a multicz config from ``path``.
-
-    Accepts ``multicz.toml`` (whole-file), ``pyproject.toml``
-    (``[tool.multicz]``), or ``package.json`` (``"multicz"`` key).
-    """
-    raw = _extract_section(path)
-    if raw is None:
-        raise FileNotFoundError(
-            f"no multicz config found in {path}"
-        )
-    config = Config.model_validate(raw)
-    config.validate_references()
-    return config
-
-
-def find_config(start: Path | None = None) -> Path:
-    """Walk up from ``start`` (default: cwd) looking for a multicz config.
-
-    At each directory level, the search order is:
-
-    1. ``multicz.toml`` (always wins when present),
-    2. ``pyproject.toml`` with a ``[tool.multicz]`` table,
-    3. ``package.json`` with a top-level ``"multicz"`` key.
-    """
-    here = (start or Path.cwd()).resolve()
-    for directory in (here, *here.parents):
-        canonical = directory / CONFIG_FILENAME
-        if canonical.is_file():
-            return canonical
-        for filename in _ALT_HOSTS:
-            candidate = directory / filename
-            if candidate.is_file() and _extract_section(candidate) is not None:
-                return candidate
-    raise FileNotFoundError(
-        "no multicz config found (looked for multicz.toml, "
-        "pyproject.toml [tool.multicz], or package.json \"multicz\" key) "
-        f"in {here} or any parent directory"
-    )
