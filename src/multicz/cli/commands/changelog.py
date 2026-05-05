@@ -11,6 +11,7 @@ from ...commits import commits_since, latest_tag, tag_prefix
 from ...components import ComponentMatcher
 from .. import app, err, presenters
 from .._shared import _build_plan_or_exit, _load
+from ..results import ChangelogEntry
 
 
 @app.command()
@@ -24,7 +25,7 @@ def changelog(
     names = [component] if component else list(config.components)
     plan = _build_plan_or_exit(repo, config)
 
-    entries: list[dict] = []
+    entries: list[ChangelogEntry] = []
     for name in names:
         if name not in config.components:
             err.print(f"[red]unknown component:[/] {name}")
@@ -36,11 +37,11 @@ def changelog(
             for c in commits_since(repo, since)
             if c.is_conventional and any(matcher.match(f) == name for f in c.files)
         ]
-        entries.append({
-            "component": name,
-            "since": since,
-            "relevant": relevant,
-            "planned": plan.bumps.get(name),
-        })
+        entries.append(ChangelogEntry(
+            component=name,
+            since=since,
+            relevant=tuple(relevant),
+            planned=plan.bumps.get(name),
+        ))
 
     presenters.render_changelog(entries, config, output=output)

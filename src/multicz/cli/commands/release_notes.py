@@ -26,6 +26,7 @@ from .._shared import (
     _component_relevant_commits,
     _load,
 )
+from ..results import ReleaseNotesSection
 
 
 def _component_for_tag(config, tag: str) -> str | None:
@@ -108,7 +109,7 @@ def release_notes_cmd(
     repo, config = _load()
     matcher = ComponentMatcher(config.components)
 
-    sections: list[dict] = []
+    sections: list[ReleaseNotesSection] = []
 
     if tag is not None:
         owner = _component_for_tag(config, tag)
@@ -126,13 +127,12 @@ def release_notes_cmd(
         commits = _filtered_commits_in_range(
             owner, config, repo, matcher, since=prev, end=tag
         )
-        sections.append({
-            "component": owner,
-            "from": prev,
-            "from_version": prev[len(prefix):] if prev else None,
-            "to_version": str(target_version),
-            "commits": commits,
-        })
+        sections.append(ReleaseNotesSection(
+            component=owner,
+            from_version=prev[len(prefix):] if prev else None,
+            to_version=str(target_version),
+            commits=tuple(commits),
+        ))
     else:
         plan_obj = _build_plan_or_exit(repo, config)
         if all_:
@@ -151,16 +151,15 @@ def release_notes_cmd(
                     return
                 continue
             commits = _component_relevant_commits(name, config, repo, matcher)
-            sections.append({
-                "component": name,
-                "from": None,
-                "from_version": str(bump.current),
-                "to_version": bump.next,
-                "commits": commits,
+            sections.append(ReleaseNotesSection(
+                component=name,
+                from_version=str(bump.current),
+                to_version=bump.next,
+                commits=tuple(commits),
                 # Cascades only attach to upcoming bumps - past tag mode
                 # has no plan reasons to draw from.
-                "cascades": _cascade_entries_for(bump, plan_obj, config),
-            })
+                cascades=tuple(_cascade_entries_for(bump, plan_obj, config)),
+            ))
 
     if not sections:
         presenters.render_release_notes_empty(output=output)

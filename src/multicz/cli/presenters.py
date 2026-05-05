@@ -22,6 +22,14 @@ from rich.table import Table
 from ..changelog import render_body
 from . import console
 from ._shared import _append_step_summary
+from .results import (
+    BumpResult,
+    ChangedReport,
+    ChangelogEntry,
+    GitSummary,
+    ReleaseNotesSection,
+    ValidationReport,
+)
 
 # ============ plan / status ============
 
@@ -141,72 +149,88 @@ def render_bump_empty(*, output: str) -> None:
         )
 
 
+def _git_summary_to_json(git: GitSummary) -> dict:
+    """Project a GitSummary back to the legacy ``git_summary`` dict shape.
+
+    The JSON output for ``multicz bump`` must stay byte-identical with
+    the pre-refactor shape: keys appear only when populated, ``tags`` is
+    a list, signed flags render as ``"yes"``. Centralised here so the
+    table-renderer (``append_bump_summary``) and the JSON renderer share
+    one definition.
+    """
+    out: dict = {}
+    if git.commit_sha:
+        out["commit"] = git.commit_sha
+    if git.tags:
+        out["tags"] = list(git.tags)
+    if git.signed_tags:
+        out["signed_tags"] = "yes"
+    if git.signed_commit and git.commit_sha:
+        out["signed_commit"] = "yes"
+    if git.pushed:
+        out["pushed"] = "yes"
+    return out
+
+
 def render_bump_result(
-    applied: dict[str, dict[str, str]],
+    result: BumpResult,
     config,
-    git_summary: dict,
-    changelogs_updated: list[str],
-    tags_created: list[str],
     *,
     output: str,
-    dry_run: bool,
 ) -> None:
     """Render the post-write result of a ``multicz bump`` invocation."""
     if output == "json":
         bumps_payload = {
-            name: {
-                "current_version": info["current"],
-                "next_version": info["next"],
-                "kind": info["kind"],
+            b.component: {
+                "current_version": b.current,
+                "next_version": b.next,
+                "kind": b.kind,
                 "artifacts": [
-                    a.render(component=name, version=info["next"])
-                    for a in config.components[name].artifacts
+                    a.render(component=b.component, version=b.next)
+                    for a in config.components[b.component].artifacts
                 ],
             }
-            for name, info in applied.items()
+            for b in result.bumps
         }
         console.print_json(
             data={
                 "schema_version": 1,
                 "bumps": bumps_payload,
-                "dry_run": dry_run,
-                "git": git_summary,
-                "changelogs": changelogs_updated,
+                "dry_run": result.dry_run,
+                "git": _git_summary_to_json(result.git),
+                "changelogs": list(result.changelogs),
             }
         )
         return
 
-    verb = "would bump" if dry_run else "bumped"
-    for name, info in applied.items():
+    verb = "would bump" if result.dry_run else "bumped"
+    for b in result.bumps:
         console.print(
-            f"[green]{verb}[/] [bold]{name}[/] "
-            f"{info['current']} → {info['next']} "
-            f"([cyan]{info['kind']}[/])"
+            f"[green]{verb}[/] [bold]{b.component}[/] "
+            f"{b.current} → {b.next} "
+            f"([cyan]{b.kind}[/])"
         )
-    if changelogs_updated:
+    if result.changelogs:
         console.print(
-            f"[green]updated changelog[/] {', '.join(changelogs_updated)}"
+            f"[green]updated changelog[/] {', '.join(result.changelogs)}"
         )
-    if git_summary.get("commit"):
-        console.print(f"[green]committed[/] {git_summary['commit'][:7]}")
-    if tags_created:
-        console.print(f"[green]tagged[/] {', '.join(tags_created)}")
-    if git_summary.get("pushed"):
+    if result.git.commit_sha:
+        console.print(f"[green]committed[/] {result.git.commit_sha[:7]}")
+    if result.git.tags:
+        console.print(f"[green]tagged[/] {', '.join(result.git.tags)}")
+    if result.git.pushed:
         console.print("[green]pushed[/]")
 
 
 def append_bump_summary(
     path: Path,
-    applied: dict,
+    result: BumpResult,
     config,
-    git_summary: dict,
-    *,
-    dry_run: bool,
 ) -> None:
     """Render the applied bump (post-write) as a markdown summary."""
-    header = "Released" if not dry_run else "Would release"
+    header = "Released" if not result.dry_run else "Would release"
     lines = [f"## {header}", ""]
-    if not applied:
+    if not result.bumps:
         lines.append("_No bumps pending._")
         _append_step_summary(path, lines)
         return
@@ -215,33 +239,33 @@ def append_bump_summary(
         "| component | current | next | kind | tag |",
         "|---|---|---|---|---|",
     ])
-    tags = git_summary.get("tags") or []
+    tags = list(result.git.tags)
     tag_index = {t.split("-v", 1)[0] if "-v" in t else None: t for t in tags}
     # Fall back to format string lookup when tag_format isn't `<comp>-v<ver>`.
-    for name, info in applied.items():
-        tag = tag_index.get(name) or "-"
+    for b in result.bumps:
+        tag = tag_index.get(b.component) or "-"
         for t in tags:
-            if config.tag_format_for(name).format(
-                component=name, version=info["next"]
+            if config.tag_format_for(b.component).format(
+                component=b.component, version=b.next
             ) == t:
                 tag = t
                 break
         lines.append(
-            f"| `{name}` | `{info['current']}` | `{info['next']}` | "
-            f"{info['kind']} | `{tag}` |"
+            f"| `{b.component}` | `{b.current}` | `{b.next}` | "
+            f"{b.kind} | `{tag}` |"
         )
     lines.append("")
-    if git_summary.get("commit"):
-        lines.append(f"**Release commit:** `{git_summary['commit'][:12]}`")
+    if result.git.commit_sha:
+        lines.append(f"**Release commit:** `{result.git.commit_sha[:12]}`")
     if tags:
         lines.append(
             f"**Tags created:** {', '.join(f'`{t}`' for t in tags)}"
         )
-    if git_summary.get("pushed"):
+    if result.git.pushed:
         lines.append("**Pushed:** yes")
-    if git_summary.get("signed_commit"):
+    if result.git.signed_commit and result.git.commit_sha:
         lines.append("**Signed commit:** yes")
-    if git_summary.get("signed_tags"):
+    if result.git.signed_tags:
         lines.append("**Signed tags:** yes")
     _append_step_summary(path, lines)
 
@@ -249,20 +273,18 @@ def append_bump_summary(
 # ============ changed ============
 
 
-def render_changed(
-    changed_list: list[str],
-    unchanged_list: list[str],
-    *,
-    output: str,
-) -> None:
+def render_changed(report: ChangedReport, *, output: str) -> None:
     """Render the output of ``multicz changed``."""
     if output == "json":
         console.print_json(
-            data={"changed": changed_list, "unchanged": unchanged_list}
+            data={
+                "changed": list(report.changed),
+                "unchanged": list(report.unchanged),
+            }
         )
         return
 
-    for name in changed_list:
+    for name in report.changed:
         print(name)
 
 
@@ -364,7 +386,7 @@ def render_release_notes_no_pending(name: str) -> None:
 
 
 def render_release_notes(
-    sections: list[dict],
+    sections: list[ReleaseNotesSection],
     config,
     *,
     output: str,
@@ -375,9 +397,9 @@ def render_release_notes(
         console.print_json(data={
             "sections": [
                 {
-                    "component": s["component"],
-                    "from_version": s["from_version"],
-                    "to_version": s["to_version"],
+                    "component": s.component,
+                    "from_version": s.from_version,
+                    "to_version": s.to_version,
                     "commits": [
                         {
                             "sha": c.sha,
@@ -386,7 +408,7 @@ def render_release_notes(
                             "breaking": c.breaking,
                             "subject": c.subject,
                         }
-                        for c in s["commits"]
+                        for c in s.commits
                     ],
                     "cascades": [
                         {
@@ -395,7 +417,7 @@ def render_release_notes(
                             "section": e.section,
                             "format": e.format,
                         }
-                        for e in s.get("cascades") or []
+                        for e in s.cascades
                     ],
                 }
                 for s in sections
@@ -406,12 +428,12 @@ def render_release_notes(
     if output == "text":
         for s in sections:
             range_label = (
-                f"{s['from_version']} → {s['to_version']}"
-                if s["from_version"]
-                else s["to_version"]
+                f"{s.from_version} → {s.to_version}"
+                if s.from_version
+                else s.to_version
             )
-            console.print(f"[bold]{s['component']}[/] {range_label}")
-            for c in s["commits"]:
+            console.print(f"[bold]{s.component}[/] {range_label}")
+            for c in s.commits:
                 bang = "!" if c.breaking else ""
                 scope = f"({c.scope})" if c.scope else ""
                 console.print(
@@ -425,22 +447,22 @@ def render_release_notes(
     chunks: list[str] = []
     for s in sections:
         body = render_body(
-            s["commits"],
+            list(s.commits),
             sections=config.project.changelog_sections,
             breaking_title=config.project.breaking_section_title,
             other_title=config.project.other_section_title,
-            cascades=s.get("cascades"),
+            cascades=list(s.cascades) if s.cascades else None,
             cascade_title=config.project.cascade_section_title,
             cascade_format=config.project.cascade_changelog_format,
         )
         if multi:
             range_label = (
-                f"{s['from_version']} → {s['to_version']}"
-                if s["from_version"]
-                else s["to_version"]
+                f"{s.from_version} → {s.to_version}"
+                if s.from_version
+                else s.to_version
             )
             chunks.append(
-                f"## {s['component']} {range_label}\n\n{body}".rstrip() + "\n"
+                f"## {s.component} {range_label}\n\n{body}".rstrip() + "\n"
             )
         else:
             chunks.append(body.rstrip() + "\n")
@@ -451,34 +473,22 @@ def render_release_notes(
 
 
 def render_changelog(
-    entries: list[dict],
+    entries: list[ChangelogEntry],
     config,
     *,
     output: str,
 ) -> None:
-    """Render the output of ``multicz changelog``.
-
-    ``entries`` is a list of dicts with keys:
-
-    * ``component``  - component name
-    * ``since``      - prior tag (or ``None``)
-    * ``relevant``   - filtered list of conventional commits
-    * ``planned``    - the planner's PlannedBump (or ``None``)
-    """
+    """Render the output of ``multicz changelog``."""
     if output == "md":
         md_chunks: list[str] = []
         for entry in entries:
-            name = entry["component"]
-            since = entry["since"]
-            relevant = entry["relevant"]
-            planned = entry["planned"]
-            heading = f"## {name}"
-            if planned:
-                heading += f" {planned.current} → {planned.next}"
-            elif since:
-                heading += f" (since {since})"
+            heading = f"## {entry.component}"
+            if entry.planned:
+                heading += f" {entry.planned.current} → {entry.planned.next}"
+            elif entry.since:
+                heading += f" (since {entry.since})"
             body = render_body(
-                relevant,
+                list(entry.relevant),
                 sections=config.project.changelog_sections,
                 breaking_title=config.project.breaking_section_title,
                 other_title=config.project.other_section_title,
@@ -491,17 +501,14 @@ def render_changelog(
 
     # text
     for entry in entries:
-        name = entry["component"]
-        since = entry["since"]
-        relevant = entry["relevant"]
-        header = f"## {name}"
-        if since:
-            header += f"  (since {since})"
+        header = f"## {entry.component}"
+        if entry.since:
+            header += f"  (since {entry.since})"
         console.print(f"\n[bold]{header}[/]")
-        if not relevant:
+        if not entry.relevant:
             console.print("  [dim]no changes[/]")
             continue
-        for commit in relevant:
+        for commit in entry.relevant:
             scope = f"({commit.scope})" if commit.scope else ""
             bang = "!" if commit.breaking else ""
             console.print(
@@ -513,14 +520,7 @@ def render_changelog(
 # ============ validate ============
 
 
-def render_validate(
-    findings,
-    errors,
-    warnings,
-    infos,
-    *,
-    output: str,
-) -> None:
+def render_validate(report: ValidationReport, *, output: str) -> None:
     """Render the findings of ``multicz validate``.
 
     The exit-code decision (0 / 1 / 2) stays in the command - this
@@ -528,22 +528,22 @@ def render_validate(
     """
     if output == "json":
         console.print_json(data={
-            "findings": [f.to_dict() for f in findings],
+            "findings": [f.to_dict() for f in report.findings],
             "summary": {
-                "errors": len(errors),
-                "warnings": len(warnings),
-                "info": len(infos),
+                "errors": len(report.errors),
+                "warnings": len(report.warnings),
+                "info": len(report.infos),
             },
         })
         return
 
-    if not findings:
+    if not report.findings:
         console.print("[green]✓ no issues found[/]")
         return
 
     colors = {"error": "red", "warning": "yellow", "info": "blue"}
     tags = {"error": "✗", "warning": "!", "info": "i"}
-    for finding in findings:
+    for finding in report.findings:
         color = colors[finding.level]
         tag = tags[finding.level]
         comp = (
@@ -557,17 +557,18 @@ def render_validate(
         )
     console.print()
     counts: list[str] = []
-    if errors:
+    if report.errors:
         counts.append(
-            f"[red]{len(errors)} error{'s' if len(errors) != 1 else ''}[/]"
+            f"[red]{len(report.errors)} "
+            f"error{'s' if len(report.errors) != 1 else ''}[/]"
         )
-    if warnings:
+    if report.warnings:
         counts.append(
-            f"[yellow]{len(warnings)} "
-            f"warning{'s' if len(warnings) != 1 else ''}[/]"
+            f"[yellow]{len(report.warnings)} "
+            f"warning{'s' if len(report.warnings) != 1 else ''}[/]"
         )
-    if infos:
-        counts.append(f"[blue]{len(infos)} info[/]")
+    if report.infos:
+        counts.append(f"[blue]{len(report.infos)} info[/]")
     console.print(", ".join(counts))
 
 

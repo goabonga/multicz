@@ -36,6 +36,7 @@ from .._shared import (
     _load,
     _parse_force_specs,
 )
+from ..results import AppliedBump, BumpResult, GitSummary
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -232,7 +233,7 @@ def _bump_debian(
 
 
 def _release_commit_message(
-    applied: dict[str, dict[str, str]],
+    bumps: list[AppliedBump],
     template: str,
 ) -> str:
     """Render the release commit message from a template with placeholders.
@@ -247,21 +248,17 @@ def _release_commit_message(
     Literal ``{`` and ``}`` in a template should be escaped as ``{{`` / ``}}``.
     """
     summary = ", ".join(
-        f"{name} {info['current']} -> {info['next']}"
-        for name, info in applied.items()
+        f"{b.component} {b.current} -> {b.next}" for b in bumps
     )
-    components = ", ".join(
-        f"{name} v{info['next']}" for name, info in applied.items()
-    )
+    components = ", ".join(f"{b.component} v{b.next}" for b in bumps)
     body = "\n".join(
-        f"- {name}: {info['current']} -> {info['next']} ({info['kind']})"
-        for name, info in applied.items()
+        f"- {b.component}: {b.current} -> {b.next} ({b.kind})" for b in bumps
     )
     rendered = template.format(
         summary=summary,
         components=components,
         body=body,
-        count=len(applied),
+        count=len(bumps),
     )
     if not rendered.endswith("\n"):
         rendered += "\n"
@@ -350,7 +347,7 @@ def bump(
         return
 
     matcher = ComponentMatcher(config.components)
-    applied: dict[str, dict[str, str]] = {}
+    applied: list[AppliedBump] = []
     written: list[Path] = []
     changelogs_updated: list[str] = []
     for planned in plan:
@@ -415,13 +412,15 @@ def bump(
                     written.append(changelog_path)
                 changelogs_updated.append(str(comp.changelog))
 
-        applied[planned.component] = {
-            "current": str(planned.current),
-            "next": new_version,
-            "kind": planned.kind,
-        }
+        applied.append(AppliedBump(
+            component=planned.component,
+            current=str(planned.current),
+            next=new_version,
+            kind=planned.kind,
+        ))
 
-    git_summary: dict[str, str | list[str]] = {}
+    commit_sha: str | None = None
+    pushed = False
     # Optional state file: written before the commit so it lands in the
     # release commit alongside the version-file changes.
     if not dry_run and config.project.state_file is not None:
@@ -431,14 +430,14 @@ def bump(
         except Exception:
             head_before = ""
         components_state: dict[str, ComponentState] = {}
-        for name, info in applied.items():
+        for b in applied:
             tag_name: str | None = None
             if tag:
-                tag_name = config.tag_format_for(name).format(
-                    component=name, version=info["next"]
+                tag_name = config.tag_format_for(b.component).format(
+                    component=b.component, version=b.next
                 )
-            components_state[name] = ComponentState(
-                version=info["next"],
+            components_state[b.component] = ComponentState(
+                version=b.next,
                 tag=tag_name,
                 tag_sha=None,
             )
@@ -472,7 +471,7 @@ def bump(
     # hash comparison catches it.
     if not dry_run and applied:
         hook_components = [
-            n for n in applied if config.components[n].post_bump
+            b.component for b in applied if config.components[b.component].post_bump
         ]
         if hook_components:
             before_dirty = _porcelain_paths(repo)
@@ -508,46 +507,44 @@ def bump(
         if sign_commits_flag:
             commit_args.insert(1, "-S")  # before -m so git accepts it
         _git(repo, *commit_args)
-        sha = _git(repo, "rev-parse", "HEAD").strip()
-        git_summary["commit"] = sha
+        commit_sha = _git(repo, "rev-parse", "HEAD").strip()
 
     tags_created: list[str] = []
     if not dry_run and tag:
-        for name, info in applied.items():
-            tag_name = config.tag_format_for(name).format(
-                component=name, version=info["next"]
+        for b in applied:
+            tag_name = config.tag_format_for(b.component).format(
+                component=b.component, version=b.next
             )
             tag_args = ["tag"]
             if sign_tags_flag:
                 # -s creates a signed annotated tag; -m supplies the message.
                 tag_args.append("-s")
-            tag_args.extend(["-m", f"{name} {info['next']}", tag_name])
+            tag_args.extend(["-m", f"{b.component} {b.next}", tag_name])
             _git(repo, *tag_args)
             tags_created.append(tag_name)
-        git_summary["tags"] = tags_created
-        if sign_tags_flag:
-            git_summary["signed_tags"] = "yes"
-        if sign_commits_flag and "commit" in git_summary:
-            git_summary["signed_commit"] = "yes"
 
     if not dry_run and push:
         _git(repo, "push", "--follow-tags")
-        git_summary["pushed"] = "yes"
+        pushed = True
+
+    git_summary = GitSummary(
+        commit_sha=commit_sha,
+        tags=tuple(tags_created),
+        pushed=pushed,
+        signed_commit=bool(sign_commits_flag and commit_sha),
+        signed_tags=bool(sign_tags_flag and tags_created),
+    )
+    result = BumpResult(
+        bumps=tuple(applied),
+        dry_run=dry_run,
+        git=git_summary,
+        changelogs=tuple(changelogs_updated),
+    )
 
     # Write the markdown summary for both --output json and --output text
     # so a CI step can simultaneously capture JSON for jq AND populate
     # $GITHUB_STEP_SUMMARY in the same invocation.
     if summary is not None:
-        presenters.append_bump_summary(
-            summary, applied, config, git_summary, dry_run=dry_run
-        )
+        presenters.append_bump_summary(summary, result, config)
 
-    presenters.render_bump_result(
-        applied,
-        config,
-        git_summary,
-        changelogs_updated,
-        tags_created,
-        output=output,
-        dry_run=dry_run,
-    )
+    presenters.render_bump_result(result, config, output=output)

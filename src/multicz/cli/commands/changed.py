@@ -13,6 +13,7 @@ from ...commits import commits_since, latest_tag, tag_prefix
 from ...components import ComponentMatcher
 from .. import app, presenters
 from .._shared import _commit_header, _load
+from ..results import ChangedReport
 
 
 @app.command()
@@ -84,4 +85,10 @@ def changed(
         else:
             unchanged_list.append(name)
 
-    presenters.render_changed(changed_list, unchanged_list, output=output)
+    presenters.render_changed(
+        ChangedReport(
+            changed=tuple(changed_list),
+            unchanged=tuple(unchanged_list),
+        ),
+        output=output,
+    )

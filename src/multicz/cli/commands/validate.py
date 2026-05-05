@@ -10,6 +10,7 @@ import typer
 from ...validation import validate as run_validation
 from .. import app, presenters
 from .._shared import _load
+from ..results import ValidationReport
 
 
 @app.command(name="validate")
@@ -47,13 +48,16 @@ def validate_cmd(
     """
     repo, config = _load()
     findings = run_validation(repo, config)
-    errors = [f for f in findings if f.level == "error"]
-    warnings = [f for f in findings if f.level == "warning"]
-    infos = [f for f in findings if f.level == "info"]
+    report = ValidationReport(
+        findings=tuple(findings),
+        errors=tuple(f for f in findings if f.level == "error"),
+        warnings=tuple(f for f in findings if f.level == "warning"),
+        infos=tuple(f for f in findings if f.level == "info"),
+    )
 
-    presenters.render_validate(findings, errors, warnings, infos, output=output)
+    presenters.render_validate(report, output=output)
 
-    if errors:
+    if report.errors:
         raise typer.Exit(code=1)
-    if strict and warnings:
+    if strict and report.warnings:
         raise typer.Exit(code=2)
