@@ -268,8 +268,8 @@ def _check_state_drift(repo: Path, config: Config) -> Iterator[Finding]:
     """
     if config.project.state_file is None:
         return
+    from .formats import FormatError, read_value
     from .state import load_state
-    from .writers import WriterError, read_value
 
     state_path = repo / config.project.state_file
     state = load_state(state_path)
@@ -294,7 +294,7 @@ def _check_state_drift(repo: Path, config: Config) -> Iterator[Finding]:
         primary = comp.bump_files[0]
         try:
             current = read_value(repo / primary.file, primary.key)
-        except (WriterError, OSError):
+        except (FormatError, OSError):
             continue
         if current != comp_state.version:
             yield Finding(

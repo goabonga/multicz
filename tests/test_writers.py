@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from multicz.writers import WriterError, read_value, write_value
+from multicz.formats import FormatError, read_value, write_value
 
 
 def test_toml_preserves_comments_and_keys(tmp_path: Path):
@@ -114,12 +114,12 @@ def test_plain_file_round_trip(tmp_path: Path):
 def test_missing_key_raises(tmp_path: Path):
     p = tmp_path / "pyproject.toml"
     p.write_text("[project]\nname = \"x\"\n")
-    with pytest.raises(WriterError):
+    with pytest.raises(FormatError):
         read_value(p, "project.version")
 
 
 def test_missing_file_on_write_raises(tmp_path: Path):
-    with pytest.raises(WriterError):
+    with pytest.raises(FormatError):
         write_value(tmp_path / "nope.toml", "x.y", "1.0.0")
 
 
@@ -165,21 +165,21 @@ def test_regex_key_makefile(tmp_path: Path):
 def test_regex_key_no_match_raises(tmp_path: Path):
     p = tmp_path / "x.py"
     p.write_text('VERSION = "0.1.0"\n')
-    with pytest.raises(WriterError, match="matched nothing"):
+    with pytest.raises(FormatError, match="matched nothing"):
         read_value(p, r"regex:^__version__\s*=\s*\"([^\"]+)\"")
 
 
 def test_regex_key_without_capture_group_raises(tmp_path: Path):
     p = tmp_path / "x.py"
     p.write_text('VERSION = "0.1.0"\n')
-    with pytest.raises(WriterError, match="capture group"):
+    with pytest.raises(FormatError, match="capture group"):
         read_value(p, r"regex:VERSION = \"[^\"]+\"")  # no group
 
 
 def test_regex_key_invalid_pattern_raises(tmp_path: Path):
     p = tmp_path / "x.py"
     p.write_text('x = "y"\n')
-    with pytest.raises(WriterError, match="invalid regex"):
+    with pytest.raises(FormatError, match="invalid regex"):
         read_value(p, r"regex:[unclosed")
 
 

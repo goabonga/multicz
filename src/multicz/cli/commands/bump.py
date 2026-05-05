@@ -20,6 +20,7 @@ from ...changelog import (
     update_changelog_file,
 )
 from ...components import ComponentMatcher
+from ...formats import write_value
 from ...state import (
     STATE_SCHEMA_VERSION,
     ComponentState,
@@ -27,7 +28,6 @@ from ...state import (
     now_iso,
     write_state,
 )
-from ...writers import write_value
 from .. import app, err, presenters
 from .._shared import (
     _build_plan_or_exit,

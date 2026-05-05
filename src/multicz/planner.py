@@ -36,7 +36,7 @@ from .commits import (
 )
 from .components import ComponentMatcher
 from .config import Config
-from .writers import WriterError, read_value
+from .formats import FormatError, read_value
 
 _KIND_ORDER: dict[BumpKind, int] = {"patch": 1, "minor": 2, "major": 3}
 
@@ -391,7 +391,7 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
         primary = comp.bump_files[0]
         try:
             return Version(read_value(repo / primary.file, primary.key))
-        except (WriterError, InvalidVersion, FileNotFoundError):
+        except (FormatError, InvalidVersion, FileNotFoundError):
             pass
     return Version(config.project.initial_version)
 
