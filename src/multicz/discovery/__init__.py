@@ -45,15 +45,16 @@ import tomlkit
 
 from ..config import Component, FileKey
 from .context import DiscoveryContext, DiscoveryResult
-from .debian import _detect_debian
-from .node import _detect_node
 from .registry import DISCOVERERS, DiscoveryStrategy
+from .relations import RELATIONS, RelationStrategy, apply_relations
 
 __all__ = [
     "DISCOVERERS",
+    "RELATIONS",
     "DiscoveryContext",
     "DiscoveryResult",
     "DiscoveryStrategy",
+    "RelationStrategy",
     "discover_components",
     "render_config",
 ]
@@ -69,48 +70,8 @@ def discover_components(repo: Path) -> dict[str, Component]:
             context.register(name, result)
 
     components = context.components()
-
-    # Post-passes (kept as free functions for now; stage 4 will move
-    # them behind a RelationStrategy protocol).
-    _link_python_helm_appversion(components, context)
-    _detect_node(repo, components, context)
-    _detect_debian(repo, components)
-
+    apply_relations(repo, components, context)
     return components
-
-
-def _link_python_helm_appversion(
-    components: dict[str, Component], context: DiscoveryContext
-) -> None:
-    """Mirror Python component versions onto matching Helm chart ``appVersion``.
-
-    Single python + single chart: unambiguous, always pair. Otherwise:
-    match by raw manifest name, so a 'worker' chart next to an 'api'
-    python project stays independent and a multi-python repo wires each
-    python to its same-named chart only.
-    """
-    pythons = context.by_kind("python")
-    charts = context.by_kind("helm")
-    if not pythons or not charts:
-        return
-
-    if len(pythons) == 1 and len(charts) == 1:
-        py_name, _ = pythons[0]
-        chart_name, _ = charts[0]
-        py = components[py_name]
-        chart_yaml_path = components[chart_name].bump_files[0].file
-        py.mirrors.append(FileKey(file=chart_yaml_path, key="appVersion"))
-        return
-
-    for py_name, py_result in pythons:
-        py = components[py_name]
-        py_raw = py_result.raw_name
-        for chart_comp_name, chart_result in charts:
-            if chart_result.raw_name == py_raw:
-                chart_yaml_path = components[chart_comp_name].bump_files[0].file
-                py.mirrors.append(
-                    FileKey(file=chart_yaml_path, key="appVersion")
-                )
 
 
 def render_config(
