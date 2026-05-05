@@ -310,7 +310,7 @@ def _check_state_drift(repo: Path, config: Config) -> Iterator[Finding]:
 
 
 def _check_debian_changelogs(repo: Path, config: Config) -> Iterator[Finding]:
-    from .debian import parse_top_stanza
+    from .changelog import parse_top_stanza
 
     for name, comp in config.components.items():
         if comp.format != "debian" or comp.debian is None:

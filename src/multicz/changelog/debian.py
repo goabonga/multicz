@@ -32,9 +32,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import format_datetime
 
-from .changelog.bucket import filter_commits
-from .commits import Commit
-from .config import ChangelogSection
+from ..commits import Commit
+from ..config import ChangelogSection
+from .bucket import filter_commits
 
 _HEADER_RE = re.compile(
     r"^(?P<package>[a-z0-9][a-z0-9+\-.]*)\s+"

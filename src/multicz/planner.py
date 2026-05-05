@@ -373,7 +373,7 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
 
     comp = config.components[name]
     if comp.format == "debian" and comp.debian is not None:
-        from .debian import from_debian_pre, parse_top_version, upstream_version
+        from .changelog import from_debian_pre, parse_top_version, upstream_version
 
         changelog_path = repo / comp.debian.changelog
         if changelog_path.is_file():

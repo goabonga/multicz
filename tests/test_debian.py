@@ -3,8 +3,7 @@
 
 from datetime import UTC, datetime
 
-from multicz.commits import parse_commit
-from multicz.debian import (
+from multicz.changelog import (
     DebianStanza,
     format_debian_version,
     from_debian_pre,
@@ -15,6 +14,7 @@ from multicz.debian import (
     to_debian_pre,
     upstream_version,
 )
+from multicz.commits import parse_commit
 
 SAMPLE = """\
 mypackage (1.2.3-1) unstable; urgency=medium

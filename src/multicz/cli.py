@@ -17,7 +17,15 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .changelog import CascadeEntry, render_body, update_changelog_file
+from .changelog import (
+    CascadeEntry,
+    drop_prerelease_stanzas,
+    format_debian_version,
+    prepend_stanza,
+    render_body,
+    render_stanza,
+    update_changelog_file,
+)
 from .commits import (
     DEFAULT_TYPES,
     commits_in_range,
@@ -31,12 +39,6 @@ from .commits import (
 )
 from .components import ComponentMatcher
 from .config import CONFIG_FILENAME, Component, find_config, load_config
-from .debian import (
-    drop_prerelease_stanzas,
-    format_debian_version,
-    prepend_stanza,
-    render_stanza,
-)
 from .discovery import discover_components, render_config
 from .planner import (
     CommitReason,
