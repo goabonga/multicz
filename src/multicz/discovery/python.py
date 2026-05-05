@@ -11,7 +11,7 @@ from pathlib import Path
 import tomlkit
 
 from ..config import Component, FileKey
-from ._common import _find_manifests
+from ._common import _find_manifests, default_component_paths
 from .context import DiscoveryContext, DiscoveryResult
 
 
@@ -100,18 +100,16 @@ class PythonDiscovery:
                 continue  # uv workspace orchestrator with no [project], skip
             raw_name, version_key = info
             rel_dir = path.parent.relative_to(repo)
-            if rel_dir == Path("."):
-                paths = ["pyproject.toml"]
-                if (repo / "src").is_dir():
-                    paths.insert(0, "src/**")
-                if (repo / "tests").is_dir():
-                    paths.append("tests/**")
-                if (repo / "Dockerfile").is_file():
-                    paths.append("Dockerfile")
-                changelog = Path("CHANGELOG.md")
-            else:
-                paths = [f"{rel_dir.as_posix()}/**"]
-                changelog = Path(f"{rel_dir.as_posix()}/CHANGELOG.md")
+            root_paths = ["pyproject.toml"]
+            if (repo / "src").is_dir():
+                root_paths.insert(0, "src/**")
+            if (repo / "tests").is_dir():
+                root_paths.append("tests/**")
+            if (repo / "Dockerfile").is_file():
+                root_paths.append("Dockerfile")
+            paths, changelog = default_component_paths(
+                rel_dir, paths_when_root=root_paths,
+            )
             component = Component(
                 paths=paths,
                 bump_files=[FileKey(file=path.relative_to(repo), key=version_key)],

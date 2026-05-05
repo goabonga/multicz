@@ -34,3 +34,27 @@ def _find_manifests(repo: Path, filename: str) -> list[Path]:
             continue
         found.append(path)
     return sorted(found)
+
+
+def default_component_paths(
+    manifest_dir: Path,
+    *,
+    paths_when_root: list[str],
+) -> tuple[list[str], Path]:
+    """Branch between root layout and subdirectory layout for a manifest.
+
+    When the manifest lives at the repo root (``manifest_dir == Path(".")``),
+    returns ``(paths_when_root, Path("CHANGELOG.md"))``. The caller owns
+    the assembly of ``paths_when_root`` — what to include unconditionally
+    vs after an existence check is ecosystem-specific (Cargo always ships
+    ``src/**``, Python only when ``src/`` exists, etc.).
+
+    When the manifest lives in a subdirectory, paths collapses to a
+    single ``<dir>/**`` glob and the changelog lives inside that
+    directory. ``paths_when_root`` is ignored in that branch since the
+    glob covers everything below.
+    """
+    if manifest_dir == Path("."):
+        return list(paths_when_root), Path("CHANGELOG.md")
+    rel = manifest_dir.as_posix()
+    return [f"{rel}/**"], Path(f"{rel}/CHANGELOG.md")

@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from ..config import Component
-from ._common import _find_manifests
+from ._common import _find_manifests, default_component_paths
 from .context import DiscoveryContext, DiscoveryResult
 
 
@@ -48,16 +48,14 @@ class GoDiscovery:
             if not raw_name:
                 continue
             rel_dir = gomod_path.parent.relative_to(repo)
-            if rel_dir == Path("."):
-                paths = ["**/*.go", "go.mod"]
-                if (repo / "go.sum").is_file():
-                    paths.append("go.sum")
-                if (repo / "Dockerfile").is_file():
-                    paths.append("Dockerfile")
-                changelog = Path("CHANGELOG.md")
-            else:
-                paths = [f"{rel_dir.as_posix()}/**"]
-                changelog = Path(f"{rel_dir.as_posix()}/CHANGELOG.md")
+            root_paths = ["**/*.go", "go.mod"]
+            if (repo / "go.sum").is_file():
+                root_paths.append("go.sum")
+            if (repo / "Dockerfile").is_file():
+                root_paths.append("Dockerfile")
+            paths, changelog = default_component_paths(
+                rel_dir, paths_when_root=root_paths,
+            )
             component = Component(
                 paths=paths,
                 bump_files=[],  # Go is tag-driven

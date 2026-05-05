@@ -19,7 +19,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 from ..config import Component, FileKey
-from ._common import _NOISE_DIRS, _find_manifests
+from ._common import _NOISE_DIRS, _find_manifests, default_component_paths
 from .context import DiscoveryContext
 
 
@@ -136,16 +136,18 @@ def _detect_node(
             continue
         comp_name = _node_unique(name, set(components))
         rel_dir = path.parent.relative_to(repo)
-        if rel_dir == Path("."):
-            paths = ["package.json"]
-            if not python_taken and (repo / "src").is_dir():
-                paths.insert(0, "src/**")
-            changelog: Path | None = (
-                Path("CHANGELOG.md") if not python_taken else None
-            )
-        else:
-            paths = [f"{rel_dir.as_posix()}/**"]
-            changelog = Path(f"{rel_dir.as_posix()}/CHANGELOG.md")
+        root_paths = ["package.json"]
+        if not python_taken and (repo / "src").is_dir():
+            root_paths.insert(0, "src/**")
+        paths, _changelog = default_component_paths(
+            rel_dir, paths_when_root=root_paths,
+        )
+        # When a Python component already owns the root CHANGELOG.md,
+        # the JS root component leaves changelog unset to avoid a
+        # second component clobbering the same file.
+        changelog: Path | None = (
+            None if rel_dir == Path(".") and python_taken else _changelog
+        )
         components[comp_name] = Component(
             paths=paths,
             bump_files=[FileKey(file=path.relative_to(repo), key="version")],
