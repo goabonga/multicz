@@ -54,6 +54,7 @@ from .commands import (  # noqa: E402, F401
     config,
     explain,
     get,
+    graph,
     init,
     plan,
     release_notes,

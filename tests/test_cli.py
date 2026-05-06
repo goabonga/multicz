@@ -1851,3 +1851,101 @@ def test_config_component_filter_unknown_name_fails(
 def test_config_invalid_output_format_fails(repo: Path, runner: CliRunner):
     result = runner.invoke(app, ["config", "--output", "yaml"])
     assert result.exit_code == 1
+
+
+# ---------------------------------------------------------------------------
+# multicz graph
+# ---------------------------------------------------------------------------
+
+
+def test_graph_tree_renders_mirror_cascade(repo: Path, runner: CliRunner):
+    """The default ``api`` mirror writes ``Chart.yaml#appVersion`` owned
+    by ``chart`` — that edge must show up in the tree."""
+    result = runner.invoke(app, ["graph"])
+    assert result.exit_code == 0, result.stdout
+    assert "api" in result.stdout
+    assert "chart" in result.stdout
+    # The cascade is rendered as a parent/child relationship.
+    assert "mirror" in result.stdout
+
+
+def test_graph_mermaid_emits_graph_lr_block(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["graph", "--output", "mermaid"])
+    assert result.exit_code == 0, result.stdout
+    lines = result.stdout.splitlines()
+    assert lines[0] == "graph LR"
+    # Edge syntax: `upstream -->|label| downstream`
+    assert any("api -->" in ln and "chart" in ln for ln in lines), result.stdout
+
+
+def test_graph_dot_emits_digraph(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["graph", "--output", "dot"])
+    assert result.exit_code == 0, result.stdout
+    assert result.stdout.startswith("digraph multicz {")
+    assert result.stdout.rstrip().endswith("}")
+    # Edge syntax: `"api" -> "chart" [label="..."];`
+    assert '"api" -> "chart"' in result.stdout
+
+
+def test_graph_component_filter_keeps_subtree_only(
+    repo: Path, runner: CliRunner,
+):
+    """``-c chart`` shows only chart's downstream cascade. Since chart
+    has no downstreams in the default fixture, the output is just the
+    chart node."""
+    result = runner.invoke(app, ["graph", "-c", "chart"])
+    assert result.exit_code == 0, result.stdout
+    assert "chart" in result.stdout
+    # api is upstream of chart; the downstream-only filter excludes it.
+    # (`api` may still appear as a substring inside `chart-api` etc., so
+    # this fixture has no chart-api — assert on whole-line presence.)
+    for line in result.stdout.splitlines():
+        assert line.strip() not in {"api"}
+
+
+def test_graph_component_filter_unknown_name_fails(
+    repo: Path, runner: CliRunner,
+):
+    result = runner.invoke(app, ["graph", "-c", "wibble"])
+    assert result.exit_code == 1
+
+
+def test_graph_invalid_output_format_fails(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["graph", "--output", "ascii"])
+    assert result.exit_code == 1
+
+
+def test_graph_depends_on_edge_appears_in_dot(
+    tmp_path: Path, runner: CliRunner,
+):
+    """``depends_on`` is a name-based cascade edge; it must appear in
+    the graph output even when no mirror is declared."""
+    import subprocess as _sp
+
+    _sp.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    _sp.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    _sp.run(["git", "config", "user.name", "T"], cwd=tmp_path, check=True)
+    (tmp_path / "multicz.toml").write_text("""
+[components.upstream]
+paths = ["upstream/**"]
+bump_files = [{ file = "upstream/VERSION" }]
+
+[components.downstream]
+paths = ["downstream/**"]
+bump_files = [{ file = "downstream/VERSION" }]
+depends_on = ["upstream"]
+""")
+    (tmp_path / "upstream").mkdir()
+    (tmp_path / "downstream").mkdir()
+    (tmp_path / "upstream/VERSION").write_text("0.1.0\n")
+    (tmp_path / "downstream/VERSION").write_text("0.1.0\n")
+
+    import os
+    cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(app, ["graph", "--output", "dot"])
+    finally:
+        os.chdir(cwd)
+    assert result.exit_code == 0, result.stdout
+    assert '"upstream" -> "downstream" [label="depends_on"]' in result.stdout

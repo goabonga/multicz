@@ -258,6 +258,70 @@ Common debugging checks:
 | a writer isn't firing | `[[components.X.writers]]` array — check `type`, `file`, and that the entry survived schema validation. |
 | `multicz` is reading the wrong file | run with `--source` to confirm which config path was discovered. |
 
+## `graph`
+
+Render the cascade DAG between components — the synoptic answer to
+"if I bump X, what else bumps?". Two kinds of edges contribute, both
+directed upstream → downstream:
+
+- **mirrors** (file-based): A's mirror writes a path owned by B. Bumping
+  A rewrites the file, which lands inside B's `paths`, which patch-bumps
+  B (Helm chart `appVersion` is the canonical case).
+- **depends_on** (name-based): B declares `depends_on = ["A"]`. Pure
+  logical edge, no file written.
+
+```bash
+multicz graph                          # ASCII tree, all roots
+multicz graph -c api                   # downstream cascade from api
+multicz graph --output mermaid         # paste into a Markdown doc
+multicz graph --output dot | dot -Tsvg # render via Graphviz
+```
+
+Sample tree on a `api / web / chart-api / chart-web / chart` umbrella:
+
+```
+api
+└── chart-api (mirror charts/myapp-api/Chart.yaml:appVersion)
+    └── chart (mirror charts/myapp/Chart.yaml:regex:- name: …)
+
+web
+└── chart-web (mirror charts/myapp-web/Chart.yaml:appVersion)
+    └── chart (mirror charts/myapp/Chart.yaml:regex:- name: …)
+```
+
+Each tree root is a component with no incoming cascade edge. A DAG
+sink reached from multiple roots (here: `chart`) is rendered under
+*each* parent — the ASCII tree flattens the DAG by duplication so the
+full propagation is visible at a glance. Cycles (forbidden by
+`multicz validate`) get a `↻ cycle back to <name>` marker if they
+slip through.
+
+Notable flags:
+
+- `--output tree` (default) — Rich-rendered ASCII tree; one root per
+  pass, blank line between.
+- `--output mermaid` — `graph LR` block ready for Markdown / GitHub
+  PR descriptions / MkDocs. Edge labels are the same as the tree
+  view (`mirror <file>:<key>` or `depends_on`).
+- `--output dot` — Graphviz DOT for offline rendering. Pipe into
+  `dot -Tsvg > graph.svg` or `dot -Tpng`.
+- `-c <name>` filters to the *downstream* cascade rooted at `name`,
+  for any of the three formats. Useful when scoping a review to a
+  single component's blast radius.
+
+Example PR-bot integration (renders the upcoming-release graph as a
+Mermaid diagram on every push):
+
+```bash
+{
+  echo '## Release cascade preview'
+  echo
+  echo '```mermaid'
+  multicz graph --output mermaid
+  echo '```'
+} >> "$GITHUB_STEP_SUMMARY"
+```
+
 ## `changelog`
 
 Per-component log of conventional commits since the last tag.
