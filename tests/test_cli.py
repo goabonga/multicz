@@ -1784,3 +1784,70 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
     )
     assert proc.returncode == 0, proc.stderr
     assert "post_bump" not in proc.stderr
+
+
+# ---------------------------------------------------------------------------
+# multicz config
+# ---------------------------------------------------------------------------
+
+
+def test_config_default_output_is_toml(repo: Path, runner: CliRunner):
+    """Without ``--output``, the command emits valid TOML round-trippable
+    by tomllib (the same parser the loader uses)."""
+    import tomllib
+
+    result = runner.invoke(app, ["config"])
+    assert result.exit_code == 0, result.stdout
+    parsed = tomllib.loads(result.stdout)
+    assert "project" in parsed
+    assert "components" in parsed
+    assert set(parsed["components"]) == {"api", "chart"}
+
+
+def test_config_shows_resolved_bump_rules(repo: Path, runner: CliRunner):
+    """The output must reflect the *effective* config, including default
+    bump_rules merged onto an absent user table."""
+    import tomllib
+
+    result = runner.invoke(app, ["config"])
+    parsed = tomllib.loads(result.stdout)
+    assert parsed["project"]["bump_rules"] == {
+        "feat": "minor",
+        "fix": "patch",
+        "perf": "patch",
+        "revert": "patch",
+    }
+
+
+def test_config_json_output_is_machine_readable(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["config", "--output", "json"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert "project" in payload
+    assert "components" in payload
+
+
+def test_config_component_filter_keeps_project_and_named_component(
+    repo: Path, runner: CliRunner,
+):
+    """``-c <name>`` keeps the [project] table (defaults are useful for
+    debugging) and exactly one component."""
+    import tomllib
+
+    result = runner.invoke(app, ["config", "-c", "api"])
+    assert result.exit_code == 0, result.stdout
+    parsed = tomllib.loads(result.stdout)
+    assert "project" in parsed
+    assert list(parsed["components"]) == ["api"]
+
+
+def test_config_component_filter_unknown_name_fails(
+    repo: Path, runner: CliRunner,
+):
+    result = runner.invoke(app, ["config", "-c", "wibble"])
+    assert result.exit_code == 1
+
+
+def test_config_invalid_output_format_fails(repo: Path, runner: CliRunner):
+    result = runner.invoke(app, ["config", "--output", "yaml"])
+    assert result.exit_code == 1

@@ -194,6 +194,24 @@ docker build -t registry/myapp:$TAG .
 Reserved sub-fields (e.g. `multicz get api.image_tag`) are not
 implemented today - only `version` is exposed.
 
+## `config`
+
+Print the *effective* configuration after multicz applied every
+default and merged the project-level `bump_rules` with the conventional
+defaults. Useful for debugging "why isn't my override taking effect?"
+without having to read the schema or the loader.
+
+```bash
+multicz config                    # full config in TOML
+multicz config -c api             # just one component (project still shown)
+multicz config --output json      # machine-readable, pipe to jq
+multicz config --source           # also print the loaded file path on stderr
+```
+
+The TOML output is round-trippable - you can copy it back into a
+`multicz.toml` and it parses identically. The JSON output mirrors the
+Pydantic schema (Path objects rendered as strings).
+
 ## `changelog`
 
 Per-component log of conventional commits since the last tag.

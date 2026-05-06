@@ -51,6 +51,7 @@ from .commands import (  # noqa: E402, F401
     changed,
     changelog,
     check,
+    config,
     explain,
     get,
     init,
