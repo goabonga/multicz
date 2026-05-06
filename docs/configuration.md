@@ -195,6 +195,23 @@ source enables signing.
 Default `false`. When `true`, every release tag is GPG-signed
 (`git tag -s`).
 
+### `post_bump_policy` { #post_bump_policy }
+
+Default `"deny"`. Controls whether
+[component `post_bump`](#post_bump) shell hooks are allowed to run
+during `multicz bump`.
+
+| value | behaviour |
+|---|---|
+| `deny` (default) | hooks are skipped; if any are configured, a warning is printed pointing to this knob |
+| `allow` | hooks run as configured |
+
+`post_bump` is the only multicz feature that executes arbitrary
+commands sourced from the config, so the default is opt-in. To
+disable hooks for a single run regardless of policy, pass
+[`multicz bump --no-post-bump`](cli.md#bump). When the policy is
+`deny`, that flag also silences the warning.
+
 ### `trigger_policy` { #trigger_policy }
 
 Default `"patch"`. Controls how a `depends_on` cascade computes the
@@ -373,10 +390,20 @@ Canonical use-case: regenerating lockfiles that depend on the version
 multicz just wrote.
 
 ```toml
+[project]
+post_bump_policy = "allow"   # opt in — see below
+
 [components.api]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 post_bump  = ["uv lock"]
 ```
+
+!!! warning "Opt-in execution"
+    Hooks only run when
+    [`[project].post_bump_policy = "allow"`](#post_bump_policy). The
+    default is `"deny"` because `post_bump` is the single feature
+    that executes arbitrary shell commands from the config —
+    enabling it should be a reviewable change.
 
 Each entry is parsed via `shlex.split` and executed in the repo root.
 Files modified by these hooks are auto-detected (by content hash) and

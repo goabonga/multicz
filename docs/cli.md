@@ -146,6 +146,7 @@ multicz bump --force api:patch                 # manual bump (rebuild)
 multicz bump --force api:minor --force chart:major
 multicz bump --commit -m "release: hotfix"     # verbatim message (no template)
 multicz bump --sign                            # GPG-sign commit + tags
+multicz bump --no-post-bump                    # skip post_bump shell hooks
 multicz bump --output json                     # machine-readable
 multicz bump --summary $GITHUB_STEP_SUMMARY    # markdown summary to file
 ```
@@ -165,6 +166,11 @@ Notable flags:
   candidates](recipes.md#release-candidates).
 - `--force NAME:KIND` - repeatable. Bypasses commit detection. Validated
   upfront ([details](recipes.md#manual-bump)).
+- `--no-post-bump` - skip
+  [`post_bump`](configuration.md#post_bump) shell hooks for this run,
+  even when `[project].post_bump_policy = "allow"`. When the policy is
+  `"deny"` (default), hooks are already skipped — this flag silences
+  the warning.
 
 `bump` intentionally does **not** take `--since` - combining a custom
 window with a write+tag can create tags that contradict actual history.

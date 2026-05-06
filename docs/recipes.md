@@ -296,10 +296,17 @@ subsequent `uv sync --frozen` (or `npm ci`, `cargo build --locked`) in
 CI fails. Use `post_bump`:
 
 ```toml
+[project]
+post_bump_policy = "allow"   # opt in — see security note
+
 [components.api]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 post_bump  = ["uv lock"]
 ```
+
+The `post_bump_policy` line is required: hooks are
+[opt-in by default](configuration.md#post_bump_policy) so that adding
+shell execution to `multicz.toml` is a deliberate, reviewable change.
 
 Common one-liners:
 

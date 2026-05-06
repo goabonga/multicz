@@ -324,6 +324,13 @@ def bump(
              "the workflow run page.",
         dir_okay=False,
     ),
+    no_post_bump: bool = typer.Option(
+        False, "--no-post-bump",
+        help="Skip post_bump shell hooks for this run, even when "
+             "[project].post_bump_policy = \"allow\". Hooks are also skipped "
+             "(loudly) when the policy is \"deny\" - this flag silences the "
+             "warning in that case.",
+    ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
     if pre is not None and finalize:
@@ -473,7 +480,18 @@ def bump(
         hook_components = [
             b.component for b in applied if config.components[b.component].post_bump
         ]
-        if hook_components:
+        policy_allows = config.project.post_bump_policy == "allow"
+        if hook_components and not policy_allows and not no_post_bump:
+            # Configured hooks but policy denies them: warn loudly.
+            # Pass --no-post-bump to silence this warning in CI.
+            err.print(
+                f"[yellow]post_bump hooks skipped[/] for "
+                f"{', '.join(hook_components)}: "
+                f"set [cyan]project.post_bump_policy = \"allow\"[/] in "
+                f"multicz.toml to enable, or pass [cyan]--no-post-bump[/] to "
+                f"silence this warning."
+            )
+        elif hook_components and policy_allows and not no_post_bump:
             before_dirty = _porcelain_paths(repo)
             before_hashes: dict[str, str | None] = {
                 relpath: _hash_file(repo / relpath)

@@ -307,6 +307,13 @@ class ProjectSettings(BaseModel):
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
     sign_commits: bool = False  # gpg-sign release commits (git commit -S)
     sign_tags: bool = False     # gpg-sign tags (git tag -s)
+    # Whether ``[components.<name>] post_bump`` shell hooks are allowed
+    # to run. Defaults to ``"deny"`` because post_bump is the *only*
+    # multicz feature that executes arbitrary commands sourced from the
+    # config — opting in is an explicit, reviewable change. Set to
+    # ``"allow"`` to enable; the CLI flag ``--no-post-bump`` can still
+    # disable hooks for a specific run.
+    post_bump_policy: Literal["deny", "allow"] = "deny"
     # Cascade kind along ``depends_on`` edges. Defaults to ``"patch"``: a
     # dependent (e.g. a Helm chart) doesn't usually *gain* the upstream's
     # feature - it just needs a fresh build referencing the new version.

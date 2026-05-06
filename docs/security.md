@@ -23,15 +23,21 @@ model is straightforward - the security guarantees should match.
   actually touched, not heuristics. A `path_overlap` finding from
   `validate` reads from `git ls-files`; nothing is sniffed from a
   watcher or filesystem scan.
-- **No code execution from config.** The TOML schema is
+- **No code execution from config by default.** The TOML schema is
   pydantic-validated with `extra="forbid"`. There are no callbacks,
   no Python imports from data, no shell-out templates.
 
 The single exception is `post_bump`: each entry is a shell command
-parsed via `shlex.split` and executed in the repo root. Treat
-`post_bump` like any other CI shell hook - review what's there, and
-keep `multicz.toml` itself under the same code-review process as the
-rest of the repo.
+parsed via `shlex.split` and executed in the repo root. As of
+multicz's `post_bump_policy` knob, `post_bump` hooks are **opt-in**:
+they only run when `[project].post_bump_policy = "allow"` is set.
+The default is `"deny"`, in which case hooks declared on components
+are skipped and a warning surfaces on stderr pointing to the policy
+knob. To disable hooks for a single run regardless of policy, pass
+`multicz bump --no-post-bump` (the flag also silences the deny
+warning). Treat enabling `post_bump_policy` like any other CI shell
+hook — review what's there, and keep `multicz.toml` itself under
+the same code-review process as the rest of the repo.
 
 ## Hardening options
 
@@ -49,6 +55,9 @@ rest of the repo.
 [unknown_commit_policy]: configuration.md#unknown_commit_policy
 [overlap_policy]: configuration.md#overlap_policy
 | Path / mirror / trigger cycles | [`multicz validate`](cli.md#validate) - runs as a CI gate before `bump` |
+| Shell execution from config | `[project].post_bump_policy = "deny"` ([details][post_bump_policy]) (default) - opt-in via `"allow"` |
+
+[post_bump_policy]: configuration.md#post_bump_policy
 
 ## CI hardening checklist
 

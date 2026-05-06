@@ -1548,6 +1548,9 @@ def test_post_bump_runs_command_and_includes_modified_file(
     """post_bump runs after writes and pulls modified files into the
     release commit (simulates `uv lock` regenerating uv.lock)."""
     (repo / "multicz.toml").write_text("""
+[project]
+post_bump_policy = "allow"
+
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -1571,6 +1574,9 @@ def test_post_bump_failure_aborts_bump(
     committing or tagging - the working tree may have been written to,
     but no release commit is created."""
     (repo / "multicz.toml").write_text("""
+[project]
+post_bump_policy = "allow"
+
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -1590,6 +1596,9 @@ def test_post_bump_skipped_in_dry_run(
     repo: Path, runner: CliRunner
 ):
     (repo / "multicz.toml").write_text("""
+[project]
+post_bump_policy = "allow"
+
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -1609,6 +1618,9 @@ def test_post_bump_includes_file_already_dirty_before_hook(
     hook then rewrites it again with different content. A pure set
     diff would miss it; the hash comparison catches it."""
     (repo / "multicz.toml").write_text("""
+[project]
+post_bump_policy = "allow"
+
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -1641,6 +1653,9 @@ def test_post_bump_json_output_has_clean_stdout(
     post_bump hook fires - the hook header must go to stderr, otherwise
     pipelines that pipe into `jq` choke."""
     (repo / "multicz.toml").write_text("""
+[project]
+post_bump_policy = "allow"
+
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -1665,6 +1680,9 @@ def test_post_bump_runs_only_for_bumped_components(
     """Hooks fire only for components that actually got bumped - a
     component with `post_bump` that didn't change must stay quiet."""
     (repo / "multicz.toml").write_text("""
+[project]
+post_bump_policy = "allow"
+
 [components.api]
 paths = ["src/**"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -1680,3 +1698,87 @@ post_bump = ["sh -c 'echo ran > untouched.lock'"]
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
     runner.invoke(app, ["bump"])
     assert not (repo / "untouched.lock").exists()
+
+
+def test_post_bump_default_policy_skips_hooks_and_warns(
+    repo: Path, runner: CliRunner
+):
+    """Without ``post_bump_policy = "allow"``, configured hooks are
+    skipped and a loud warning is emitted (the security default: shell
+    execution from config is opt-in)."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["sh -c 'echo ran > should_not_exist.lock'"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    # CliRunner merges stderr into output; subprocess keeps them separate.
+    proc = subprocess.run(
+        [sys.executable, "-m", "multicz", "bump"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert not (repo / "should_not_exist.lock").exists()
+    assert "post_bump hooks skipped" in proc.stderr
+    assert "post_bump_policy" in proc.stderr
+
+
+def test_post_bump_no_post_bump_flag_silences_warning(
+    repo: Path, runner: CliRunner
+):
+    """``--no-post-bump`` skips hooks AND silences the deny-policy
+    warning. Useful in CI when the policy is intentionally deny."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["sh -c 'echo ran > should_not_exist.lock'"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    proc = subprocess.run(
+        [sys.executable, "-m", "multicz", "bump", "--no-post-bump"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert not (repo / "should_not_exist.lock").exists()
+    assert "post_bump hooks skipped" not in proc.stderr
+
+
+def test_post_bump_no_post_bump_overrides_allow_policy(
+    repo: Path, runner: CliRunner
+):
+    """``--no-post-bump`` overrides ``post_bump_policy = "allow"`` for
+    the current run — emergency disable without editing config."""
+    (repo / "multicz.toml").write_text("""
+[project]
+post_bump_policy = "allow"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+post_bump = ["sh -c 'echo ran > should_not_exist.lock'"]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    result = runner.invoke(app, ["bump", "--no-post-bump"])
+    assert result.exit_code == 0, result.stdout
+    assert not (repo / "should_not_exist.lock").exists()
+
+
+def test_post_bump_policy_no_warning_when_no_hooks_configured(
+    repo: Path, runner: CliRunner
+):
+    """The deny warning fires only when hooks are configured. Repos
+    without any post_bump must stay quiet on the default policy."""
+    (repo / "multicz.toml").write_text("""
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
+    proc = subprocess.run(
+        [sys.executable, "-m", "multicz", "bump"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "post_bump" not in proc.stderr
