@@ -687,3 +687,157 @@ def test_mirror_rejects_unknown_field(tmp_path: Path):
     )
     with pytest.raises(ValidationError):
         load_config(target)
+
+
+# ---------------------------------------------------------------------------
+# bump_rules + ignored_types deprecation
+# ---------------------------------------------------------------------------
+
+
+def _minimal_component(extra: str = "") -> str:
+    """Single-component config used by the bump_rules tests."""
+    return f"""
+[components.api]
+paths = ["src/**"]
+bump_files = [{{ file = "pyproject.toml", key = "project.version" }}]
+{extra}
+"""
+
+
+def test_bump_rules_default_matches_default_bump_rules(tmp_path: Path):
+    """Without an explicit `[project.bump_rules]` table, the project
+    inherits :data:`DEFAULT_BUMP_RULES`."""
+    from multicz.commits import DEFAULT_BUMP_RULES
+
+    target = _write(tmp_path, _minimal_component())
+    config = load_config(target)
+    assert config.project.bump_rules == DEFAULT_BUMP_RULES
+
+
+def test_bump_rules_user_entries_merge_on_top_of_defaults(tmp_path: Path):
+    """User entries merge on top of :data:`DEFAULT_BUMP_RULES`. Adding
+    ``infra = "patch"`` keeps the conventional ``feat`` / ``fix`` / ``perf``
+    / ``revert`` defaults — no footgun on sparse user tables."""
+    target = _write(
+        tmp_path,
+        """
+[project.bump_rules]
+infra = "patch"
+"""
+        + _minimal_component(),
+    )
+    config = load_config(target)
+    rules = config.project.bump_rules
+    assert rules == {
+        "feat": "minor",
+        "fix": "patch",
+        "perf": "patch",
+        "revert": "patch",
+        "infra": "patch",
+    }
+
+
+def test_bump_rules_user_can_silence_default(tmp_path: Path):
+    """``feat = "none"`` overrides the default ``feat = "minor"``."""
+    target = _write(
+        tmp_path,
+        """
+[project.bump_rules]
+feat = "none"
+"""
+        + _minimal_component(),
+    )
+    config = load_config(target)
+    assert config.project.bump_rules["feat"] == "none"
+
+
+def test_bump_rules_keys_are_lowercased(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+[project.bump_rules]
+FEAT = "minor"
+"""
+        + _minimal_component(),
+    )
+    config = load_config(target)
+    assert "feat" in config.project.bump_rules
+    assert "FEAT" not in config.project.bump_rules
+
+
+def test_bump_rules_rejects_invalid_value(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+[project.bump_rules]
+feat = "wibble"
+"""
+        + _minimal_component(),
+    )
+    with pytest.raises(ValidationError):
+        load_config(target)
+
+
+def test_bump_rules_for_merges_project_and_component(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        """
+[project.bump_rules]
+feat = "minor"
+fix = "patch"
+"""
+        + _minimal_component('bump_rules = { feat = "patch" }'),
+    )
+    config = load_config(target)
+    rules = config.bump_rules_for("api")
+    # Component override wins per-type; project entries pass through.
+    assert rules["feat"] == "patch"
+    assert rules["fix"] == "patch"
+
+
+def test_ignored_types_project_emits_deprecation_and_folds(tmp_path: Path):
+    """``[project] ignored_types`` is folded into ``bump_rules`` as
+    ``"none"`` and triggers a DeprecationWarning."""
+    target = _write(
+        tmp_path,
+        """
+[project]
+ignored_types = ["chore", "ci"]
+"""
+        + _minimal_component(),
+    )
+    with pytest.warns(DeprecationWarning, match="ignored_types is deprecated"):
+        config = load_config(target)
+    assert config.project.bump_rules.get("chore") == "none"
+    assert config.project.bump_rules.get("ci") == "none"
+    # The legacy field is consumed and cleared.
+    assert config.project.ignored_types == []
+
+
+def test_ignored_types_component_emits_deprecation_and_folds(tmp_path: Path):
+    target = _write(
+        tmp_path,
+        _minimal_component('ignored_types = ["fix"]'),
+    )
+    with pytest.warns(DeprecationWarning, match="ignored_types is deprecated"):
+        config = load_config(target)
+    api = config.components["api"]
+    assert api.bump_rules.get("fix") == "none"
+    assert api.ignored_types == []
+
+
+def test_ignored_types_overrides_bump_rules_default(tmp_path: Path):
+    """Legacy ``ignored_types = ["feat"]`` must beat the default
+    ``bump_rules.feat = "minor"`` (otherwise feat! would still bump major
+    on the legacy config form)."""
+    target = _write(
+        tmp_path,
+        """
+[project]
+ignored_types = ["feat"]
+"""
+        + _minimal_component(),
+    )
+    with pytest.warns(DeprecationWarning):
+        config = load_config(target)
+    assert config.project.bump_rules["feat"] == "none"

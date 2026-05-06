@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import re
 import shlex
+import warnings
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from ..commits import DEFAULT_BUMP_RULES, BumpRule
 
 # Component names land in git tag names, file paths (CHANGELOG.md location),
 # JSON output, release-notes headings, and CLI arguments
@@ -127,6 +130,13 @@ class Component(BaseModel):
     debian: DebianSettings | None = None
     tag_format: str | None = None  # overrides the project-level tag_format
     bump_policy: Literal["as-commit", "scoped"] = "as-commit"
+    # Sparse override over ``project.bump_rules`` (component wins per type).
+    # Map a conventional-commit type to its bump level: ``major`` /
+    # ``minor`` / ``patch`` / ``none`` (= silence the type, including its
+    # breaking variants).
+    bump_rules: dict[str, BumpRule] = Field(default_factory=dict)
+    # Deprecated: use ``bump_rules`` with ``= "none"`` instead. Kept as a
+    # parse-time alias; folded into ``bump_rules`` after model validation.
     ignored_types: list[str] = Field(default_factory=list)
     version_scheme: Literal["semver", "pep440"] = "semver"
     artifacts: list[Artifact] = Field(default_factory=list)
@@ -158,6 +168,27 @@ class Component(BaseModel):
                     f"command: {exc}"
                 ) from exc
         return value
+
+    @field_validator("bump_rules")
+    @classmethod
+    def _lowercase_bump_rule_keys(cls, value: dict[str, BumpRule]) -> dict[str, BumpRule]:
+        return {k.lower(): v for k, v in value.items()}
+
+    @model_validator(mode="after")
+    def _fold_ignored_types(self) -> Component:
+        """Deprecated alias: each ``ignored_types`` entry becomes
+        ``bump_rules[type] = "none"``."""
+        if self.ignored_types:
+            warnings.warn(
+                "[components.<name>] ignored_types is deprecated; use "
+                "bump_rules with '<type> = \"none\"' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            for t in self.ignored_types:
+                self.bump_rules[t.lower()] = "none"
+            self.ignored_types = []
+        return self
 
     @model_validator(mode="after")
     def _merge_triggers_alias(self) -> Component:
@@ -256,12 +287,54 @@ class ProjectSettings(BaseModel):
     cascade_changelog_format: str = "Track `{upstream}` `{upstream_version}`"
     finalize_strategy: Literal["consolidate", "promote", "annotate"] = "consolidate"
     overlap_policy: Literal["error", "first-match", "allow", "all"] = "error"
+    # Bump level per conventional-commit type. Entries map to ``major`` /
+    # ``minor`` / ``patch`` / ``none``. A type set to ``"none"`` is fully
+    # silenced (its breaking variants are also dropped). Types absent from
+    # the map fall back to: skip when not breaking, major when breaking
+    # (Conventional Commits default).
+    #
+    # User-provided entries are *merged on top of* :data:`DEFAULT_BUMP_RULES`
+    # so adding a single rule like ``refactor = "patch"`` doesn't silently
+    # lose the conventional bump for ``feat`` / ``fix`` / ``perf`` /
+    # ``revert``. To silence a default, set it to ``"none"`` explicitly.
+    bump_rules: dict[str, BumpRule] = Field(
+        default_factory=lambda: dict(DEFAULT_BUMP_RULES)
+    )
+    # Deprecated: use ``bump_rules`` with ``= "none"`` instead. Kept as a
+    # parse-time alias; folded into ``bump_rules`` after model validation.
     ignored_types: list[str] = Field(default_factory=list)
     state_file: Path | None = None  # opt-in JSON snapshot, written on bump
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
     sign_commits: bool = False  # gpg-sign release commits (git commit -S)
     sign_tags: bool = False     # gpg-sign tags (git tag -s)
     trigger_policy: Literal["match-upstream", "patch"] = "match-upstream"
+
+    @field_validator("bump_rules", mode="before")
+    @classmethod
+    def _merge_default_bump_rules(cls, value: Any) -> Any:
+        """Merge user entries on top of :data:`DEFAULT_BUMP_RULES` so a
+        sparse override doesn't silently drop conventional bumps."""
+        if not isinstance(value, dict):
+            return value
+        merged = dict(DEFAULT_BUMP_RULES)
+        merged.update({k.lower(): v for k, v in value.items()})
+        return merged
+
+    @model_validator(mode="after")
+    def _fold_ignored_types(self) -> ProjectSettings:
+        """Deprecated alias: each ``ignored_types`` entry becomes
+        ``bump_rules[type] = "none"``."""
+        if self.ignored_types:
+            warnings.warn(
+                "[project] ignored_types is deprecated; use bump_rules with "
+                "'<type> = \"none\"' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            for t in self.ignored_types:
+                self.bump_rules[t.lower()] = "none"
+            self.ignored_types = []
+        return self
 
 
 class Config(BaseModel):
@@ -364,16 +437,28 @@ class Config(BaseModel):
                 )
             seen[prefix] = name
 
-    def ignored_types_for(self, component: str) -> set[str]:
-        """Return the lowercased commit types ignored for ``component``.
+    def bump_rules_for(self, component: str) -> dict[str, BumpRule]:
+        """Effective bump rules for ``component``.
 
-        Effective set is the union of project and component ignored types.
+        Project rules merged with the component's sparse override; the
+        component-level value wins per type.
         """
+        rules = dict(self.project.bump_rules)
         comp = self.components.get(component)
-        comp_set: set[str] = set()
         if comp is not None:
-            comp_set = {t.lower() for t in comp.ignored_types}
-        return {t.lower() for t in self.project.ignored_types} | comp_set
+            rules.update(comp.bump_rules)
+        return rules
+
+    def ignored_types_for(self, component: str) -> set[str]:
+        """Return the lowercased commit types silenced for ``component``.
+
+        Derived from :meth:`bump_rules_for`: any type whose effective
+        rule is ``"none"`` is considered ignored. Kept for callers that
+        still consume ignored-types semantics directly.
+        """
+        return {
+            t for t, kind in self.bump_rules_for(component).items() if kind == "none"
+        }
 
     def tag_format_for(self, component: str) -> str:
         """Return the effective tag_format for ``component``.

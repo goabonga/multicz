@@ -28,19 +28,25 @@ from .git import (
     previous_tag,
 )
 from .parse import (
+    DEFAULT_BUMP_RULES,
     DEFAULT_TYPES,
     BumpKind,
+    BumpRule,
     Commit,
+    bump_kind_for,
     parse_commit,
     tag_prefix,
     validate_message,
 )
 
 __all__ = [
+    "DEFAULT_BUMP_RULES",
     "DEFAULT_TYPES",
     "BumpKind",
+    "BumpRule",
     "Commit",
     "GitError",
+    "bump_kind_for",
     "commits_in_range",
     "commits_since",
     "latest_stable_tag",

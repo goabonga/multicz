@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-from multicz.commits import parse_commit, validate_message
+from multicz.commits import (
+    DEFAULT_BUMP_RULES,
+    bump_kind_for,
+    parse_commit,
+    validate_message,
+)
 
 
 def test_feat_is_minor():
@@ -98,3 +103,54 @@ def test_validate_custom_types():
     assert validate_message("custom: x", allowed_types=("custom", "feat")) is None
     error = validate_message("feat: x", allowed_types=("custom",))
     assert error is not None
+
+
+# ---------------------------------------------------------------------------
+# bump_kind_for: configurable rules
+# ---------------------------------------------------------------------------
+
+
+def test_bump_kind_for_default_rules_match_property():
+    """The free function with DEFAULT_BUMP_RULES matches the convenience
+    property on Commit."""
+    for msg in (
+        "feat: x",
+        "fix: x",
+        "perf: x",
+        "revert: x",
+        "feat!: x",
+        "chore: x",
+        "chore!: x",
+        "refactor: x",
+    ):
+        c = parse_commit("a", msg, ())
+        assert bump_kind_for(c, DEFAULT_BUMP_RULES) == c.bump_kind, msg
+
+
+def test_bump_kind_for_custom_rule_promotes_refactor_to_patch():
+    """Adding ``refactor = "patch"`` makes refactor commits bump patch."""
+    c = parse_commit("a", "refactor: split module", ())
+    rules = {**DEFAULT_BUMP_RULES, "refactor": "patch"}
+    assert bump_kind_for(c, rules) == "patch"
+
+
+def test_bump_kind_for_explicit_none_silences_breaking_too():
+    """``feat = "none"`` drops feat! as well — the legacy ignored_types
+    semantics: explicit opt-out beats the breaking marker."""
+    c = parse_commit("a", "feat!: drop py3.11", ())
+    rules = {**DEFAULT_BUMP_RULES, "feat": "none"}
+    assert bump_kind_for(c, rules) is None
+
+
+def test_bump_kind_for_absent_type_keeps_breaking_as_major():
+    """A type with no rule (e.g. chore by default) still bumps major
+    when breaking — Conventional Commits default."""
+    c = parse_commit("a", "chore!: rip out legacy", ())
+    assert bump_kind_for(c, DEFAULT_BUMP_RULES) == "major"
+
+
+def test_bump_kind_for_custom_type_bumps_per_rule():
+    """A user-defined type like ``infra`` bumps per its rule."""
+    c = parse_commit("a", "infra: rotate creds", ())
+    assert bump_kind_for(c, {"infra": "patch"}) == "patch"
+    assert bump_kind_for(c, {"infra": "minor"}) == "minor"

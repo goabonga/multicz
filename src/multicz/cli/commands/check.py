@@ -11,7 +11,21 @@ from pathlib import Path
 import typer
 
 from ...commits import DEFAULT_TYPES, validate_message
+from ...config import find_config, load_config
 from .. import app, err
+
+
+def _allowed_types_from_config() -> tuple[str, ...]:
+    """Allowed conventional-commit types: union of the project's
+    ``bump_rules`` keys and the conventional baseline. Falls back to
+    :data:`DEFAULT_TYPES` if no config file is reachable or if loading
+    fails for any reason (the commit-msg hook must never block on a
+    config issue — it only validates the header shape)."""
+    try:
+        config = load_config(find_config(Path.cwd()))
+    except (FileNotFoundError, ValueError):
+        return DEFAULT_TYPES
+    return tuple(sorted(set(DEFAULT_TYPES) | set(config.project.bump_rules)))
 
 
 @app.command()
@@ -43,7 +57,7 @@ def check(
             raise typer.Exit(code=1)
         message = path.read_text(encoding="utf-8")
 
-    allowed = tuple(types) if types else DEFAULT_TYPES
+    allowed = tuple(types) if types else _allowed_types_from_config()
     error = validate_message(message, allowed_types=allowed)
     if error is not None:
         err.print(f"[red]invalid commit message:[/] {error}")

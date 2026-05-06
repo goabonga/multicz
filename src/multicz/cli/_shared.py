@@ -131,8 +131,9 @@ def _component_relevant_commits(
 
     * release commits matching ``project.release_commit_pattern`` are
       skipped so the chore(release) lines don't pollute the changelog.
-    * commits whose type is in the component's effective ``ignored_types``
-      (project + component, union) are skipped entirely.
+    * commits whose effective ``bump_rules`` entry is ``"none"`` (i.e.
+      explicitly silenced, including breaking variants) are skipped
+      entirely.
 
     When ``since_stable`` is True, the range starts at the previous
     *stable* tag instead - used by the ``consolidate`` and ``promote``

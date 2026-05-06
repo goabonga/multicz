@@ -12,10 +12,12 @@ happens in this module.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
 BumpKind = Literal["major", "minor", "patch"]
+BumpRule = Literal["major", "minor", "patch", "none"]
 
 _HEADER_RE = re.compile(
     r"^(?P<type>[a-zA-Z]+)"
@@ -29,6 +31,12 @@ DEFAULT_TYPES: tuple[str, ...] = (
     "feat", "fix", "perf", "refactor", "docs", "test",
     "build", "ci", "chore", "style", "revert",
 )
+DEFAULT_BUMP_RULES: dict[str, BumpRule] = {
+    "feat": "minor",
+    "fix": "patch",
+    "perf": "patch",
+    "revert": "patch",
+}
 _AUTO_PREFIXES: tuple[str, ...] = (
     "Merge ", "Revert ", "fixup!", "squash!", "amend!",
 )
@@ -78,25 +86,36 @@ class Commit:
 
     @property
     def bump_kind(self) -> BumpKind | None:
-        """Semver level implied by the conventional-commit type.
+        """Semver level under :data:`DEFAULT_BUMP_RULES`.
 
-        ``major``: ``!`` marker or ``BREAKING CHANGE:`` footer.
-        ``minor``: ``feat``.
-        ``patch``: ``fix``, ``perf``, ``revert``. A revert is a
-        user-visible change (something was removed or restored), and a
-        patch is the conservative answer - the next release isn't a
-        feature or breaking change, but it isn't nothing either.
-
-        Other types (``chore``, ``docs``, ``style``, ``refactor``,
-        ``test``, ``build``, ``ci``) return ``None`` and don't bump.
+        Convenience for callers that don't have a :class:`Config` in
+        scope. The planner uses :func:`bump_kind_for` with the
+        component-effective ``bump_rules`` instead.
         """
-        if self.breaking:
-            return "major"
-        if self.type.lower() == "feat":
-            return "minor"
-        if self.type.lower() in {"fix", "perf", "revert"}:
-            return "patch"
+        return bump_kind_for(self, DEFAULT_BUMP_RULES)
+
+
+def bump_kind_for(commit: Commit, rules: Mapping[str, BumpRule]) -> BumpKind | None:
+    """Resolve the semver level for ``commit`` under ``rules``.
+
+    Resolution order:
+
+    1. Type explicitly mapped to ``"none"`` -> always skip, even when
+       the commit is breaking. Mirrors the legacy ``ignored_types``
+       opt-out: silencing a type silences its breaking variants too.
+    2. Otherwise breaking commits (``!`` marker or ``BREAKING CHANGE:``
+       footer) bump major.
+    3. Otherwise the rule's value (``major`` / ``minor`` / ``patch``).
+    4. Type absent from ``rules`` and not breaking -> no bump.
+    """
+    rule = rules.get(commit.type.lower())
+    if rule == "none":
         return None
+    if commit.breaking:
+        return "major"
+    if rule is None:
+        return None
+    return rule
 
 
 def parse_commit(sha: str, message: str, files: tuple[str, ...]) -> Commit:

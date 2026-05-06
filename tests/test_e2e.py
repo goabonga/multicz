@@ -195,8 +195,88 @@ paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 """)
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat!: drop py3.11")
-    plan = build_plan(repo, load_config(cfg))
+    with pytest.warns(DeprecationWarning, match="ignored_types is deprecated"):
+        plan = build_plan(repo, load_config(cfg))
     assert "api" not in plan.bumps  # ignored even though it's breaking
+
+
+def test_bump_rules_promote_refactor_to_patch(repo: Path):
+    """Custom bump rule: ``refactor = "patch"`` makes refactor commits bump."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project.bump_rules]
+feat = "minor"
+fix = "patch"
+refactor = "patch"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "refactor: split module")
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["api"].kind == "patch"
+
+
+def test_bump_rules_silence_via_none_drops_breaking_too(repo: Path):
+    """``bump_rules.feat = "none"`` drops feat! too (replaces ignored_types)."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project.bump_rules]
+feat = "none"
+fix = "patch"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat!: drop py3.11")
+    plan = build_plan(repo, load_config(cfg))
+    assert "api" not in plan.bumps
+
+
+def test_bump_rules_component_override_wins_over_project(repo: Path):
+    """A component's bump_rules override project rules per-type."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project.bump_rules]
+feat = "minor"
+fix = "patch"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+bump_rules = { feat = "patch" }   # api: feat is just a patch here
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+""")
+    _commit(
+        repo,
+        {"src/main.py": "x = 2\n", "charts/myapp/values.yaml": "x: 1\n"},
+        "feat: shared change",
+    )
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["api"].kind == "patch"     # component override
+    assert plan.bumps["chart"].kind == "minor"   # project default
+
+
+def test_bump_rules_custom_type_bumps_per_rule(repo: Path):
+    """A user-defined type (e.g. ``infra``) bumps when listed in bump_rules."""
+    cfg = repo / "multicz.toml"
+    cfg.write_text("""
+[project.bump_rules]
+feat = "minor"
+infra = "patch"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "infra: rotate creds")
+    plan = build_plan(repo, load_config(cfg))
+    assert plan.bumps["api"].kind == "patch"
 
 
 def test_bump_policy_default_propagates_kind_to_every_touched_component(repo: Path):

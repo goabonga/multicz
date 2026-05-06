@@ -26,6 +26,7 @@ from packaging.version import InvalidVersion, Version
 
 from ..commits import (
     BumpKind,
+    bump_kind_for,
     commits_since,
     latest_tag,
     latest_version,
@@ -132,7 +133,7 @@ def _direct_pass(
             since = latest_tag(repo, prefix)
         else:
             since = since_override
-        ignored = config.ignored_types_for(name)
+        rules = config.bump_rules_for(name)
         for commit in commits_since(repo, since):
             # Handle non-conventional commits before anything else.
             if not commit.is_conventional:
@@ -171,9 +172,8 @@ def _direct_pass(
             )
             if release_re.match(header):
                 continue
-            if commit.type.lower() in ignored:
-                continue
-            if commit.bump_kind is None:
+            commit_kind = bump_kind_for(commit, rules)
+            if commit_kind is None:
                 continue
             if overlap_all:
                 owned = tuple(
@@ -187,7 +187,7 @@ def _direct_pass(
                 continue
 
             comp = config.components[name]
-            kind = commit.bump_kind
+            kind = commit_kind
             demoted = False
             if (
                 comp.bump_policy == "scoped"
@@ -208,7 +208,7 @@ def _direct_pass(
                 subject=commit.subject,
                 files=owned,
                 bump_kind=kind,
-                original_kind=commit.bump_kind if demoted else None,
+                original_kind=commit_kind if demoted else None,
             )
             _promote(plan, name, kind, versions[name], reason)
 
