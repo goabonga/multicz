@@ -223,12 +223,13 @@ def _triggers_pass(
 
     The cascade kind is governed by ``project.trigger_policy``:
 
-    * ``match-upstream`` (default): the dependent inherits the upstream's
-      bump kind. ``api`` going minor → ``chart`` also goes minor.
-    * ``patch``: the dependent always patches when its upstream bumps,
-      regardless of the upstream's level. Useful when a dependent isn't
-      really gaining a feature when its dependency does, just needs a
-      fresh build.
+    * ``patch`` (default): the dependent always patches when its upstream
+      bumps, regardless of the upstream's level. A dependent (e.g. a Helm
+      chart) usually doesn't *gain* the upstream's feature; it just needs
+      a fresh build referencing the new version.
+    * ``match-upstream``: the dependent inherits the upstream's bump kind.
+      ``api`` going minor → ``chart`` also goes minor. Use when the
+      dependent's release semantics genuinely track the upstream's.
     """
     policy = config.project.trigger_policy
     changed = True

@@ -157,13 +157,13 @@ Default `false`. When `true`, every release tag is GPG-signed
 
 ### `trigger_policy` { #trigger_policy }
 
-Default `"match-upstream"`. Controls how a `depends_on` cascade
-computes the dependent's bump kind.
+Default `"patch"`. Controls how a `depends_on` cascade computes the
+dependent's bump kind.
 
 | value | behaviour |
 |---|---|
-| `match-upstream` | dependent inherits the upstream's kind (`api` minor → `chart` minor) |
-| `patch` | dependent always patches when its upstream bumps |
+| `patch` (default) | dependent always patches when its upstream bumps — a Helm chart referencing a new app version doesn't *gain* the feature, it just needs a fresh build |
+| `match-upstream` | dependent inherits the upstream's kind (`api` minor → `chart` minor) — use when the dependent's release semantics genuinely track the upstream's |
 
 ## Component settings
 

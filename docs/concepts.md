@@ -185,8 +185,8 @@ The bump kind on the dependent is governed by
 
 | value | behaviour |
 |---|---|
-| `match-upstream` (default) | dependent inherits the upstream's kind |
-| `patch` | dependent always patches when its upstream bumps |
+| `patch` (default) | dependent always patches when its upstream bumps |
+| `match-upstream` | dependent inherits the upstream's kind |
 
 !!! note "Mirrors vs. depends_on"
 

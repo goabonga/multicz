@@ -307,7 +307,11 @@ class ProjectSettings(BaseModel):
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
     sign_commits: bool = False  # gpg-sign release commits (git commit -S)
     sign_tags: bool = False     # gpg-sign tags (git tag -s)
-    trigger_policy: Literal["match-upstream", "patch"] = "match-upstream"
+    # Cascade kind along ``depends_on`` edges. Defaults to ``"patch"``: a
+    # dependent (e.g. a Helm chart) doesn't usually *gain* the upstream's
+    # feature - it just needs a fresh build referencing the new version.
+    # Set to ``"match-upstream"`` to inherit the upstream's kind verbatim.
+    trigger_policy: Literal["match-upstream", "patch"] = "patch"
 
     @field_validator("bump_rules", mode="before")
     @classmethod
