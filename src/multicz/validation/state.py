@@ -46,7 +46,10 @@ class StateDriftCheck:
                     ),
                 )
                 continue
-            if not comp.bump_files or comp.format == "debian":
+            if not comp.bump_files:
+                # No bump_files = state source is a writer; drift
+                # detection for writer-only components requires
+                # writer-aware reading, which is not yet implemented.
                 continue
             primary = comp.bump_files[0]
             try:

@@ -77,9 +77,10 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
     Priority:
       1. the highest matching git tag (authoritative release state),
       2. the value stored in the primary bump_file (in-tree state),
-         or the top stanza of ``debian/changelog`` for debian-format
-         components,
-      3. ``initial_version`` from the project settings (bootstrap).
+      3. a writer that claims the version-source role (e.g. the top
+         stanza of a ``debian-changelog`` writer when ``bump_files``
+         is empty),
+      4. ``initial_version`` from the project settings (bootstrap).
     """
     prefix = tag_prefix(config.tag_format_for(name), name)
     tagged = latest_version(repo, prefix)
@@ -87,27 +88,21 @@ def _current_version(repo: Path, config: Config, name: str) -> Version:
         return tagged
 
     comp = config.components[name]
-    if comp.format == "debian" and comp.debian is not None:
-        from ..changelog import from_debian_pre, parse_top_version, upstream_version
-
-        changelog_path = repo / comp.debian.changelog
-        if changelog_path.is_file():
-            try:
-                top = parse_top_version(
-                    changelog_path.read_text(encoding="utf-8")
-                )
-                if top:
-                    return Version(from_debian_pre(upstream_version(top)))
-            except (InvalidVersion, OSError):
-                pass
-        return Version(config.project.initial_version)
-
     if comp.bump_files:
         primary = comp.bump_files[0]
         try:
             return Version(read_value(repo / primary.file, primary.key))
         except (FormatError, InvalidVersion, FileNotFoundError):
             pass
+    elif comp.writers:
+        from ..writers import read_version_from_writers
+
+        claimed = read_version_from_writers(comp.writers, repo)
+        if claimed is not None:
+            try:
+                return Version(claimed)
+            except InvalidVersion:
+                pass
     return Version(config.project.initial_version)
 
 

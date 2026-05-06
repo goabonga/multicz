@@ -43,7 +43,7 @@ from pathlib import Path
 
 import tomlkit
 
-from ..config import Component, FileKey
+from ..config import Component, DebianChangelogWriter, FileKey
 from .context import DiscoveryContext, DiscoveryResult
 from .registry import DISCOVERERS, DiscoveryStrategy
 from .relations import RELATIONS, RelationStrategy, apply_relations
@@ -119,19 +119,28 @@ def render_config(
             section["depends_on"] = list(comp.depends_on)
         if comp.changelog is not None:
             section["changelog"] = str(comp.changelog)
-        if comp.format != "default":
-            section["format"] = comp.format
-        if comp.debian is not None:
-            debian_table = tomlkit.table()
-            debian_table["changelog"] = str(comp.debian.changelog)
-            debian_table["distribution"] = comp.debian.distribution
-            debian_table["urgency"] = comp.debian.urgency
-            debian_table["debian_revision"] = comp.debian.debian_revision
-            if comp.debian.maintainer is not None:
-                debian_table["maintainer"] = comp.debian.maintainer
-            if comp.debian.epoch is not None:
-                debian_table["epoch"] = comp.debian.epoch
-            section["debian"] = debian_table
+        if comp.writers:
+            writers_array = tomlkit.aot()
+            for writer in comp.writers:
+                table = tomlkit.table()
+                table["type"] = writer.type
+                table["file"] = str(writer.file)
+                # Only emit non-default per-writer fields, mirroring how
+                # `_filekey_array` only emits ``key`` when set. Keeps
+                # generated configs minimal and readable.
+                if isinstance(writer, DebianChangelogWriter):
+                    if writer.distribution != "UNRELEASED":
+                        table["distribution"] = writer.distribution
+                    if writer.urgency != "medium":
+                        table["urgency"] = writer.urgency
+                    if writer.debian_revision != 1:
+                        table["debian_revision"] = writer.debian_revision
+                    if writer.maintainer is not None:
+                        table["maintainer"] = writer.maintainer
+                    if writer.epoch is not None:
+                        table["epoch"] = writer.epoch
+                writers_array.append(table)
+            section["writers"] = writers_array
         components_root.append(name, section)
     doc.append("components", components_root)
 

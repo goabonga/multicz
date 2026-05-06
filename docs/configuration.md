@@ -281,35 +281,6 @@ sync. The file is created with a small preamble on first use; subsequent
 runs prepend a new keep-a-changelog section. Pass `--no-changelog` to
 opt out for a single bump.
 
-### `format` { #format }
-
-Default `"default"`. Set to `"debian"` for components built as `.deb`.
-With `format = "debian"`:
-
-- `bump_files` and `mirrors` are forbidden (the version is read from /
-  written to `debian/changelog`),
-- the top-level `changelog` field becomes **optional** — when set,
-  multicz writes a parallel keep-a-changelog Markdown file at every
-  bump, alongside the Debian stanza. The Debian stanza
-  (`[components.<name>.debian].changelog`) remains the version source
-  of truth; the Markdown copy is for human readers (GitHub Releases,
-  repo browsing). Both files apply the same
-  [`changelog_sections`](#changelog_sections) filter.
-- `version_scheme` must remain `"semver"` (the renderer applies its
-  own `~rc1` notation),
-- a `[components.<name>.debian]` table configures the stanza
-  ([fields below](#debian-settings)).
-
-```toml
-[components.helloworld]
-paths     = ["src/**", "debian/**"]
-format    = "debian"
-changelog = "CHANGELOG.md"          # optional Markdown rendering
-
-[components.helloworld.debian]
-changelog = "debian/changelog"      # version source of truth
-```
-
 ### `tag_format` (component) { #tag_format_component }
 
 Default `null` (inherit from `[project]`). Per-component override.
@@ -358,7 +329,8 @@ Default `[]`. Per-component list of commit types to ignore.
 ### `version_scheme` { #version_scheme }
 
 Default `"semver"`. Set to `"pep440"` for strict canonical Python
-output. Incompatible with `format = "debian"`.
+output. Incompatible with a `debian-changelog`
+[writer](#writers).
 
 ### `artifacts` { #artifacts }
 
@@ -414,19 +386,48 @@ land atomically. Common commands: `uv lock`, `npm install
 `composer update --lock`, `go mod tidy`. Bad quoting surfaces at
 `multicz validate`.
 
-## Debian settings { #debian-settings }
+### `writers` { #writers }
 
-The `[components.<name>.debian]` table. Only valid when
-`format = "debian"`.
+Default `[]`. Array of sinks rewritten on every bump. Each entry is a
+table with a `type` discriminator. The current writer kinds:
+
+| type | meaning |
+|---|---|
+| `debian-changelog` | prepends a fresh stanza to a `debian/changelog`-format file. When the component has no `bump_files`, this writer also acts as the version source of truth (parses the topmost stanza). |
+
+Example — Python wheel + .deb (bump_files is the source, writer is a sink):
+
+    [components.api]
+    paths = ["src/**", "pyproject.toml"]
+    bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+    [[components.api.writers]]
+    type = "debian-changelog"
+    file = "debian/changelog"        # default; can be omitted
+    distribution = "unstable"
+    debian_revision = 1
+
+Example — pure Debian source package (no bump_files; writer is the source):
+
+    [components.foo]
+    paths = ["debian/**"]
+
+    [[components.foo.writers]]
+    type = "debian-changelog"
+
+Per-writer fields for `debian-changelog`:
 
 | field | default | meaning |
 |---|---|---|
-| `changelog` | `debian/changelog` | path to the source `debian/changelog` |
-| `distribution` | `UNRELEASED` | distribution field on the new stanza (change to `unstable` before upload) |
+| `file` | `debian/changelog` | path to the source `debian/changelog` |
+| `distribution` | `UNRELEASED` | distribution field on the new stanza |
 | `urgency` | `medium` | `urgency=` on the new stanza |
-| `maintainer` | `null` | `Name <email>`. Falls back to `Maintainer:` in `debian/control`, then `git config user.name`/`user.email`, then a placeholder. |
+| `maintainer` | `null` | `Name <email>`. Falls back to `Maintainer:` in `debian/control`, then `git config user.{name,email}`, then a placeholder. |
 | `debian_revision` | `1` | appended as `-<n>` to the upstream version |
 | `epoch` | `null` | rare; prepended as `<n>:` |
+
+Requires `version_scheme = "semver"` (default) — the renderer's `~rc1`
+pre-release notation depends on the canonical semver form.
 
 ## Full example
 

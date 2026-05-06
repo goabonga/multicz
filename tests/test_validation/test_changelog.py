@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-"""Unit tests for ChangelogPathCheck and DebianChangelogCheck in isolation."""
+"""Unit tests for ChangelogPathCheck and WritersCheck in isolation."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from multicz.config import ComponentMatcher, load_config
 from multicz.validation._base import ValidationContext
 from multicz.validation.changelog import (
     ChangelogPathCheck,
-    DebianChangelogCheck,
+    WritersCheck,
 )
 
 
@@ -46,9 +46,11 @@ def test_debian_changelog_unparseable_is_error(tmp_path: Path):
     (tmp_path / "multicz.toml").write_text("""
 [components.mypkg]
 paths = ["debian/**"]
-format = "debian"
+
+[[components.mypkg.writers]]
+type = "debian-changelog"
 """)
-    findings = list(DebianChangelogCheck().run(_ctx(tmp_path)))
+    findings = list(WritersCheck().run(_ctx(tmp_path)))
     bad = [f for f in findings if f.check == "debian_changelog_unparseable"]
     assert bad
     assert bad[0].level == "error"

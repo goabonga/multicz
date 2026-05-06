@@ -1320,10 +1320,10 @@ def test_bump_debian_format_prepends_stanza(tmp_path: Path, runner: CliRunner):
         "multicz.toml": """
 [components.mypkg]
 paths = ["debian/**", "src/**"]
-format = "debian"
 
-[components.mypkg.debian]
-changelog = "debian/changelog"
+[[components.mypkg.writers]]
+type = "debian-changelog"
+file = "debian/changelog"
 distribution = "unstable"
 urgency = "medium"
 """,
@@ -1363,7 +1363,9 @@ def test_bump_debian_dry_run_does_not_modify(tmp_path: Path, runner: CliRunner):
         "multicz.toml": """
 [components.mypkg]
 paths = ["debian/**", "src/**"]
-format = "debian"
+
+[[components.mypkg.writers]]
+type = "debian-changelog"
 """,
         "debian/changelog": (
             "mypkg (1.0.0-1) unstable; urgency=medium\n"
@@ -1396,9 +1398,9 @@ def test_bump_debian_with_revision_3(tmp_path: Path, runner: CliRunner):
         "multicz.toml": """
 [components.mypkg]
 paths = ["debian/**", "src/**"]
-format = "debian"
 
-[components.mypkg.debian]
+[[components.mypkg.writers]]
+type = "debian-changelog"
 debian_revision = 3
 """,
         "debian/changelog": (

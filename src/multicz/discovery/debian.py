@@ -14,12 +14,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..changelog import parse_top_stanza
-from ..config import Component, DebianSettings
+from ..config import Component, DebianChangelogWriter
 
 
 def _detect_debian(repo: Path, components: dict[str, Component]) -> None:
-    """When ``debian/changelog`` exists, register a format='debian' component
-    named after the package declared on the top stanza."""
+    """When ``debian/changelog`` exists, register a component with a
+    ``debian-changelog`` writer named after the package declared on the
+    top stanza. The writer claims the version-source role since no
+    ``bump_files`` is emitted by this strategy."""
     changelog = repo / "debian" / "changelog"
     if not changelog.is_file():
         return
@@ -37,8 +39,7 @@ def _detect_debian(repo: Path, components: dict[str, Component]) -> None:
         paths.append("src/**")
     components[comp_name] = Component(
         paths=paths,
-        format="debian",
-        debian=DebianSettings(),
+        writers=[DebianChangelogWriter(type="debian-changelog")],
     )
 
 

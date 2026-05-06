@@ -14,7 +14,7 @@ import re
 import shlex
 import warnings
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -95,22 +95,35 @@ class Artifact(BaseModel):
         }
 
 
-class DebianSettings(BaseModel):
-    """Per-component settings for ``format = "debian"`` packaging.
+class DebianChangelogWriter(BaseModel):
+    """A ``debian/changelog`` sink: a fresh stanza is prepended on every
+    bump, older stanzas are preserved verbatim.
 
-    The component's version is read from the topmost stanza of
-    ``changelog`` (default ``debian/changelog``) and a new stanza is
-    *prepended* on every bump - older stanzas are never rewritten.
+    Declared inside a component's ``[[writers]]`` array. When the
+    component has no ``bump_files``, this writer also acts as the
+    *version source of truth* — multicz reads the upstream version from
+    the topmost stanza. With ``bump_files`` declared, the writer is a
+    pure sink and the version source is the primary bump_file (typical
+    "Python wheel + .deb" or "Cargo crate + .deb" setup).
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    changelog: Path = Path("debian/changelog")
+    type: Literal["debian-changelog"]
+    file: Path = Path("debian/changelog")
     distribution: str = "UNRELEASED"
     urgency: str = "medium"
     maintainer: str | None = None  # falls back to debian/control then git config
     debian_revision: int = 1
     epoch: int | None = None
+
+
+# Discriminated union of all writer types. Add new writer schemas here
+# and a matching impl in ``multicz.writers`` (Strategy + Registry).
+Writer = Annotated[
+    DebianChangelogWriter,
+    Field(discriminator="type"),
+]
 
 
 class Component(BaseModel):
@@ -126,8 +139,11 @@ class Component(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     triggers: list[str] = Field(default_factory=list)  # alias, post-merged
     changelog: Path | None = None
-    format: Literal["default", "debian"] = "default"
-    debian: DebianSettings | None = None
+    # Sinks that get rewritten on every bump (and may also act as the
+    # *version source* when ``bump_files`` is empty - useful for pure
+    # Debian source packages with no pyproject/Cargo/package.json).
+    # See :data:`Writer` for the supported types.
+    writers: list[Writer] = Field(default_factory=list)
     tag_format: str | None = None  # overrides the project-level tag_format
     bump_policy: Literal["as-commit", "scoped"] = "as-commit"
     # Sparse override over ``project.bump_rules`` (component wins per type).
@@ -205,37 +221,33 @@ class Component(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_format(self) -> Component:
-        if self.format == "debian":
-            if self.debian is None:
-                self.debian = DebianSettings()
-            if self.bump_files:
+    def _validate_writers(self) -> Component:
+        """Constraints on writer declarations:
+
+        * a ``debian-changelog`` writer requires ``version_scheme = "semver"``
+          (the renderer's ``~rc1`` notation depends on the internal canonical
+          form);
+        * file paths must be unique across writers within the component
+          (catches a ``[[writers]]`` table accidentally duplicated).
+        """
+        seen_files: set[Path] = set()
+        for writer in self.writers:
+            if writer.file in seen_files:
                 raise ValueError(
-                    "components with format='debian' read the version from "
-                    "debian/changelog; remove bump_files."
+                    f"duplicate writer file {str(writer.file)!r} on this "
+                    "component; each writer must point to a distinct path."
                 )
-            if self.mirrors:
+            seen_files.add(writer.file)
+            if (
+                isinstance(writer, DebianChangelogWriter)
+                and self.version_scheme != "semver"
+            ):
                 raise ValueError(
-                    "mirrors are not supported on format='debian' components."
+                    "writer type='debian-changelog' requires "
+                    "version_scheme='semver' (the internal canonical form); "
+                    "the Debian changelog renderer applies its own '~rc1' "
+                    "notation."
                 )
-            # The top-level `changelog` field is OPTIONAL for debian
-            # components: when set, multicz writes a parallel
-            # keep-a-changelog markdown file in addition to the Debian
-            # stanza. The Debian stanza (`[components.<name>.debian]
-            # .changelog`) remains the version source of truth; the
-            # markdown copy is for human readers (GitHub Releases, repo
-            # browsing).
-            if self.version_scheme != "semver":
-                raise ValueError(
-                    "format='debian' requires version_scheme='semver' (the "
-                    "internal canonical form); the Debian changelog "
-                    "stanza renderer applies its own '~rc1' notation."
-                )
-        elif self.debian is not None:
-            raise ValueError(
-                "the [components.<name>.debian] table is only valid when "
-                "format = 'debian'."
-            )
         return self
 
 

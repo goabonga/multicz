@@ -19,9 +19,9 @@ from multicz.cli import app
 CONFIG = """\
 [components.mypkg]
 paths = ["debian/**", "src/**"]
-format = "debian"
 
-[components.mypkg.debian]
+[[components.mypkg.writers]]
+type = "debian-changelog"
 distribution = "unstable"
 urgency = "medium"
 """
@@ -74,10 +74,10 @@ def test_pre_rc_uses_tilde_notation_in_debian_changelog(
 CONFIG_DUAL = """\
 [components.mypkg]
 paths     = ["debian/**", "src/**"]
-format    = "debian"
 changelog = "CHANGELOG.md"
 
-[components.mypkg.debian]
+[[components.mypkg.writers]]
+type         = "debian-changelog"
 distribution = "unstable"
 urgency      = "medium"
 """

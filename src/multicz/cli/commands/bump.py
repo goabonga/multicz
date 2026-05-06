@@ -12,13 +12,7 @@ from pathlib import Path
 
 import typer
 
-from ...changelog import (
-    drop_prerelease_stanzas,
-    format_debian_version,
-    prepend_stanza,
-    render_stanza,
-    update_changelog_file,
-)
+from ...changelog import update_changelog_file
 from ...config import ComponentMatcher
 from ...formats import write_value
 from ...state import (
@@ -28,6 +22,8 @@ from ...state import (
     now_iso,
     write_state,
 )
+from ...writers import WriteContext
+from ...writers import impl_for as writer_impl_for
 from .. import app, err, presenters
 from .._shared import (
     _build_plan_or_exit,
@@ -106,130 +102,11 @@ def _run_post_bump_hook(repo: Path, command: str) -> None:
         raise typer.Exit(code=1)
 
 
-def _resolve_maintainer(repo: Path, configured: str | None) -> str:
-    """Pick a Debian-format maintainer string ``Name <email>``.
-
-    Priority: explicit config -> ``Maintainer:`` line in ``debian/control``
-    -> ``git config user.name`` + ``git config user.email`` -> placeholder.
-    """
-    if configured:
-        return configured
-    control = repo / "debian" / "control"
-    if control.is_file():
-        for line in control.read_text(encoding="utf-8").splitlines():
-            if line.startswith("Maintainer:"):
-                return line[len("Maintainer:"):].strip()
-    name_proc = subprocess.run(
-        ["git", "config", "user.name"],
-        cwd=repo, capture_output=True, text=True,
-    )
-    email_proc = subprocess.run(
-        ["git", "config", "user.email"],
-        cwd=repo, capture_output=True, text=True,
-    )
-    name = name_proc.stdout.strip()
-    email = email_proc.stdout.strip()
-    if name and email:
-        return f"{name} <{email}>"
-    return "Unknown <unknown@example.com>"
-
-
 def _is_finalize(planned) -> bool:
     """A finalize op is any planned bump that turns a pre-release into a
     final version (either via --finalize or auto-finalize when --pre isn't
     set on a current pre-release)."""
     return planned.current.is_prerelease and planned.pre is None
-
-
-def _bump_debian(
-    name: str,
-    comp,  # Component
-    config,  # Config
-    repo: Path,
-    matcher: ComponentMatcher,
-    new_version: str,
-    *,
-    is_finalize: bool,
-    dry_run: bool,
-    written: list[Path],
-    changelogs_updated: list[str],
-) -> None:
-    """Apply a debian-format bump: render and prepend a fresh stanza.
-
-    The git tag uses the semver form (``mypkg-v1.3.0-rc.1``) so multicz can
-    re-read it later via :class:`packaging.version.Version`; only the
-    *changelog file* gets the Debian-style ``~rc1`` rendering.
-
-    On finalize, the project's :attr:`finalize_strategy` controls whether
-    the new stanza enumerates commits since the last RC (``annotate``) or
-    since the last *stable* tag (``consolidate`` / ``promote``), and whether
-    the now-superseded ``~rc*`` stanzas are removed from the file
-    (``promote`` only).
-    """
-    settings = comp.debian
-    if dry_run:
-        return
-
-    strategy = config.project.finalize_strategy
-    use_stable_since = is_finalize and strategy in {"consolidate", "promote"}
-
-    relevant = _component_relevant_commits(
-        name, config, repo, matcher, since_stable=use_stable_since
-    )
-    debian_version = format_debian_version(
-        new_version,
-        debian_revision=settings.debian_revision,
-        epoch=settings.epoch,
-    )
-    maintainer = _resolve_maintainer(repo, settings.maintainer)
-    stanza = render_stanza(
-        package=name,
-        version=debian_version,
-        distribution=settings.distribution,
-        urgency=settings.urgency,
-        commits=relevant,
-        maintainer=maintainer,
-        sections=config.project.changelog_sections,
-        breaking_title=config.project.breaking_section_title,
-        other_title=config.project.other_section_title,
-    )
-
-    changelog_path = repo / settings.changelog
-    existing = (
-        changelog_path.read_text(encoding="utf-8")
-        if changelog_path.is_file()
-        else ""
-    )
-    if is_finalize and strategy == "promote":
-        existing = drop_prerelease_stanzas(existing, new_version)
-    changelog_path.parent.mkdir(parents=True, exist_ok=True)
-    changelog_path.write_text(prepend_stanza(existing, stanza), encoding="utf-8")
-    if changelog_path not in written:
-        written.append(changelog_path)
-    changelogs_updated.append(str(settings.changelog))
-
-    # Optional parallel markdown rendering: when `[components.<name>]
-    # .changelog` is set on a debian-format component, multicz also
-    # writes a keep-a-changelog Markdown file alongside the Debian
-    # stanza. The Debian file stays the version source of truth; the
-    # Markdown copy is purely for human readers (GitHub Releases,
-    # repo browsing). Cascades don't apply here — debian-format
-    # components reject mirrors entirely.
-    if comp.changelog is not None:
-        md_path = repo / comp.changelog
-        md_path.parent.mkdir(parents=True, exist_ok=True)
-        update_changelog_file(
-            md_path,
-            new_version,
-            relevant,
-            sections=config.project.changelog_sections,
-            breaking_title=config.project.breaking_section_title,
-            other_title=config.project.other_section_title,
-            drop_prereleases=is_finalize and strategy == "promote",
-        )
-        if md_path not in written:
-            written.append(md_path)
-        changelogs_updated.append(str(comp.changelog))
 
 
 def _release_commit_message(
@@ -362,62 +239,80 @@ def bump(
         new_version = str(planned.next)
 
         is_final = _is_finalize(planned)
+        strategy = config.project.finalize_strategy
+        use_stable_since = is_final and strategy in {"consolidate", "promote"}
 
-        if comp.format == "debian":
-            _bump_debian(
-                planned.component,
-                comp,
-                config,
-                repo,
-                matcher,
-                new_version,
-                is_finalize=is_final,
-                dry_run=dry_run,
-                written=written,
-                changelogs_updated=changelogs_updated,
+        # 1. bump_files + mirrors: rewrite the version literal in
+        #    every declared sink so external tooling (Docker, helm, uv,
+        #    npm, ...) sees the new version.
+        targets: list[tuple[Path, str | None]] = []
+        for bump_file in comp.bump_files:
+            targets.append((repo / bump_file.file, bump_file.key))
+        for mirror in comp.mirrors:
+            targets.append((repo / mirror.file, mirror.key))
+        for file, key in targets:
+            if not dry_run:
+                write_value(file, key, new_version)
+                if file not in written:
+                    written.append(file)
+
+        # 2. Markdown changelog (keep-a-changelog).
+        if comp.changelog and not no_changelog and not dry_run:
+            relevant = _component_relevant_commits(
+                planned.component, config, repo, matcher,
+                since_stable=use_stable_since,
             )
-        else:
-            targets: list[tuple[Path, str | None]] = []
-            for bump_file in comp.bump_files:
-                targets.append((repo / bump_file.file, bump_file.key))
-            for mirror in comp.mirrors:
-                targets.append((repo / mirror.file, mirror.key))
+            # Surface mirror/trigger cascades as a Dependencies
+            # section: when a release is purely cascade-driven
+            # (e.g. chart bumps because api updated appVersion),
+            # this is the only thing that explains *why* the
+            # release exists.
+            cascade_entries = _cascade_entries_for(planned, plan, config)
+            changelog_path = repo / comp.changelog
+            update_changelog_file(
+                changelog_path,
+                new_version,
+                relevant,
+                sections=config.project.changelog_sections,
+                breaking_title=config.project.breaking_section_title,
+                other_title=config.project.other_section_title,
+                drop_prereleases=is_final and strategy == "promote",
+                cascades=cascade_entries,
+                cascade_title=config.project.cascade_section_title,
+                cascade_format=config.project.cascade_changelog_format,
+            )
+            if changelog_path not in written:
+                written.append(changelog_path)
+            changelogs_updated.append(str(comp.changelog))
 
-            for file, key in targets:
-                if not dry_run:
-                    write_value(file, key, new_version)
-                    if file not in written:
-                        written.append(file)
-
-            if comp.changelog and not no_changelog and not dry_run:
-                strategy = config.project.finalize_strategy
-                use_stable_since = is_final and strategy in {"consolidate", "promote"}
-                relevant = _component_relevant_commits(
-                    planned.component, config, repo, matcher,
-                    since_stable=use_stable_since,
+        # 3. Writers (debian-changelog, ...). Writers may *also* be the
+        #    version source when bump_files is empty - in that case the
+        #    planner already resolved the version against the writer
+        #    via _current_version, and we just append the new stanza.
+        if comp.writers and not dry_run:
+            relevant = _component_relevant_commits(
+                planned.component, config, repo, matcher,
+                since_stable=use_stable_since,
+            )
+            for writer in comp.writers:
+                impl = writer_impl_for(writer)
+                ctx = WriteContext(
+                    repo=repo,
+                    component_name=planned.component,
+                    component=comp,
+                    writer=writer,
+                    planned=planned,
+                    new_version=new_version,
+                    config=config,
+                    relevant_commits=tuple(relevant),
+                    is_finalize=is_final,
                 )
-                # Surface mirror/trigger cascades as a Dependencies
-                # section: when a release is purely cascade-driven
-                # (e.g. chart bumps because api updated appVersion),
-                # this is the only thing that explains *why* the
-                # release exists.
-                cascade_entries = _cascade_entries_for(planned, plan, config)
-                changelog_path = repo / comp.changelog
-                update_changelog_file(
-                    changelog_path,
-                    new_version,
-                    relevant,
-                    sections=config.project.changelog_sections,
-                    breaking_title=config.project.breaking_section_title,
-                    other_title=config.project.other_section_title,
-                    drop_prereleases=is_final and strategy == "promote",
-                    cascades=cascade_entries,
-                    cascade_title=config.project.cascade_section_title,
-                    cascade_format=config.project.cascade_changelog_format,
-                )
-                if changelog_path not in written:
-                    written.append(changelog_path)
-                changelogs_updated.append(str(comp.changelog))
+                modified = impl.write(ctx)
+                for path in modified:
+                    if path not in written:
+                        written.append(path)
+                    rel = path.relative_to(repo) if path.is_relative_to(repo) else path
+                    changelogs_updated.append(str(rel))
 
         applied.append(AppliedBump(
             component=planned.component,

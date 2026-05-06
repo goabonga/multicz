@@ -299,17 +299,17 @@ bump_files     = [{ file = "pyproject.toml", key = "project.version" }]
 version_scheme = "pep440"
 ```
 
-`format = "debian"` requires `version_scheme = "semver"` (the canonical
-internal form); the Debian renderer applies its own `~rc1` notation
-at write time.
+A component with a `debian-changelog` [writer](configuration.md#writers)
+requires `version_scheme = "semver"` (the canonical internal form); the
+Debian renderer applies its own `~rc1` notation at write time.
 
-A debian-format component may also declare a top-level `changelog`
-path. When set, multicz writes a parallel keep-a-changelog Markdown
-file at every bump, alongside the Debian stanza. The stanza remains
-the version source of truth; the Markdown copy is purely for human
-readers (GitHub Releases, repo browsing). See
-[`format` in the configuration reference](configuration.md#format) for
-the dual layout.
+A component with a `debian-changelog` writer may also declare a
+top-level `changelog` path. When set, multicz writes a parallel
+keep-a-changelog Markdown file at every bump, alongside the Debian
+stanza. The stanza remains the version source of truth; the Markdown
+copy is purely for human readers (GitHub Releases, repo browsing). See
+[`writers` in the configuration reference](configuration.md#writers)
+for the dual layout.
 
 ## Tags
 
@@ -321,7 +321,7 @@ Each component gets its own annotated git tag, rendered from
 api-v1.3.0
 api-v1.4.0-rc.1
 chart-v0.5.0
-mypkg-v1.3.0          # debian-format components keep semver in the tag
+mypkg-v1.3.0          # debian-changelog writers keep semver in the tag
 ```
 
 Each component's *rendered prefix* must be unique across the project,

@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-"""Checks: changelog file paths and Debian changelog parseability."""
+"""Checks: changelog file paths and per-writer validation."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 
 from ._base import Finding, ValidationContext
 
@@ -30,44 +31,22 @@ class ChangelogPathCheck:
                 )
 
 
-class DebianChangelogCheck:
-    name = "debian_changelog"
+class WritersCheck:
+    """Iterate every writer on every component and surface findings.
+
+    Each writer's impl owns the actual checks (e.g. the debian-changelog
+    impl parses the top stanza). This class is just the dispatch loop;
+    it stamps the component name onto each finding so the report can
+    show ``api: 'debian/changelog' top stanza is not a valid ...``.
+    """
+
+    name = "writers"
 
     def run(self, ctx: ValidationContext) -> Iterator[Finding]:
-        from ..changelog import parse_top_stanza
+        from ..writers import impl_for
 
         for name, comp in ctx.config.components.items():
-            if comp.format != "debian" or comp.debian is None:
-                continue
-            path = ctx.repo / comp.debian.changelog
-            if not path.exists():
-                yield Finding(
-                    level="info",
-                    check="debian_changelog_missing",
-                    component=name,
-                    message=(
-                        f"{str(comp.debian.changelog)!r} does not exist; "
-                        "it will be created on the first bump"
-                    ),
-                )
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except OSError as exc:
-                yield Finding(
-                    level="error",
-                    check="debian_changelog_unreadable",
-                    component=name,
-                    message=f"could not read {str(comp.debian.changelog)!r}: {exc}",
-                )
-                continue
-            if parse_top_stanza(text) is None:
-                yield Finding(
-                    level="error",
-                    check="debian_changelog_unparseable",
-                    component=name,
-                    message=(
-                        f"{str(comp.debian.changelog)!r} top stanza is not a "
-                        "valid Debian changelog header"
-                    ),
-                )
+            for writer in comp.writers:
+                impl = impl_for(writer)
+                for finding in impl.validate(writer, ctx.repo):
+                    yield replace(finding, component=name)

@@ -244,7 +244,9 @@ def test_debian_changelog_missing_is_info(repo: Path):
     _write_config(repo, """
 [components.mypkg]
 paths = ["debian/**"]
-format = "debian"
+
+[[components.mypkg.writers]]
+type = "debian-changelog"
 """)
     findings = validate(repo, load_config(repo / "multicz.toml"))
     assert "debian_changelog_missing" in _checks(findings)
@@ -257,7 +259,9 @@ def test_debian_changelog_unparseable_is_error(repo: Path):
     _write_config(repo, """
 [components.mypkg]
 paths = ["debian/**"]
-format = "debian"
+
+[[components.mypkg.writers]]
+type = "debian-changelog"
 """)
     findings = validate(repo, load_config(repo / "multicz.toml"))
     bad = [f for f in findings if f.check == "debian_changelog_unparseable"]
@@ -276,7 +280,9 @@ def test_debian_changelog_parseable_passes(repo: Path):
     _write_config(repo, """
 [components.mypkg]
 paths = ["debian/**"]
-format = "debian"
+
+[[components.mypkg.writers]]
+type = "debian-changelog"
 """)
     findings = validate(repo, load_config(repo / "multicz.toml"))
     debian_findings = [f for f in findings if "debian" in f.check]

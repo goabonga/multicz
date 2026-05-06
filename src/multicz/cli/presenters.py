@@ -613,7 +613,6 @@ def render_init_detect(components: dict, *, output: str) -> None:
         payload = {
             name: {
                 "paths": list(c.paths),
-                "format": c.format,
                 "bump_files": [
                     {"file": str(b.file), "key": b.key}
                     for b in c.bump_files
@@ -621,6 +620,10 @@ def render_init_detect(components: dict, *, output: str) -> None:
                 "mirrors": [
                     {"file": str(m.file), "key": m.key}
                     for m in c.mirrors
+                ],
+                "writers": [
+                    {"type": w.type, "file": str(w.file)}
+                    for w in c.writers
                 ],
                 "changelog": str(c.changelog) if c.changelog else None,
             }
@@ -635,12 +638,14 @@ def render_init_detect(components: dict, *, output: str) -> None:
         line = f"  • [bold]{name}[/]"
         if primary is not None:
             line += f" [dim]({primary.as_posix()})[/]"
-        elif comp.format == "debian":
-            line += " [dim](debian/changelog)[/]"
+        elif comp.writers:
+            first = comp.writers[0]
+            line += f" [dim]({first.file.as_posix()})[/]"
         else:
             line += " [dim](tag-driven)[/]"
-        if comp.format != "default":
-            line += f" [yellow]format={comp.format}[/]"
+        if comp.writers:
+            kinds = ", ".join(w.type for w in comp.writers)
+            line += f" [yellow]writers={kinds}[/]"
         if comp.mirrors:
             targets = ", ".join(
                 f"{m.file.as_posix()}:{m.key}" if m.key else m.file.as_posix()

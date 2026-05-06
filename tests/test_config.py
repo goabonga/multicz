@@ -182,93 +182,88 @@ def test_init_output_round_trips_through_array_form(tmp_path: Path):
     assert config.components["alpha"].bump_files[0].key is None
 
 
-def test_debian_format_requires_no_bump_files(tmp_path: Path):
+def test_debian_writer_allows_bump_files(tmp_path: Path):
+    """A component can declare a ``debian-changelog`` writer *and*
+    ``bump_files`` simultaneously — the writer is then a pure sink while
+    the bump_files entry is the version source of truth (Python wheel +
+    .deb dual-publish)."""
     target = _write(
         tmp_path,
         """
         [components.api]
-        paths = ["debian/**"]
-        format = "debian"
-        bump_files = [{ file = "debian/changelog" }]
-        """,
-    )
-    with pytest.raises(ValidationError) as exc:
-        load_config(target)
-    assert "bump_files" in str(exc.value)
+        paths = ["debian/**", "pyproject.toml"]
+        bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 
-
-def test_debian_format_accepts_top_level_changelog_for_dual_rendering(
-    tmp_path: Path,
-):
-    """Debian-format components may declare a top-level `changelog`
-    alongside `[debian].changelog` — the markdown file becomes a
-    parallel human-readable rendering of every bump, while the Debian
-    stanza stays the version source of truth."""
-    target = _write(
-        tmp_path,
-        """
-        [components.api]
-        paths = ["debian/**"]
-        format = "debian"
-        changelog = "CHANGELOG.md"
-
-        [components.api.debian]
-        changelog = "debian/changelog"
+        [[components.api.writers]]
+        type = "debian-changelog"
         """,
     )
     config = load_config(target)
     api = config.components["api"]
-    assert api.format == "debian"
-    assert str(api.changelog) == "CHANGELOG.md"
-    assert str(api.debian.changelog) == "debian/changelog"
+    assert len(api.writers) == 1
+    writer = api.writers[0]
+    from multicz.config import DebianChangelogWriter
+    assert isinstance(writer, DebianChangelogWriter)
+    assert str(api.bump_files[0].file) == "pyproject.toml"
 
 
-def test_debian_settings_only_with_debian_format(tmp_path: Path):
+def test_debian_writer_accepts_top_level_changelog_for_dual_rendering(
+    tmp_path: Path,
+):
+    """Components with a ``debian-changelog`` writer may declare a
+    top-level `changelog` alongside the writer's ``file`` — the markdown
+    file becomes a parallel human-readable rendering of every bump,
+    while the Debian stanza stays the version source of truth."""
     target = _write(
         tmp_path,
         """
         [components.api]
-        paths = ["src/**"]
-        bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+        paths = ["debian/**"]
+        changelog = "CHANGELOG.md"
 
-        [components.api.debian]
-        changelog = "debian/changelog"
+        [[components.api.writers]]
+        type = "debian-changelog"
+        file = "debian/changelog"
         """,
     )
-    with pytest.raises(ValidationError) as exc:
-        load_config(target)
-    assert "format = 'debian'" in str(exc.value)
+    config = load_config(target)
+    api = config.components["api"]
+    assert str(api.changelog) == "CHANGELOG.md"
+    assert len(api.writers) == 1
+    assert str(api.writers[0].file) == "debian/changelog"
 
 
-def test_debian_format_with_defaults(tmp_path: Path):
+def test_debian_writer_with_defaults(tmp_path: Path):
     target = _write(
         tmp_path,
         """
         [components.mypkg]
         paths = ["debian/**", "src/**"]
-        format = "debian"
+
+        [[components.mypkg.writers]]
+        type = "debian-changelog"
         """,
     )
     config = load_config(target)
     comp = config.components["mypkg"]
-    assert comp.format == "debian"
-    assert comp.debian is not None  # auto-filled
-    assert str(comp.debian.changelog) == "debian/changelog"
-    assert comp.debian.distribution == "UNRELEASED"
-    assert comp.debian.urgency == "medium"
-    assert comp.debian.debian_revision == 1
+    assert len(comp.writers) == 1
+    writer = comp.writers[0]
+    assert str(writer.file) == "debian/changelog"
+    assert writer.distribution == "UNRELEASED"
+    assert writer.urgency == "medium"
+    assert writer.debian_revision == 1
 
 
-def test_debian_format_with_overrides(tmp_path: Path):
+def test_debian_writer_with_overrides(tmp_path: Path):
     target = _write(
         tmp_path,
         """
         [components.mypkg]
         paths = ["debian/**"]
-        format = "debian"
 
-        [components.mypkg.debian]
-        changelog = "packaging/changelog"
+        [[components.mypkg.writers]]
+        type = "debian-changelog"
+        file = "packaging/changelog"
         distribution = "stable"
         urgency = "high"
         maintainer = "Chris <chris@example.com>"
@@ -277,13 +272,13 @@ def test_debian_format_with_overrides(tmp_path: Path):
         """,
     )
     config = load_config(target)
-    settings = config.components["mypkg"].debian
-    assert str(settings.changelog) == "packaging/changelog"
-    assert settings.distribution == "stable"
-    assert settings.urgency == "high"
-    assert settings.maintainer == "Chris <chris@example.com>"
-    assert settings.debian_revision == 3
-    assert settings.epoch == 2
+    writer = config.components["mypkg"].writers[0]
+    assert str(writer.file) == "packaging/changelog"
+    assert writer.distribution == "stable"
+    assert writer.urgency == "high"
+    assert writer.maintainer == "Chris <chris@example.com>"
+    assert writer.debian_revision == 3
+    assert writer.epoch == 2
 
 
 def test_load_from_pyproject_tool_multicz(tmp_path: Path):
@@ -598,14 +593,16 @@ def test_static_tag_format_without_component_placeholder(tmp_path: Path):
     assert config._render_tag_prefix("thing") == "release-"
 
 
-def test_pep440_scheme_with_debian_format_is_rejected(tmp_path: Path):
+def test_pep440_scheme_with_debian_writer_is_rejected(tmp_path: Path):
     target = _write(
         tmp_path,
         """
         [components.mypkg]
         paths = ["debian/**"]
-        format = "debian"
         version_scheme = "pep440"
+
+        [[components.mypkg.writers]]
+        type = "debian-changelog"
         """,
     )
     with pytest.raises(ValidationError) as exc:

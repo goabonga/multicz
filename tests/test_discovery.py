@@ -487,6 +487,8 @@ def test_python_workspace_helm_mirrors_by_name(tmp_path: Path):
 
 
 def test_debian_changelog_creates_debian_component(tmp_path: Path):
+    from multicz.config import DebianChangelogWriter
+
     debian = tmp_path / "debian"
     debian.mkdir()
     (debian / "changelog").write_text(
@@ -496,16 +498,18 @@ def test_debian_changelog_creates_debian_component(tmp_path: Path):
     )
     comps = discover_components(tmp_path)
     assert "mypkg" in comps
-    assert comps["mypkg"].format == "debian"
-    assert comps["mypkg"].debian is not None
+    assert len(comps["mypkg"].writers) == 1
+    assert isinstance(comps["mypkg"].writers[0], DebianChangelogWriter)
     assert "debian/**" in comps["mypkg"].paths
-    # No bump_files: format='debian' reads from debian/changelog
+    # No bump_files: the debian-changelog writer reads from debian/changelog
     assert comps["mypkg"].bump_files == []
 
 
 def test_debian_changelog_with_python_alongside(tmp_path: Path):
     """A repo that ships a Python project AND its Debian packaging.
     Each is its own component with its own version source."""
+    from multicz.config import DebianChangelogWriter
+
     (tmp_path / "pyproject.toml").write_text(
         '[project]\nname = "mypkg"\nversion = "1.2.3"\n'
     )
@@ -522,8 +526,13 @@ def test_debian_changelog_with_python_alongside(tmp_path: Path):
     assert "mypkg" in comps
     # Debian comp gets the -deb suffix because of the collision
     assert "mypkg-deb" in comps
-    assert comps["mypkg"].format == "default"
-    assert comps["mypkg-deb"].format == "debian"
+    # The python component has no writers (default Python project shape).
+    assert comps["mypkg"].writers == []
+    # The debian component has a single debian-changelog writer.
+    assert len(comps["mypkg-deb"].writers) == 1
+    assert isinstance(
+        comps["mypkg-deb"].writers[0], DebianChangelogWriter
+    )
 
 
 def test_debian_changelog_garbage_skipped(tmp_path: Path):

@@ -22,7 +22,7 @@ from pathlib import Path
 from ..config import ComponentMatcher, Config
 from ._base import Check, Finding, Level, ValidationContext
 from .bump_files import BumpFilesExistCheck
-from .changelog import ChangelogPathCheck, DebianChangelogCheck
+from .changelog import ChangelogPathCheck, WritersCheck
 from .cycles import MirrorCycleCheck, TriggerCycleCheck
 from .mirrors import MirrorTargetsCheck
 from .overlap import PathOverlapCheck
@@ -37,7 +37,7 @@ CHECKS: list[Check] = [
     MirrorCycleCheck(),
     ChangelogPathCheck(),
     CurrentVersionCheck(),
-    DebianChangelogCheck(),
+    WritersCheck(),
     StateDriftCheck(),
 ]
 # Order matches the original validate() ordering — preserve it.
@@ -59,7 +59,6 @@ __all__ = [
     "ChangelogPathCheck",
     "Check",
     "CurrentVersionCheck",
-    "DebianChangelogCheck",
     "Finding",
     "Level",
     "MirrorCycleCheck",
@@ -68,5 +67,6 @@ __all__ = [
     "StateDriftCheck",
     "TriggerCycleCheck",
     "ValidationContext",
+    "WritersCheck",
     "validate",
 ]
