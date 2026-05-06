@@ -199,7 +199,9 @@ multicz changelog --output md             # grouped Breaking / Features / Fixes 
 ```
 
 The grouping honours `[project].changelog_sections`,
-`breaking_section_title`, `other_section_title`, and `ignored_types`.
+`breaking_section_title`, `other_section_title`, and any commit type
+set to `"none"` in `[project.bump_rules]` (or its deprecated alias
+`ignored_types`).
 
 ## `release-notes`
 
@@ -311,7 +313,12 @@ Restrict allowed types:
 multicz check "$1" --type feat --type fix --type docs
 ```
 
-Defaults to the full conventional-commits set.
+Without `--type`, the allowed-types vocabulary is the union of the
+conventional-commits default set and the keys of
+[`[project.bump_rules]`](configuration.md#bump_rules) (loaded by
+walking up from the current directory). This means a custom type
+declared in your config — e.g. `infra = "patch"` — is accepted by the
+hook without extra flags.
 
 ## `--since` { #since }
 

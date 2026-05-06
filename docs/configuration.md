@@ -122,7 +122,47 @@ Default `"error"`. See [overlap policy](concepts.md#overlap-policy).
 | `allow` | silent | same as `first-match` |
 | `all` | info | bumps every claiming component |
 
+### `bump_rules` { #bump_rules }
+
+Default mirrors the Conventional Commits convention:
+
+```toml
+[project.bump_rules]
+feat   = "minor"
+fix    = "patch"
+perf   = "patch"
+revert = "patch"
+```
+
+Maps a commit `type` to the semver level it triggers. Accepted values
+are `"major"`, `"minor"`, `"patch"`, and `"none"`. User entries **merge
+on top of** the defaults: adding a single rule like
+`refactor = "patch"` keeps the four conventional bumps intact. To
+silence a default, set it to `"none"` explicitly.
+
+Resolution at planning time:
+
+| commit | rule | resulting bump |
+|---|---|---|
+| `feat: x` | `"minor"` | `minor` |
+| `feat!: x` | `"minor"` | `major` (breaking marker wins) |
+| `feat: x` | `"none"` | *skip* (explicit opt-out drops breaking too) |
+| `chore: x` | absent | *skip* |
+| `chore!: x` | absent | `major` (Conventional Commits default) |
+| `infra: x` | `"patch"` | `patch` (custom type) |
+
+Custom types declared in `bump_rules` are also accepted by
+[`multicz check`](cli.md#check) at commit-msg hook time.
+
+A per-component override is available — see
+[`bump_rules` (component)](#bump_rules_component).
+
 ### `ignored_types` (project) { #ignored_types_project }
+
+!!! warning "Deprecated"
+    Folded into [`bump_rules`](#bump_rules) as `<type> = "none"` at
+    config-load time and emits a `DeprecationWarning`. Migrate by
+    moving each entry to `[project.bump_rules]` with `"none"`.
 
 Default `[]`. Commit types that should never bump or appear in
 changelogs. The filter short-circuits before bump kind is computed.
@@ -270,10 +310,33 @@ Default `"as-commit"`. Set to `"scoped"` to demote `minor`/`major` to
 `patch` when the commit's scope names a different component. See [bump
 policy](concepts.md#bump-policy).
 
+### `bump_rules` (component) { #bump_rules_component }
+
+Default `{}` (empty). Sparse override on top of
+[`[project.bump_rules]`](#bump_rules); the component-level value wins
+per type. Useful when a single repo has different release semantics
+per component:
+
+```toml
+[project.bump_rules]
+feat = "minor"
+fix  = "patch"
+
+[components.api.bump_rules]
+feat = "patch"   # this component never goes minor on a feature
+```
+
+Same accepted values as the project-level field
+(`"major"` / `"minor"` / `"patch"` / `"none"`).
+
 ### `ignored_types` (component) { #ignored_types_component }
 
-Default `[]`. Per-component list of commit types to ignore. Effective
-set is the union with `[project].ignored_types`.
+!!! warning "Deprecated"
+    Folded into [component `bump_rules`](#bump_rules_component) as
+    `<type> = "none"` at config-load time and emits a
+    `DeprecationWarning`.
+
+Default `[]`. Per-component list of commit types to ignore.
 
 ### `version_scheme` { #version_scheme }
 

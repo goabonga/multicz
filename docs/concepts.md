@@ -406,22 +406,42 @@ the release commit. `multicz validate` then adds two checks:
 
 Inspect with `multicz state` (text or JSON).
 
-## Ignoring commit types
+## Bump rules
 
-Some commit types should never appear in any bump or changelog:
-
-```toml
-[project]
-ignored_types = ["chore", "ci", "docs", "test", "style"]
-```
-
-Or per-component (the effective set is the union):
+The mapping from a commit `type` to the semver level it produces is
+configurable. Defaults follow Conventional Commits:
 
 ```toml
-[components.api]
-ignored_types = ["fix"]
+[project.bump_rules]
+feat   = "minor"
+fix    = "patch"
+perf   = "patch"
+revert = "patch"
 ```
 
-The filter is stricter than `release_commit_pattern`: `ignored_types`
-short-circuits before bump kind is computed, so even `feat!: ...` is
-dropped if `feat` is in the list.
+Accepted values: `"major"`, `"minor"`, `"patch"`, `"none"`. User
+entries merge on top of the defaults — adding `refactor = "patch"`
+doesn't silently drop `feat`/`fix`/`perf`/`revert`.
+
+A type set to `"none"` is fully silenced, **including its breaking
+variants**: `feat = "none"` drops `feat!: ...` too. A type *absent*
+from the table still bumps `major` when breaking (Conventional
+Commits default for unknown types).
+
+Per-component overrides are sparse merges on top of project rules:
+
+```toml
+[components.api.bump_rules]
+feat = "patch"   # api: a feature is just a patch here
+```
+
+Custom types are first-class: declare `infra = "patch"` and
+[`multicz check`](cli.md#check) accepts `infra: ...` at commit-msg
+hook time.
+
+!!! warning "`ignored_types` is deprecated"
+    `[project] ignored_types = [...]` and
+    `[components.<name>] ignored_types = [...]` still parse but emit a
+    `DeprecationWarning`. Each entry is folded into `bump_rules` as
+    `<type> = "none"`. Migrate when convenient — semantics are
+    preserved exactly.
