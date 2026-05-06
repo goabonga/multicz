@@ -26,11 +26,11 @@ def test_trigger_cycle_detected(tmp_path: Path):
     (tmp_path / "multicz.toml").write_text("""
 [components.a]
 paths = ["a/**"]
-triggers = ["b"]
+depends_on = ["b"]
 
 [components.b]
 paths = ["b/**"]
-triggers = ["a"]
+depends_on = ["a"]
 """)
     findings = list(TriggerCycleCheck().run(_ctx(tmp_path)))
     assert findings

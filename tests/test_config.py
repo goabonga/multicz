@@ -125,7 +125,7 @@ def test_array_form_empty_list_rejected(tmp_path: Path):
         Config.model_validate({"components": []})
 
 
-def test_array_form_with_triggers_resolves(tmp_path: Path):
+def test_array_form_with_depends_on_resolves(tmp_path: Path):
     target = _write(
         tmp_path,
         """
@@ -136,15 +136,12 @@ def test_array_form_with_triggers_resolves(tmp_path: Path):
         [[components]]
         name = "downstream"
         paths = ["downstream/**"]
-        triggers = ["base"]
+        depends_on = ["base"]
         """,
     )
     config = load_config(target)
     config.validate_references()  # must not raise
-    # 'triggers' is the legacy alias - it is merged into depends_on
-    # post-load, so the canonical field is what we assert against.
     assert config.components["downstream"].depends_on == ["base"]
-    assert config.components["downstream"].triggers == []
 
 
 def test_dict_and_array_produce_identical_models():
@@ -687,7 +684,7 @@ def test_mirror_rejects_unknown_field(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# bump_rules + ignored_types deprecation
+# bump_rules
 # ---------------------------------------------------------------------------
 
 
@@ -792,49 +789,33 @@ fix = "patch"
     assert rules["fix"] == "patch"
 
 
-def test_ignored_types_project_emits_deprecation_and_folds(tmp_path: Path):
-    """``[project] ignored_types`` is folded into ``bump_rules`` as
-    ``"none"`` and triggers a DeprecationWarning."""
+def test_legacy_ignored_types_field_is_rejected(tmp_path: Path):
+    """``ignored_types`` was removed in v1; the schema now rejects it."""
     target = _write(
         tmp_path,
         """
 [project]
-ignored_types = ["chore", "ci"]
+ignored_types = ["chore"]
 """
         + _minimal_component(),
     )
-    with pytest.warns(DeprecationWarning, match="ignored_types is deprecated"):
-        config = load_config(target)
-    assert config.project.bump_rules.get("chore") == "none"
-    assert config.project.bump_rules.get("ci") == "none"
-    # The legacy field is consumed and cleared.
-    assert config.project.ignored_types == []
+    with pytest.raises(ValidationError, match="ignored_types"):
+        load_config(target)
 
 
-def test_ignored_types_component_emits_deprecation_and_folds(tmp_path: Path):
-    target = _write(
-        tmp_path,
-        _minimal_component('ignored_types = ["fix"]'),
-    )
-    with pytest.warns(DeprecationWarning, match="ignored_types is deprecated"):
-        config = load_config(target)
-    api = config.components["api"]
-    assert api.bump_rules.get("fix") == "none"
-    assert api.ignored_types == []
-
-
-def test_ignored_types_overrides_bump_rules_default(tmp_path: Path):
-    """Legacy ``ignored_types = ["feat"]`` must beat the default
-    ``bump_rules.feat = "minor"`` (otherwise feat! would still bump major
-    on the legacy config form)."""
+def test_legacy_triggers_field_is_rejected(tmp_path: Path):
+    """``triggers`` was a parse-time alias for ``depends_on`` and is
+    removed in v1; the schema now rejects it."""
     target = _write(
         tmp_path,
         """
-[project]
-ignored_types = ["feat"]
-"""
-        + _minimal_component(),
+[components.api]
+paths = ["src/**"]
+
+[components.chart]
+paths = ["charts/**"]
+triggers = ["api"]
+""",
     )
-    with pytest.warns(DeprecationWarning):
-        config = load_config(target)
-    assert config.project.bump_rules["feat"] == "none"
+    with pytest.raises(ValidationError, match="triggers"):
+        load_config(target)

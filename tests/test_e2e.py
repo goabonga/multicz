@@ -116,11 +116,14 @@ def test_release_commits_are_skipped(repo: Path):
     assert "release" not in summaries.lower()
 
 
-def test_ignored_types_project_level_skips_commit_entirely(repo: Path):
+def test_bump_rules_project_level_silences_commits(repo: Path):
+    """``[project.bump_rules]`` entries set to ``"none"`` silence commit
+    types entirely (replaces the legacy ``ignored_types`` field)."""
     cfg = repo / "multicz.toml"
     cfg.write_text("""
-[project]
-ignored_types = ["chore", "ci"]
+[project.bump_rules]
+chore = "none"
+ci = "none"
 
 [components.api]
 paths = ["src/**", "pyproject.toml"]
@@ -138,13 +141,15 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
     assert "ci:" not in summaries
 
 
-def test_ignored_types_component_level(repo: Path):
+def test_bump_rules_component_level_silences_commits(repo: Path):
+    """A component's ``bump_rules`` override silences a type for that
+    component only."""
     cfg = repo / "multicz.toml"
     cfg.write_text("""
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-ignored_types = ["fix"]
+bump_rules = { fix = "none" }
 
 [components.chart]
 paths = ["charts/**"]
@@ -156,22 +161,24 @@ bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
         "fix: cross cutting bug",
     )
     plan = build_plan(repo, load_config(cfg))
-    # api ignores 'fix' -> not in plan
+    # api silences 'fix' -> not in plan
     assert "api" not in plan.bumps
     # chart still patches
     assert plan.bumps["chart"].kind == "patch"
 
 
-def test_ignored_types_unioned(repo: Path):
+def test_bump_rules_project_and_component_compose(repo: Path):
+    """Component-level rule overrides project-level for that component;
+    project-level still applies elsewhere."""
     cfg = repo / "multicz.toml"
     cfg.write_text("""
-[project]
-ignored_types = ["docs"]
+[project.bump_rules]
+docs = "none"
 
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-ignored_types = ["fix"]
+bump_rules = { fix = "none" }
 """)
     _commit(repo, {"src/main.py": "x = 2\n"}, "fix: filtered-by-component")
     _commit(repo, {"src/main.py": "x = 3\n"}, "docs: filtered-by-project")
@@ -183,21 +190,21 @@ ignored_types = ["fix"]
     assert "kept" in summaries
 
 
-def test_ignored_types_does_not_drop_breaking_commits_implicitly(repo: Path):
-    """If `feat` is ignored, even feat! is filtered out - explicit user choice."""
+def test_bump_rules_none_drops_breaking_commits_implicitly(repo: Path):
+    """``feat = "none"`` drops feat! too — explicit opt-out beats the
+    breaking marker. (Was the legacy ignored_types semantics.)"""
     cfg = repo / "multicz.toml"
     cfg.write_text("""
-[project]
-ignored_types = ["feat"]
+[project.bump_rules]
+feat = "none"
 
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 """)
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat!: drop py3.11")
-    with pytest.warns(DeprecationWarning, match="ignored_types is deprecated"):
-        plan = build_plan(repo, load_config(cfg))
-    assert "api" not in plan.bumps  # ignored even though it's breaking
+    plan = build_plan(repo, load_config(cfg))
+    assert "api" not in plan.bumps  # silenced even though it's breaking
 
 
 def test_bump_rules_promote_refactor_to_patch(repo: Path):
@@ -427,29 +434,6 @@ depends_on = ["api"]
     plan = build_plan(repo, load_config(cfg))
     assert plan.bumps["api"].kind == "minor"
     assert plan.bumps["chart"].kind == "minor"
-
-
-def test_triggers_alias_still_works(repo: Path):
-    """Backwards compat: 'triggers' is accepted as an alias for depends_on.
-
-    Asserts the cascade fires; kind is ``patch`` under the default
-    ``trigger_policy``.
-    """
-    cfg = repo / "multicz.toml"
-    cfg.write_text("""
-[components.api]
-paths = ["src/**", "pyproject.toml"]
-bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-
-[components.chart]
-paths = ["charts/**"]
-bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
-triggers = ["api"]
-""")
-    _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
-    plan = build_plan(repo, load_config(cfg))
-    assert "chart" in plan.bumps  # cascade fired via the legacy alias
-    assert plan.bumps["chart"].kind == "patch"
 
 
 def test_unknown_commit_default_is_ignore(repo: Path):

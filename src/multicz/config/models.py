@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import re
 import shlex
-import warnings
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -134,10 +133,8 @@ class Component(BaseModel):
     bump_files: list[FileKey] = Field(default_factory=list)
     mirrors: list[Mirror] = Field(default_factory=list)
     # depends_on lists upstream components whose bump should cascade into
-    # this one. ``triggers`` is kept as a parse-time alias for users who
-    # already wrote it that way; both names normalise to ``depends_on``.
+    # this one.
     depends_on: list[str] = Field(default_factory=list)
-    triggers: list[str] = Field(default_factory=list)  # alias, post-merged
     changelog: Path | None = None
     # Sinks that get rewritten on every bump (and may also act as the
     # *version source* when ``bump_files`` is empty - useful for pure
@@ -151,9 +148,6 @@ class Component(BaseModel):
     # ``minor`` / ``patch`` / ``none`` (= silence the type, including its
     # breaking variants).
     bump_rules: dict[str, BumpRule] = Field(default_factory=dict)
-    # Deprecated: use ``bump_rules`` with ``= "none"`` instead. Kept as a
-    # parse-time alias; folded into ``bump_rules`` after model validation.
-    ignored_types: list[str] = Field(default_factory=list)
     version_scheme: Literal["semver", "pep440"] = "semver"
     artifacts: list[Artifact] = Field(default_factory=list)
     # Shell commands run after multicz has rewritten this component's
@@ -189,36 +183,6 @@ class Component(BaseModel):
     @classmethod
     def _lowercase_bump_rule_keys(cls, value: dict[str, BumpRule]) -> dict[str, BumpRule]:
         return {k.lower(): v for k, v in value.items()}
-
-    @model_validator(mode="after")
-    def _fold_ignored_types(self) -> Component:
-        """Deprecated alias: each ``ignored_types`` entry becomes
-        ``bump_rules[type] = "none"``."""
-        if self.ignored_types:
-            warnings.warn(
-                "[components.<name>] ignored_types is deprecated; use "
-                "bump_rules with '<type> = \"none\"' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            for t in self.ignored_types:
-                self.bump_rules[t.lower()] = "none"
-            self.ignored_types = []
-        return self
-
-    @model_validator(mode="after")
-    def _merge_triggers_alias(self) -> Component:
-        """Fold ``triggers`` (legacy name) into ``depends_on`` (canonical).
-
-        Both fields are accepted; the union is what the planner reads.
-        After the merge ``triggers`` is left empty so the rest of the
-        codebase only needs to look at ``depends_on``.
-        """
-        if self.triggers:
-            merged = list(dict.fromkeys([*self.depends_on, *self.triggers]))
-            self.depends_on = merged
-            self.triggers = []
-        return self
 
     @model_validator(mode="after")
     def _validate_writers(self) -> Component:
@@ -312,9 +276,6 @@ class ProjectSettings(BaseModel):
     bump_rules: dict[str, BumpRule] = Field(
         default_factory=lambda: dict(DEFAULT_BUMP_RULES)
     )
-    # Deprecated: use ``bump_rules`` with ``= "none"`` instead. Kept as a
-    # parse-time alias; folded into ``bump_rules`` after model validation.
-    ignored_types: list[str] = Field(default_factory=list)
     state_file: Path | None = None  # opt-in JSON snapshot, written on bump
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
     sign_commits: bool = False  # gpg-sign release commits (git commit -S)
@@ -342,22 +303,6 @@ class ProjectSettings(BaseModel):
         merged = dict(DEFAULT_BUMP_RULES)
         merged.update({k.lower(): v for k, v in value.items()})
         return merged
-
-    @model_validator(mode="after")
-    def _fold_ignored_types(self) -> ProjectSettings:
-        """Deprecated alias: each ``ignored_types`` entry becomes
-        ``bump_rules[type] = "none"``."""
-        if self.ignored_types:
-            warnings.warn(
-                "[project] ignored_types is deprecated; use bump_rules with "
-                "'<type> = \"none\"' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            for t in self.ignored_types:
-                self.bump_rules[t.lower()] = "none"
-            self.ignored_types = []
-        return self
 
 
 class Config(BaseModel):

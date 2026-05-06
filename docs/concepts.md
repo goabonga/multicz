@@ -177,9 +177,6 @@ paths      = ["charts/myapp/**"]
 depends_on = ["api"]
 ```
 
-The legacy alias `triggers = [...]` still parses; both fold into
-`depends_on`.
-
 The bump kind on the dependent is governed by
 [`trigger_policy`](configuration.md#trigger_policy):
 
@@ -438,10 +435,3 @@ feat = "patch"   # api: a feature is just a patch here
 Custom types are first-class: declare `infra = "patch"` and
 [`multicz check`](cli.md#check) accepts `infra: ...` at commit-msg
 hook time.
-
-!!! warning "`ignored_types` is deprecated"
-    `[project] ignored_types = [...]` and
-    `[components.<name>] ignored_types = [...]` still parse but emit a
-    `DeprecationWarning`. Each entry is folded into `bump_rules` as
-    `<type> = "none"`. Migrate when convenient — semantics are
-    preserved exactly.

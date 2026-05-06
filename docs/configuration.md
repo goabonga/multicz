@@ -157,16 +157,6 @@ Custom types declared in `bump_rules` are also accepted by
 A per-component override is available — see
 [`bump_rules` (component)](#bump_rules_component).
 
-### `ignored_types` (project) { #ignored_types_project }
-
-!!! warning "Deprecated"
-    Folded into [`bump_rules`](#bump_rules) as `<type> = "none"` at
-    config-load time and emits a `DeprecationWarning`. Migrate by
-    moving each entry to `[project.bump_rules]` with `"none"`.
-
-Default `[]`. Commit types that should never bump or appear in
-changelogs. The filter short-circuits before bump kind is computed.
-
 ### `state_file` { #state_file }
 
 Default `null`. Optional path (e.g. `.multicz/state.json`) for the
@@ -271,8 +261,7 @@ for usage patterns.
 ### `depends_on` { #depends_on }
 
 Default `[]`. Names of upstream components whose bumps should cascade
-into this one. The legacy alias `triggers = [...]` still parses; both
-fold into `depends_on`.
+into this one.
 
 ### `changelog` { #changelog }
 
@@ -316,15 +305,6 @@ feat = "patch"   # this component never goes minor on a feature
 
 Same accepted values as the project-level field
 (`"major"` / `"minor"` / `"patch"` / `"none"`).
-
-### `ignored_types` (component) { #ignored_types_component }
-
-!!! warning "Deprecated"
-    Folded into [component `bump_rules`](#bump_rules_component) as
-    `<type> = "none"` at config-load time and emits a
-    `DeprecationWarning`.
-
-Default `[]`. Per-component list of commit types to ignore.
 
 ### `version_scheme` { #version_scheme }
 

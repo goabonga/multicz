@@ -206,8 +206,7 @@ multicz changelog --output md             # grouped Breaking / Features / Fixes 
 
 The grouping honours `[project].changelog_sections`,
 `breaking_section_title`, `other_section_title`, and any commit type
-set to `"none"` in `[project.bump_rules]` (or its deprecated alias
-`ignored_types`).
+set to `"none"` in `[project.bump_rules]`.
 
 ## `release-notes`
 

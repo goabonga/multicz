@@ -180,11 +180,11 @@ def test_trigger_cycle_detected(repo: Path):
     _write_config(repo, """
 [components.a]
 paths = ["a/**"]
-triggers = ["b"]
+depends_on = ["b"]
 
 [components.b]
 paths = ["b/**"]
-triggers = ["a"]
+depends_on = ["a"]
 """)
     findings = validate(repo, load_config(repo / "multicz.toml"))
     cycles = [f for f in findings if f.check == "trigger_cycle"]

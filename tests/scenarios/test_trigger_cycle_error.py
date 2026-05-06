@@ -16,11 +16,11 @@ from multicz.cli import app
 CYCLIC_CONFIG = """\
 [components.a]
 paths = ["a/**"]
-triggers = ["b"]
+depends_on = ["b"]
 
 [components.b]
 paths = ["b/**"]
-triggers = ["a"]
+depends_on = ["a"]
 """
 
 
