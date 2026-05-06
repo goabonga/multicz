@@ -2,6 +2,22 @@
 
 All notable changes to this component are documented here.
 
+## [1.0.0] - 2026-05-06
+
+### Breaking changes
+
+- **config**: switch trigger_policy default from match-upstream to patch (`6cfd541`)
+- **security**: gate post_bump shell hooks behind post_bump_policy (`ff66cb2`)
+- **config**: replace format='debian' with composable [[writers]] AOT (`01f7cdf`)
+- **config**: drop deprecation aliases (ignored_types, triggers) for v1 (`6782fcb`)
+
+### Features
+
+- **init**: support --skip <ecosystems> to disable specific discovery strategies (`d3e9d5a`)
+- **config**: make commit-type bump rules configurable, deprecate ignored_types (`d51492f`)
+- **cli**: add `multicz config` to print the effective configuration (`d802536`)
+- **cli**: add `multicz graph` to render the cascade DAG (`139b248`)
+
 ## [0.6.0] - 2026-05-04
 
 ### Features
