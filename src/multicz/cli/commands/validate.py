@@ -33,11 +33,11 @@ def validate_cmd(
       explicit, not silent)
     - mirror targets are owned by another component (otherwise no
       cascade fires) and don't loop back to the same component
-    - declared triggers form no cycle
+    - declared depends_on edges form no cycle
     - mirror cascades form no cycle
     - declared changelog paths are reachable
     - the planner can resolve the current version of every component
-    - debian/changelog files (when format='debian') parse correctly
+    - declared writers (e.g. debian-changelog) validate against the repo
 
     Exit code:
 

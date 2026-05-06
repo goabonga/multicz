@@ -136,10 +136,11 @@ when no commits landed since the last RC tag - finalising IS a release
 event in its own right. Without either flag, a `multicz bump` from a
 pre-release version auto-finalises.
 
-For Debian-format components the changelog stanza renders with `~`
-notation so `apt`'s ordering puts pre-releases *before* the final:
-`mypkg (1.3.0~rc1-1)` < `mypkg (1.3.0-1)`. The git tag itself stays in
-semver form (`mypkg-v1.3.0-rc.1`).
+For components with a [`debian-changelog` writer](configuration.md#writers)
+the stanza renders with `~` notation so `apt`'s ordering puts
+pre-releases *before* the final: `mypkg (1.3.0~rc1-1)` <
+`mypkg (1.3.0-1)`. The git tag itself stays in semver form
+(`mypkg-v1.3.0-rc.1`).
 
 The output format on the changelog after `--finalize` is governed by
 [`finalize_strategy`](configuration.md#finalize_strategy) -

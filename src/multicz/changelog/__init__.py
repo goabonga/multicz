@@ -8,8 +8,8 @@ The package is split by output format:
 * :mod:`multicz.changelog.bucket` - pure commit filtering / section
   bucketing logic shared by every renderer.
 * :mod:`multicz.changelog.markdown` - keep-a-changelog ``CHANGELOG.md``
-  rendering (default-format components and the parallel markdown
-  changelog of debian-format components).
+  rendering (used both as a component's primary changelog and as a
+  parallel markdown rendering alongside a ``debian-changelog`` writer).
 * :mod:`multicz.changelog.debian` - RFC 5322 stanza rendering for
   ``debian/changelog``, plus the parsing helpers used to read the
   topmost stanza as a version source of truth.

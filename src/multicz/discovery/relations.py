@@ -107,11 +107,12 @@ class NodeWorkspaceRelation:
 
 
 class DebianChangelogRelation:
-    """Detect a top-level ``debian/changelog`` and add a debian-format component.
+    """Detect a top-level ``debian/changelog`` and add a component with
+    a ``debian-changelog`` writer.
 
     Currently a thin wrapper over :func:`.debian._detect_debian`; the
-    Protocol surface lets a future debian-format-aware project policy
-    swap it out (e.g. detect package-per-binary in a multi-binary
+    Protocol surface lets a future writer-aware project policy swap it
+    out (e.g. detect package-per-binary in a multi-binary
     debian/control).
     """
 
