@@ -196,10 +196,10 @@ implemented today - only `version` is exposed.
 
 ## `config`
 
-Print the *effective* configuration after multicz applied every
-default and merged the project-level `bump_rules` with the conventional
-defaults. Useful for debugging "why isn't my override taking effect?"
-without having to read the schema or the loader.
+Print the *effective* configuration: every default applied, every
+alias normalised, every sparse override merged. Useful when an option
+isn't behaving as you expected — `config` shows you what multicz
+actually parsed, not what you typed.
 
 ```bash
 multicz config                    # full config in TOML
@@ -208,9 +208,55 @@ multicz config --output json      # machine-readable, pipe to jq
 multicz config --source           # also print the loaded file path on stderr
 ```
 
-The TOML output is round-trippable - you can copy it back into a
-`multicz.toml` and it parses identically. The JSON output mirrors the
-Pydantic schema (Path objects rendered as strings).
+What you see vs. what you wrote:
+
+```toml
+# in your multicz.toml:
+[components.api]
+paths      = ["src/**"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+# `multicz config -c api` shows:
+[project]
+bump_rules = { feat = "minor", fix = "patch", perf = "patch", revert = "patch" }
+overlap_policy   = "error"
+post_bump_policy = "deny"
+trigger_policy   = "patch"
+# … every other default
+
+[components.api]
+paths         = ["src/**"]
+exclude_paths = []
+bump_policy   = "as-commit"
+version_scheme = "semver"
+# … every other default
+[[components.api.bump_files]]
+file = "pyproject.toml"
+key  = "project.version"
+```
+
+Notable flags:
+
+- `--output toml` (default) — round-trippable; you can copy the output
+  back into a `multicz.toml` and it parses identically. Internally
+  goes through Pydantic's JSON dump and strips `null` values (TOML
+  has no null).
+- `--output json` — mirrors the Pydantic schema with `Path` objects
+  rendered as strings. Pipe to `jq` in CI to extract a specific
+  field.
+- `-c <name>` keeps the `[project]` table in the output (defaults are
+  the most useful debugging context) and exactly one component.
+- `--source` — writes the path of the loaded `multicz.toml` /
+  `pyproject.toml` / `package.json` to **stderr**, so it doesn't
+  pollute the JSON/TOML on stdout.
+
+Common debugging checks:
+
+| concern | look for |
+|---|---|
+| my `bump_rules` override isn't applied | `[project.bump_rules]` or `[components.X.bump_rules]` shows the resolved map; if a key is absent, the user table didn't reach Pydantic. |
+| a writer isn't firing | `[[components.X.writers]]` array — check `type`, `file`, and that the entry survived schema validation. |
+| `multicz` is reading the wrong file | run with `--source` to confirm which config path was discovered. |
 
 ## `changelog`
 
