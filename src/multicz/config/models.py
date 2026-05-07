@@ -115,6 +115,14 @@ class DebianChangelogWriter(BaseModel):
     maintainer: str | None = None  # falls back to debian/control then git config
     debian_revision: int = 1
     epoch: int | None = None
+    # Debian package name written into each new stanza header. Defaults
+    # to the multicz component name when unset. Override when the
+    # component name (typically short - "api", "worker") differs from
+    # the Debian binary package name (typically prefixed -
+    # "shomer-api"); ``dpkg-source`` errors out otherwise because the
+    # changelog's package name must match ``debian/control``'s
+    # ``Source:`` field.
+    package: str | None = None
 
 
 # Discriminated union of all writer types. Add new writer schemas here

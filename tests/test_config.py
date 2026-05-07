@@ -249,6 +249,28 @@ def test_debian_writer_with_defaults(tmp_path: Path):
     assert writer.distribution == "UNRELEASED"
     assert writer.urgency == "medium"
     assert writer.debian_revision == 1
+    assert writer.package is None
+
+
+def test_debian_writer_package_override(tmp_path: Path):
+    """The ``package`` field overrides the multicz component name in
+    the rendered stanza header — necessary when a short component name
+    (``api``) doesn't match its Debian binary name (``shomer-api``)."""
+    target = _write(
+        tmp_path,
+        """
+        [components.api]
+        paths = ["src/**"]
+        bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+        [[components.api.writers]]
+        type = "debian-changelog"
+        package = "shomer-api"
+        """,
+    )
+    config = load_config(target)
+    writer = config.components["api"].writers[0]
+    assert writer.package == "shomer-api"
 
 
 def test_debian_writer_with_overrides(tmp_path: Path):

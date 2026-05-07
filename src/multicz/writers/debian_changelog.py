@@ -67,7 +67,7 @@ class DebianChangelogImpl:
         )
         maintainer = _resolve_maintainer(ctx.repo, writer.maintainer)
         stanza = render_stanza(
-            package=ctx.component_name,
+            package=writer.package or ctx.component_name,
             version=debian_version,
             distribution=writer.distribution,
             urgency=writer.urgency,

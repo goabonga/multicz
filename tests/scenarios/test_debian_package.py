@@ -142,3 +142,47 @@ def test_dual_changelog_filters_chore_in_both_files(
     assert "tidy imports" not in md
     assert "Add fixture" not in deb
     assert "fixture" not in md.lower()
+
+
+CONFIG_PACKAGE_OVERRIDE = """\
+[components.api]
+paths      = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+
+[[components.api.writers]]
+type    = "debian-changelog"
+file    = "debian/changelog"
+package = "shomer-api"
+"""
+
+
+def test_writer_package_override_used_in_stanza_header(
+    make_repo, commit, runner
+):
+    """When ``package`` is set on the writer, the rendered stanza uses
+    that name in the header (matching debian/control's Source:),
+    even though the multicz component is just ``api``."""
+    repo = make_repo({
+        "multicz.toml": CONFIG_PACKAGE_OVERRIDE,
+        "pyproject.toml": (
+            "[project]\nname = \"shomer-api\"\nversion = \"1.2.3\"\n"
+        ),
+        "src/main.py": "x = 1\n",
+        "debian/changelog": (
+            "shomer-api (1.2.3-1) unstable; urgency=medium\n"
+            "\n"
+            "  * Initial release.\n"
+            "\n"
+            " -- scenarios <scenarios@multicz>  "
+            "Sun, 01 Jan 2023 00:00:00 +0000\n"
+        ),
+    })
+    commit({"src/main.py": "x = 2\n"}, "feat: add login")
+
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 0, result.stdout
+
+    text = (repo / "debian/changelog").read_text()
+    # New stanza must use "shomer-api", not "api" (the component name).
+    assert text.startswith("shomer-api (1.3.0-1)")
+    assert "api (1.3.0-1)" not in text.replace("shomer-api (1.3.0-1)", "")
