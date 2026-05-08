@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.1.0] - 2026-05-08
+
+### Features
+
+- **writers**: add `package` field to debian-changelog writer (`2a97080`)
+
 ## [1.0.0] - 2026-05-06
 
 ### Breaking changes
