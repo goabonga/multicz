@@ -31,12 +31,12 @@ older release section.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from ..commits import Commit
+from ..commits import BumpRule, Commit
 from ..config import ChangelogSection, _default_changelog_sections
 from .bucket import bucket_commits
 
@@ -75,6 +75,7 @@ def render_body(
     commits: Iterable[Commit],
     *,
     sections: Sequence[ChangelogSection] | None = None,
+    bump_rules: Mapping[str, BumpRule] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
     cascades: Sequence[CascadeEntry] | None = None,
@@ -87,6 +88,11 @@ def render_body(
     commits then fall through to whichever section claims their type).
     Empty string ``other_title`` drops unmatched conventional commits.
 
+    ``bump_rules`` (when passed) ties the rendered sections to the bump
+    configuration: a type with a non-``"none"`` rule is included even
+    if no explicit section claims it (auto-bucketed under
+    ``type.title()``). See :func:`bucket_commits`.
+
     ``cascades`` lists upstream bumps that pulled this component along
     (mirror writes, trigger edges). When present and ``cascade_title``
     is non-empty, they render as a dedicated H3 section; this also
@@ -97,6 +103,7 @@ def render_body(
     bucketed = bucket_commits(
         commits,
         sections=sections,
+        bump_rules=bump_rules,
         breaking_title=breaking_title,
         other_title=other_title,
     )
@@ -173,6 +180,7 @@ def render_section(
     *,
     today: date | None = None,
     sections: Sequence[ChangelogSection] | None = None,
+    bump_rules: Mapping[str, BumpRule] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
     cascades: Sequence[CascadeEntry] | None = None,
@@ -184,6 +192,7 @@ def render_section(
     body = render_body(
         commits,
         sections=sections,
+        bump_rules=bump_rules,
         breaking_title=breaking_title,
         other_title=other_title,
         cascades=cascades,
@@ -236,6 +245,7 @@ def update_changelog_file(
     *,
     today: date | None = None,
     sections: Sequence[ChangelogSection] | None = None,
+    bump_rules: Mapping[str, BumpRule] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
     drop_prereleases: bool = False,
@@ -254,6 +264,7 @@ def update_changelog_file(
         commits,
         today=today,
         sections=sections,
+        bump_rules=bump_rules,
         breaking_title=breaking_title,
         other_title=other_title,
         cascades=cascades,

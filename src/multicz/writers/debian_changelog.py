@@ -74,6 +74,7 @@ class DebianChangelogImpl:
             commits=ctx.relevant_commits,
             maintainer=maintainer,
             sections=config.project.changelog_sections,
+            bump_rules=config.bump_rules_for(ctx.component_name),
             breaking_title=config.project.breaking_section_title,
             other_title=config.project.other_section_title,
         )

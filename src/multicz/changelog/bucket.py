@@ -14,10 +14,10 @@ markers).
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from ..commits import Commit
+from ..commits import BumpRule, Commit
 from ..config import ChangelogSection, _default_changelog_sections
 
 
@@ -51,6 +51,7 @@ def bucket_commits(
     commits: Iterable[Commit],
     *,
     sections: Sequence[ChangelogSection] | None = None,
+    bump_rules: Mapping[str, BumpRule] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
 ) -> BucketedCommits:
@@ -61,6 +62,13 @@ def bucket_commits(
     breaking bucket (breaking commits then fall through to whichever
     section claims their type), ``other_title=""`` drops unmatched
     commits entirely.
+
+    ``bump_rules`` (if passed) bridges the bump configuration with the
+    rendered sections. Any commit type with a non-``"none"`` rule is
+    considered "interesting": if no explicit section claims it, an
+    auto-bucket titled ``type.title()`` is created (e.g. ``docs:`` →
+    ``"Docs"`` section). Auto-buckets render *after* the explicitly
+    declared sections, in alphabetical order for determinism.
     """
     sections = list(sections) if sections is not None else _default_changelog_sections()
     relevant = [c for c in commits if c.is_conventional]
@@ -80,12 +88,31 @@ def bucket_commits(
         if items:
             by_section[section.title] = items
 
+    section_claimed = {t.lower() for s in sections for t in s.types}
+
+    # Auto-buckets for types declared in bump_rules but not claimed by
+    # any explicit section. Sorted for stable output.
+    rule_claimed: set[str] = set()
+    if bump_rules:
+        rule_claimed = {
+            t.lower()
+            for t, kind in bump_rules.items()
+            if kind != "none"
+        }
+        for type_name in sorted(rule_claimed - section_claimed):
+            items = [
+                c for c in relevant
+                if id(c) not in breaking_set and c.type.lower() == type_name
+            ]
+            if items:
+                by_section[type_name.title()] = items
+
     leftovers: list[Commit] = []
     if other_title:
-        claimed = {t.lower() for s in sections for t in s.types}
+        all_claimed = section_claimed | rule_claimed
         leftovers = [
             c for c in relevant
-            if id(c) not in breaking_set and c.type.lower() not in claimed
+            if id(c) not in breaking_set and c.type.lower() not in all_claimed
         ]
 
     return BucketedCommits(
@@ -99,6 +126,7 @@ def filter_commits(
     commits: Iterable[Commit],
     *,
     sections: Sequence[ChangelogSection] | None = None,
+    bump_rules: Mapping[str, BumpRule] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
 ) -> list[Commit]:
@@ -108,9 +136,17 @@ def filter_commits(
     list bullets in original commit order). Equivalent to "any commit
     that ``bucket_commits`` would have placed somewhere", expressed as
     a single list.
+
+    Same ``bump_rules`` semantics as :func:`bucket_commits`: a type
+    with a non-``"none"`` rule is kept even when no explicit section
+    claims it.
     """
     sections = list(sections) if sections is not None else _default_changelog_sections()
     section_types = {t.lower() for s in sections for t in s.types}
+    rule_types = {
+        t.lower() for t, kind in (bump_rules or {}).items() if kind != "none"
+    }
+    keep = section_types | rule_types
     keep_breaking = bool(breaking_title)
     keep_leftovers = bool(other_title)
     return [
@@ -118,7 +154,7 @@ def filter_commits(
         if c.is_conventional
         and (
             (keep_breaking and c.breaking)
-            or c.type.lower() in section_types
+            or c.type.lower() in keep
             or keep_leftovers
         )
     ]

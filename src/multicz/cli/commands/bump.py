@@ -274,6 +274,7 @@ def bump(
                 new_version,
                 relevant,
                 sections=config.project.changelog_sections,
+                bump_rules=config.bump_rules_for(planned.component),
                 breaking_title=config.project.breaking_section_title,
                 other_title=config.project.other_section_title,
                 drop_prereleases=is_final and strategy == "promote",

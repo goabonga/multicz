@@ -27,12 +27,12 @@ configured Debian revision when writing a new stanza.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import format_datetime
 
-from ..commits import Commit
+from ..commits import BumpRule, Commit
 from ..config import ChangelogSection
 from .bucket import filter_commits
 
@@ -195,6 +195,7 @@ def render_stanza(
     maintainer: str = "Unknown <unknown@example.com>",
     when: datetime | None = None,
     sections: Sequence[ChangelogSection] | None = None,
+    bump_rules: Mapping[str, BumpRule] | None = None,
     breaking_title: str = "Breaking changes",
     other_title: str = "",
 ) -> str:
@@ -222,6 +223,7 @@ def render_stanza(
     filtered = filter_commits(
         commits,
         sections=sections,
+        bump_rules=bump_rules,
         breaking_title=breaking_title,
         other_title=other_title,
     )

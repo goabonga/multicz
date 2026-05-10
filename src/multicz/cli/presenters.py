@@ -449,6 +449,7 @@ def render_release_notes(
         body = render_body(
             list(s.commits),
             sections=config.project.changelog_sections,
+            bump_rules=config.bump_rules_for(s.component),
             breaking_title=config.project.breaking_section_title,
             other_title=config.project.other_section_title,
             cascades=list(s.cascades) if s.cascades else None,
@@ -490,6 +491,7 @@ def render_changelog(
             body = render_body(
                 list(entry.relevant),
                 sections=config.project.changelog_sections,
+                bump_rules=config.bump_rules_for(entry.component),
                 breaking_title=config.project.breaking_section_title,
                 other_title=config.project.other_section_title,
             )

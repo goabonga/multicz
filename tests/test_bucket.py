@@ -171,3 +171,93 @@ def test_filter_skips_non_conventional_commits():
     ]
     out = filter_commits(commits, sections=DEFAULT_SECTIONS)
     assert [c.subject for c in out] == ["real"]
+
+
+# ---------------------------------------------------------------------------
+# bump_rules → auto-buckets
+# ---------------------------------------------------------------------------
+
+
+def test_bucket_auto_buckets_type_with_non_none_rule_not_in_sections():
+    """A type that bumps the component (rule != "none") AND isn't
+    claimed by any section gets an auto-bucket named title-case(type).
+    Closes the gap where `multicz plan` listed the bump driver but
+    `multicz release-notes` dropped the same commit silently."""
+    commits = [
+        parse_commit("a", "feat: x", ()),
+        parse_commit("b", "docs: rewrite", ()),
+        parse_commit("c", "infra: rotate", ()),
+    ]
+    out = bucket_commits(
+        commits,
+        sections=DEFAULT_SECTIONS,
+        bump_rules={"feat": "minor", "docs": "patch", "infra": "patch"},
+    )
+    # `feat` matches the explicit "Features" section, untouched.
+    assert "Features" in out.by_section
+    assert [c.subject for c in out.by_section["Features"]] == ["x"]
+    # `docs` and `infra` are auto-bucketed (no explicit section claims them).
+    assert "Docs" in out.by_section
+    assert [c.subject for c in out.by_section["Docs"]] == ["rewrite"]
+    assert "Infra" in out.by_section
+    assert [c.subject for c in out.by_section["Infra"]] == ["rotate"]
+
+
+def test_bucket_no_bump_rules_keeps_legacy_behaviour():
+    """Without `bump_rules`, types not claimed by sections are dropped
+    (preserves the pre-feature default)."""
+    commits = [
+        parse_commit("a", "feat: x", ()),
+        parse_commit("b", "docs: rewrite", ()),
+    ]
+    out = bucket_commits(commits, sections=DEFAULT_SECTIONS)
+    assert list(out.by_section) == ["Features"]
+
+
+def test_bucket_rule_none_does_not_auto_bucket():
+    """A type explicitly silenced (rule == "none") must NOT appear in
+    the rendered changelog even if commits exist for it."""
+    commits = [
+        parse_commit("a", "chore: tidy", ()),
+    ]
+    out = bucket_commits(
+        commits,
+        sections=DEFAULT_SECTIONS,
+        bump_rules={"chore": "none"},
+    )
+    assert out.by_section == {}
+
+
+def test_bucket_explicit_section_wins_over_auto_bucket():
+    """When a section explicitly claims a type, the section's title is
+    used (not the auto-bucket title-case fallback)."""
+    custom_sections = [
+        ChangelogSection(title="Documentation", types=["docs"]),
+    ]
+    commits = [
+        parse_commit("a", "docs: rewrite", ()),
+    ]
+    out = bucket_commits(
+        commits,
+        sections=custom_sections,
+        bump_rules={"docs": "patch"},
+    )
+    assert list(out.by_section) == ["Documentation"]
+    assert "Docs" not in out.by_section
+
+
+def test_filter_keeps_types_from_bump_rules():
+    """`filter_commits` (used by Debian renderer) extends its keep-set
+    with bump_rules types — same logic as bucket_commits, flat output."""
+    commits = [
+        parse_commit("a", "feat: x", ()),
+        parse_commit("b", "docs: rewrite", ()),
+        parse_commit("c", "chore: tidy", ()),
+    ]
+    out = filter_commits(
+        commits,
+        sections=DEFAULT_SECTIONS,
+        bump_rules={"feat": "minor", "docs": "patch"},
+    )
+    # feat (section) + docs (rule) kept; chore (neither) dropped.
+    assert [c.subject for c in out] == ["x", "rewrite"]
