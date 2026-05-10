@@ -8,6 +8,11 @@
 commit_convention = "conventional"
 tag_format = "{component}-v{version}"
 initial_version = "0.0.0"
+# Opt in to the `uv lock` post_bump hook below. Without this, the
+# default `deny` policy silently skips the hook and uv.lock drifts
+# away from the just-written pyproject.toml version (catches CI on
+# the next `uv sync --frozen`).
+post_bump_policy = "allow"
 
 [components.multicz]
 paths = ["src/**", "pyproject.toml", "tests/**"]
