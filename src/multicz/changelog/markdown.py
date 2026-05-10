@@ -144,11 +144,24 @@ def render_body(
         merged.extend(cascade_groups.pop(breaking_title, []))
         ordered.append((breaking_title, merged))
 
+    rendered_titles: set[str] = set()
     for section in sections:
         if section.title in bucketed.by_section:
             merged = [_commit_line(c) for c in bucketed.by_section[section.title]]
             merged.extend(cascade_groups.pop(section.title, []))
             ordered.append((section.title, merged))
+            rendered_titles.add(section.title)
+
+    # Auto-buckets (titles in bucketed.by_section that aren't claimed
+    # by any explicit `sections` entry) come from bump_rules-driven
+    # types — render them after the explicit sections, in the order
+    # bucket_commits inserted them (alphabetical).
+    for title, commits_in_bucket in bucketed.by_section.items():
+        if title in rendered_titles:
+            continue
+        merged = [_commit_line(c) for c in commits_in_bucket]
+        merged.extend(cascade_groups.pop(title, []))
+        ordered.append((title, merged))
 
     if other_title and bucketed.leftovers:
         merged = [_commit_line(c) for c in bucketed.leftovers]

@@ -323,3 +323,33 @@ def test_update_changelog_file_prepends_to_existing(tmp_path: Path):
     )
     content = target.read_text()
     assert content.index("## [1.1.0]") < content.index("## [1.0.0]")
+
+
+def test_render_body_emits_auto_buckets_from_bump_rules():
+    """Bug regression: bucket_commits put `docs:` commits in an auto
+    bucket but render_body iterated only the explicit sections list,
+    so the bucket got silently dropped from the rendered output. Each
+    auto-bucket title in bucketed.by_section must surface in the
+    output even when no ChangelogSection claims it."""
+    from multicz.changelog import render_body
+    from multicz.commits import parse_commit
+    from multicz.config import ChangelogSection
+
+    body = render_body(
+        [
+            parse_commit("a", "feat: x", ()),
+            parse_commit("b", "docs: rewrite", ()),
+            parse_commit("c", "fix: bug", ()),
+        ],
+        sections=[
+            ChangelogSection(title="Features", types=["feat"]),
+            ChangelogSection(title="Fixes", types=["fix"]),
+        ],
+        bump_rules={"feat": "minor", "fix": "patch", "docs": "patch"},
+        breaking_title="",
+        other_title="",
+    )
+    assert "### Features" in body
+    assert "### Fixes" in body
+    assert "### Docs" in body
+    assert "rewrite" in body
