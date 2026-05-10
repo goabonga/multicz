@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.2.0] - 2026-05-10
+
+### Features
+
+- **changelog**: bucket bump_rules-driven types into auto sections (`13af3f7`)
+
 ## [1.1.0] - 2026-05-08
 
 ### Features
