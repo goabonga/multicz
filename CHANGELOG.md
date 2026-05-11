@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.2.1] - 2026-05-11
+
+### Fixes
+
+- **changelog**: render auto-buckets from bump_rules in render_body (`d0a7c9a`)
+
 ## [1.2.0] - 2026-05-10
 
 ### Features
