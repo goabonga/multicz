@@ -162,8 +162,14 @@ def test_changelog_markdown_no_changes(repo: Path, runner: CliRunner):
 
 
 def test_changelog_markdown_uses_project_sections(repo: Path, runner: CliRunner):
-    # rewrite multicz.toml with custom sections (keep-a-changelog vocabulary)
+    # Rewrite multicz.toml with custom sections (keep-a-changelog vocabulary)
+    # AND silence `perf` at the bump_rules level so the type doesn't
+    # auto-bucket: this test asserts that custom sections drive the
+    # render and types neither claimed nor bumped get dropped entirely.
     (repo / "multicz.toml").write_text(CONFIG + """
+[project.bump_rules]
+perf = "none"
+
 [[project.changelog_sections]]
 title = "Added"
 types = ["feat"]
@@ -180,7 +186,9 @@ types = ["fix"]
     assert result.exit_code == 0, result.stdout
     assert "### Added" in result.stdout
     assert "### Fixed" in result.stdout
-    # Performance is no longer a configured section -> commit dropped
+    # `perf` has no section AND its bump rule is "none" -> auto-bucket
+    # is suppressed, the commit is dropped from the render entirely.
+    assert "Perf" not in result.stdout
     assert "Performance" not in result.stdout
     assert "tighter loop" not in result.stdout
 
