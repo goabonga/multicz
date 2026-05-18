@@ -7,9 +7,25 @@ version = "1.0.0"
 description = "Example package that exercises the deprecation plugin."
 requires-python = ">=3.12"
 
+# multicz is *not* a runtime dependency of ``legacy_api`` — nothing in
+# this package imports it. It's the release tool used to bump versions
+# and surface the built-in deprecation plugin, so it lives in the
+# ``dev`` dependency group: ``uv sync`` still installs it locally, but
+# ``pip install legacy-api`` won't drag it into a consumer's env.
+[dependency-groups]
+dev = ["multicz"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/legacy_api"]
+
+# Workspace-only convenience: this example lives *inside* the multicz
+# repo, so ``multicz`` is resolved from the local source tree (two
+# levels up) instead of PyPI. When copying this example outside the
+# repo, delete this section — ``uv sync`` (and ``pip``) will then pick
+# multicz up from PyPI like any other dependency.
+[tool.uv.sources]
+multicz = { path = "../../" }

@@ -16,7 +16,9 @@ requires-python = ">=3.12"
 # Depend on multicz so installing the plugin gives you the host CLI too.
 # A real plugin distributed independently would pin a range that matches
 # the stable plugin Protocol (e.g. ``multicz>=1.2,<2``).
-dependencies = ["multicz"]
+dependencies = [
+    "multicz",
+]
 
 # This is what makes the plugin discoverable. When multicz starts up, it
 # iterates ``importlib.metadata.entry_points(group="multicz.plugins")``
@@ -36,3 +38,11 @@ build-backend = "hatchling.build"
 #   * ``app``   — a stand-in for "your project being versioned"
 # A real plugin would only ship ``newsy``.
 packages = ["src/newsy", "src/app"]
+
+# Workspace-only convenience: this example lives *inside* the multicz
+# repo, so ``multicz`` is resolved from the local source tree (two
+# levels up) instead of PyPI. When copying this example outside the
+# repo, delete this section — ``uv sync`` (and ``pip``) will then pick
+# multicz up from PyPI like any other dependency.
+[tool.uv.sources]
+multicz = { path = "../../" }
