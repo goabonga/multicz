@@ -57,6 +57,7 @@ from .commands import (  # noqa: E402, F401
     graph,
     init,
     plan,
+    plugins,
     release_notes,
     state,
     status,

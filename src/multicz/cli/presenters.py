@@ -149,6 +149,64 @@ def render_bump_empty(*, output: str) -> None:
         )
 
 
+def render_plugins_list(plugins, plugins_config, *, output: str) -> None:
+    """Render the ``multicz plugins`` listing.
+
+    ``plugins`` is the iterable of discovered :class:`Plugin` instances
+    (typically ``list(DEFAULT_REGISTRY)``). ``plugins_config`` is
+    ``config.plugins`` — the raw TOML ``[plugins.<name>]`` map keyed by
+    plugin name.
+
+    Text output is a 3-column table; JSON is the machine-readable
+    shape for CI consumers.
+    """
+    rows = []
+    for plugin in plugins:
+        section = plugins_config.get(plugin.name, {}) or {}
+        # ``enabled`` defaults to True (opt-in disable, not opt-in enable).
+        enabled = bool(section.get("enabled", True))
+        # Locate the import path of the plugin class for the JSON shape.
+        impl_cls = type(plugin)
+        module = impl_cls.__module__
+        rows.append(
+            {
+                "name": plugin.name,
+                "enabled": enabled,
+                "module": module,
+                "class": impl_cls.__name__,
+                "config": section,
+            }
+        )
+    if output == "json":
+        console.print_json(data={"plugins": rows})
+        return
+    if not rows:
+        console.print("[dim]no plugins discovered[/]")
+        console.print(
+            "[dim]install a plugin or check it declares the "
+            "[bold]multicz.plugins[/] entry-point group[/]"
+        )
+        return
+    table = Table()
+    table.add_column("Plugin", style="bold")
+    table.add_column("Status")
+    table.add_column("Module")
+    table.add_column("Config section")
+    for row in rows:
+        status = "[green]enabled[/]" if row["enabled"] else "[dim]disabled[/]"
+        cfg = row["config"]
+        # Square brackets in TOML section names trigger Rich's markup
+        # parser — escape them so they render literally in the table.
+        section_label = f"\\[plugins.{row['name']}]"
+        if cfg:
+            keys = ", ".join(f"{k}={v!r}" for k, v in cfg.items())
+            cfg_cell = f"{section_label} {keys}"
+        else:
+            cfg_cell = f"[dim](no {section_label} in multicz.toml)[/]"
+        table.add_row(row["name"], status, row["module"], cfg_cell)
+    console.print(table)
+
+
 def render_plugin_advice(lines, *, output: str) -> None:
     """Render :meth:`Plugin.status_lines` output — free-form actionable
     text plugins return to inform the user (e.g. "3 deprecations marked
