@@ -53,6 +53,7 @@ nav = [
   { "Concepts" = "concepts.md" },
   { "Configuration" = "configuration.md" },
   { "CLI" = "cli.md" },
+  { "Plugins" = "plugins.md" },
   { "Recipes" = "recipes.md" },
   { "Why multicz?" = "why.md" },
   { "Security" = "security.md" },

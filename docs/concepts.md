@@ -435,3 +435,13 @@ feat = "patch"   # api: a feature is just a patch here
 Custom types are first-class: declare `infra = "patch"` and
 [`multicz check`](cli.md#check) accepts `infra: ...` at commit-msg
 hook time.
+
+## Plugins
+
+The core can be extended via [plugins](plugins.md): external Python
+packages that register under the `multicz.plugins` entry-point group
+and participate in three places of the release flow — gating the
+bump, enriching the changelog, and surfacing pre-flight advice in
+`multicz status` / `multicz plan`. Plugins are **opt-in**: a
+discovered plugin only runs when the project declares
+`[plugins.<name>]` in its config.

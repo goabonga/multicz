@@ -384,6 +384,20 @@ rendered refs. The same data is embedded inside
 `multicz plan --output json` and `multicz bump --output json` against
 the planned/applied version.
 
+## `plugins`
+
+List every plugin discovered via the `multicz.plugins` entry-point
+group, with its activation state and config section.
+
+```bash
+multicz plugins                   # text table
+multicz plugins --output json
+```
+
+Three states are surfaced per plugin (`active`, `disabled`,
+`inactive`) — see [Plugins → Activation](plugins.md#activation) for
+the full model.
+
 ## `state`
 
 Inspect the optional state file written after each bump.
