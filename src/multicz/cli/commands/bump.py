@@ -15,6 +15,7 @@ import typer
 from ...changelog import update_changelog_file
 from ...config import ComponentMatcher
 from ...formats import write_value
+from ...plugins import has_errors, run_post_plan
 from ...state import (
     STATE_SCHEMA_VERSION,
     ComponentState,
@@ -229,6 +230,15 @@ def bump(
     if not plan:
         presenters.render_bump_empty(output=output)
         return
+
+    # Plugin hook — gate the bump on installed plugins (deprecation
+    # removal policy, license check, etc.). Errors abort here BEFORE
+    # any write touches the repo. Warnings + infos surface but proceed.
+    violations = run_post_plan(config, repo, plan)
+    if violations:
+        presenters.render_plugin_violations(violations, output=output)
+    if has_errors(violations):
+        raise typer.Exit(code=1)
 
     matcher = ComponentMatcher(config.components)
     applied: list[AppliedBump] = []

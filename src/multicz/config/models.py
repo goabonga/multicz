@@ -318,6 +318,12 @@ class Config(BaseModel):
 
     project: ProjectSettings = Field(default_factory=ProjectSettings)
     components: dict[str, Component]
+    # Free-form sub-tables consumed by installed plugins. multicz itself
+    # never validates the inner shape — each plugin is responsible for
+    # parsing its own ``plugins[<plugin-name>]`` slice. Allows
+    # ``[plugins.deprecation]`` in multicz.toml without the core needing
+    # to know what fields the deprecation plugin uses.
+    plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod

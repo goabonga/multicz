@@ -149,6 +149,48 @@ def render_bump_empty(*, output: str) -> None:
         )
 
 
+def render_plugin_violations(violations, *, output: str) -> None:
+    """Render the list of :class:`multicz.plugins.Violation` raised by
+    installed plugins after :meth:`Plugin.post_plan`.
+
+    Text output groups by severity (errors first, then warnings, then
+    infos) and prefixes each line with the plugin name. JSON output
+    emits an array suited for CI consumers.
+    """
+    if output == "json":
+        console.print_json(
+            data={
+                "violations": [
+                    {
+                        "severity": v.severity.value,
+                        "message": v.message,
+                        "plugin": v.plugin,
+                        "component": v.component,
+                        "file": str(v.file) if v.file else None,
+                        "line": v.line,
+                    }
+                    for v in violations
+                ]
+            }
+        )
+        return
+    colour = {"error": "red", "warning": "yellow", "info": "cyan"}
+    glyph = {"error": "✗", "warning": "!", "info": "·"}
+    by_severity: dict[str, list] = {"error": [], "warning": [], "info": []}
+    for v in violations:
+        by_severity[v.severity.value].append(v)
+    for sev in ("error", "warning", "info"):
+        for v in by_severity[sev]:
+            loc = ""
+            if v.file:
+                loc = f" [dim]({v.file}{':' + str(v.line) if v.line else ''})[/]"
+            comp = f"[dim]\\[{v.component}][/] " if v.component else ""
+            console.print(
+                f"  [{colour[sev]}]{glyph[sev]}[/] {comp}{v.message}"
+                f" [dim](from {v.plugin})[/]" + loc
+            )
+
+
 def _git_summary_to_json(git: GitSummary) -> dict:
     """Project a GitSummary back to the legacy ``git_summary`` dict shape.
 

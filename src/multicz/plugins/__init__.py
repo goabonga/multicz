@@ -23,6 +23,12 @@ from .protocol import (
     Violation,
 )
 from .registry import DEFAULT_REGISTRY, ENTRY_POINT_GROUP, PluginRegistry
+from .runner import (
+    has_errors,
+    run_enrich_changelog,
+    run_post_plan,
+    run_status_lines,
+)
 
 __all__ = [
     "BasePlugin",
@@ -34,4 +40,8 @@ __all__ = [
     "PluginRegistry",
     "Severity",
     "Violation",
+    "has_errors",
+    "run_enrich_changelog",
+    "run_post_plan",
+    "run_status_lines",
 ]
