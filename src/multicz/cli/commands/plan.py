@@ -9,6 +9,7 @@ from pathlib import Path
 
 import typer
 
+from ...plugins import run_post_plan, run_status_lines
 from .. import app, err, presenters
 from .._shared import (
     _build_plan_or_exit,
@@ -85,3 +86,15 @@ def plan_cmd(
         presenters.append_plan_summary(summary, plan_obj, header="Release plan")
 
     presenters.render_plan(plan_obj, config, output=output)
+
+    # Preview the post_plan hook so users see violations BEFORE running
+    # `multicz bump` — same contract as the real gate, but never aborts.
+    violations = run_post_plan(config, repo, plan_obj)
+    if violations:
+        presenters.render_plugin_violations(violations, output=output)
+
+    # status_lines surface actionable advice from each plugin
+    # (e.g. "remove deprecation X before bumping to 3.0").
+    advice = run_status_lines(config, repo, plan_obj)
+    if advice:
+        presenters.render_plugin_advice(advice, output=output)

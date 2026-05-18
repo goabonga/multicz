@@ -149,6 +149,24 @@ def render_bump_empty(*, output: str) -> None:
         )
 
 
+def render_plugin_advice(lines, *, output: str) -> None:
+    """Render :meth:`Plugin.status_lines` output — free-form actionable
+    text plugins return to inform the user (e.g. "3 deprecations marked
+    for removal in v3.0").
+
+    Text output prefixes each line with a magenta arrow so it stands
+    out from the bump table without screaming like a violation.
+    """
+    if output == "json":
+        console.print_json(data={"advice": list(lines)})
+        return
+    if not lines:
+        return
+    console.print()
+    for line in lines:
+        console.print(f"  [magenta]→[/] {line}")
+
+
 def render_plugin_violations(violations, *, output: str) -> None:
     """Render the list of :class:`multicz.plugins.Violation` raised by
     installed plugins after :meth:`Plugin.post_plan`.
