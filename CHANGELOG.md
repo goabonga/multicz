@@ -2,6 +2,25 @@
 
 All notable changes to this component are documented here.
 
+## [1.3.0] - 2026-05-18
+
+### Features
+
+- **plugins**: add Plugin protocol + entry-point discovery registry (`23a1032`)
+- **plugins**: wire post_plan hook in bump + accept [plugins.X] config sections (`2b4771e`)
+- **cli**: surface plugin violations + status_lines in plan and status output (`3e0d483`)
+- **plugins**: add built-in deprecation policy plugin (scanner + post_plan + enrich + status) (`249cd71`)
+- **plugins**: plumb enrich_changelog into bump + release-notes (Deprecated/Removed sections) (`8717ac1`)
+- **cli**: add 'multicz plugins' command to list discovered plugins + their config (`8175f5d`)
+
+### Fixes
+
+- **cli**: plugins command docstring — drop backticks + <name> mangled by Rich markup (`05a3454`)
+- **plugins**: require explicit [plugins.<name>] section to activate a plugin (`e922b19`)
+- **examples**: bump custom-plugin requires-python to >=3.12 to match multicz (`a97ded5`)
+- **examples**: bump deprecation-plugin requires-python to >=3.12 to match multicz (`57186da`)
+- **ci**: ruff cleanups + align copyright year with license-header check (`4a2fe18`)
+
 ## [1.2.1] - 2026-05-11
 
 ### Fixes
