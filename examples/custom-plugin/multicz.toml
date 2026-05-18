@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# multicz config for a project that uses a *custom* plugin (``newsy``).
+#
+# Layout:
+#   src/app/                -> the component being versioned
+#   src/newsy/              -> the plugin's own code (third-party in real life)
+#   changes.d/<id>.<type>.md -> one news fragment per change
+#
+# Once the plugin is installed (``pip install -e .`` for this example,
+# ``pip install newsy`` in real life) and ``[plugins.newsy]`` is declared
+# here, multicz invokes it on every plan / bump.
+
+[project]
+commit_convention = "conventional"
+tag_format = "v{version}"
+initial_version = "0.1.0"
+
+[components.app]
+paths = ["src/app/**", "pyproject.toml"]
+bump_files = [
+  { file = "src/app/__init__.py", key = "__version__" },
+]
+changelog = "CHANGELOG.md"
+
+# --- Plugin activation ----------------------------------------------------
+#
+# The minimal opt-in is just ``[plugins.newsy]`` with no keys — every
+# field below is a tweak.
+#
+# Verify with::
+#
+#   $ multicz plugins
+#   ┃ Plugin │ Status │ Module │ Config section
+#   │ newsy  │ active │ newsy  │ [plugins.newsy] directory='changes.d', …
+#
+# If you see ``newsy: inactive`` instead, you forgot to declare the
+# section. If you don't see ``newsy`` at all, the plugin isn't
+# installed in the same env — ``pip install -e .`` from this directory.
+
+[plugins.newsy]
+# Where the news fragments live, relative to the repo root.
+directory = "changes.d"
+# Filename suffix — anything ending in ``<type><extension>`` is picked up.
+extension = ".md"
+# Refuse to bump when zero fragments are present. Set to false during
+# the initial roll-out so a green CI doesn't immediately turn red.
+require_fragment_for_bump = true
