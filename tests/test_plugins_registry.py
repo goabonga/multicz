@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Chris <goabonga@pm.me>
+# Copyright (c) 2025 Chris <goabonga@pm.me>
 
 """Plugin protocol + registry tests."""
 
@@ -20,7 +20,6 @@ from multicz.plugins import (
     Severity,
     Violation,
 )
-
 
 # ---------------------------------------------------------------------------
 # Protocol — BasePlugin defaults + duck typing
@@ -70,8 +69,10 @@ def test_plugin_can_override_just_one_hook():
 
 
 def test_violation_is_frozen():
+    from dataclasses import FrozenInstanceError
+
     v = Violation(Severity.error, "boom", plugin="x")
-    with pytest.raises(Exception):  # noqa: PT011 — dataclass FrozenInstanceError
+    with pytest.raises(FrozenInstanceError):
         v.severity = Severity.info  # type: ignore[misc]
 
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Chris <goabonga@pm.me>
+# Copyright (c) 2025 Chris <goabonga@pm.me>
 
 """Source-tree scanner for deprecation markers.
 

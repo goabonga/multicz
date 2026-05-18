@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Chris <goabonga@pm.me>
+# Copyright (c) 2025 Chris <goabonga@pm.me>
 
 """``multicz plugins`` command — listing + JSON output."""
 
@@ -13,7 +13,6 @@ import pytest
 from typer.testing import CliRunner
 
 from multicz.cli import app
-
 
 MINIMAL_CONFIG = """\
 [project]

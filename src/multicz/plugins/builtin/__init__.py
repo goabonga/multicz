@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Chris <goabonga@pm.me>
+# Copyright (c) 2025 Chris <goabonga@pm.me>
 
 """Built-in multicz plugins shipped alongside the core.
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Chris <goabonga@pm.me>
+# Copyright (c) 2025 Chris <goabonga@pm.me>
 
 """Built-in deprecation plugin — scanner + post_plan + enrich_changelog
 + status_lines."""
@@ -9,12 +9,9 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from multicz.plugins import PluginContext, Severity
 from multicz.plugins.builtin.deprecation import DeprecationPlugin
-from multicz.plugins.builtin.deprecation.scanner import Deprecation, scan_paths
-
+from multicz.plugins.builtin.deprecation.scanner import scan_paths
 
 # ---------------------------------------------------------------------------
 # Scanner — decorator + comment forms

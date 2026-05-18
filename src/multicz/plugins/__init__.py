@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Chris <goabonga@pm.me>
+# Copyright (c) 2025 Chris <goabonga@pm.me>
 
 """multicz plugin system.
 
@@ -31,10 +31,10 @@ from .runner import (
 )
 
 __all__ = [
-    "BasePlugin",
-    "ChangelogEntry",
     "DEFAULT_REGISTRY",
     "ENTRY_POINT_GROUP",
+    "BasePlugin",
+    "ChangelogEntry",
     "Plugin",
     "PluginContext",
     "PluginRegistry",

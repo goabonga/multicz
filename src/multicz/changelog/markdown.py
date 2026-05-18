@@ -85,7 +85,7 @@ def render_body(
     cascades: Sequence[CascadeEntry] | None = None,
     cascade_title: str = "Dependencies",
     cascade_format: str = "Track `{upstream}` `{upstream_version}`",
-    plugin_sections: Sequence["PluginChangelogEntry"] | None = None,
+    plugin_sections: Sequence[PluginChangelogEntry] | None = None,
 ) -> str:
     """Render the section bodies (no leading H2).
 
@@ -228,7 +228,7 @@ def render_section(
     cascades: Sequence[CascadeEntry] | None = None,
     cascade_title: str = "Dependencies",
     cascade_format: str = "Track `{upstream}` `{upstream_version}`",
-    plugin_sections: Sequence["PluginChangelogEntry"] | None = None,
+    plugin_sections: Sequence[PluginChangelogEntry] | None = None,
 ) -> str:
     """Render the markdown for a single release section."""
     when = (today or date.today()).isoformat()
@@ -296,7 +296,7 @@ def update_changelog_file(
     cascades: Sequence[CascadeEntry] | None = None,
     cascade_title: str = "Dependencies",
     cascade_format: str = "Track `{upstream}` `{upstream_version}`",
-    plugin_sections: Sequence["PluginChangelogEntry"] | None = None,
+    plugin_sections: Sequence[PluginChangelogEntry] | None = None,
 ) -> None:
     """Render a new section and merge it into ``path`` (creating the file if needed).
 
