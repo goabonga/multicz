@@ -157,21 +157,37 @@ def render_plugins_list(plugins, plugins_config, *, output: str) -> None:
     ``config.plugins`` — the raw TOML ``[plugins.<name>]`` map keyed by
     plugin name.
 
-    Text output is a 3-column table; JSON is the machine-readable
+    Three discrete states are surfaced:
+
+    * **active** — ``[plugins.<name>]`` declared in multicz.toml and not
+      explicitly disabled. The runner will invoke it.
+    * **disabled** — section declared but ``enabled = false``. The user
+      has opted out on purpose.
+    * **inactive** — the plugin is discovered via its entry point but
+      no ``[plugins.<name>]`` section is declared. It will *not* run;
+      the project hasn't opted in.
+
+    Text output is a 4-column table; JSON is the machine-readable
     shape for CI consumers.
     """
     rows = []
     for plugin in plugins:
+        configured = plugin.name in plugins_config
         section = plugins_config.get(plugin.name, {}) or {}
-        # ``enabled`` defaults to True (opt-in disable, not opt-in enable).
-        enabled = bool(section.get("enabled", True))
-        # Locate the import path of the plugin class for the JSON shape.
+        if not configured:
+            status = "inactive"
+        elif section.get("enabled", True):
+            status = "active"
+        else:
+            status = "disabled"
         impl_cls = type(plugin)
         module = impl_cls.__module__
         rows.append(
             {
                 "name": plugin.name,
-                "enabled": enabled,
+                "status": status,
+                "configured": configured,
+                "enabled": status == "active",
                 "module": module,
                 "class": impl_cls.__name__,
                 "config": section,
@@ -192,18 +208,28 @@ def render_plugins_list(plugins, plugins_config, *, output: str) -> None:
     table.add_column("Status")
     table.add_column("Module")
     table.add_column("Config section")
+    status_render = {
+        "active": "[green]active[/]",
+        "disabled": "[yellow]disabled[/]",
+        "inactive": "[dim]inactive[/]",
+    }
     for row in rows:
-        status = "[green]enabled[/]" if row["enabled"] else "[dim]disabled[/]"
+        status_cell = status_render[row["status"]]
         cfg = row["config"]
         # Square brackets in TOML section names trigger Rich's markup
         # parser — escape them so they render literally in the table.
         section_label = f"\\[plugins.{row['name']}]"
-        if cfg:
+        if row["status"] == "inactive":
+            cfg_cell = (
+                f"[dim](not in multicz.toml — add {section_label} "
+                "to activate)[/]"
+            )
+        elif cfg:
             keys = ", ".join(f"{k}={v!r}" for k, v in cfg.items())
             cfg_cell = f"{section_label} {keys}"
         else:
-            cfg_cell = f"[dim](no {section_label} in multicz.toml)[/]"
-        table.add_row(row["name"], status, row["module"], cfg_cell)
+            cfg_cell = f"{section_label} [dim](defaults)[/]"
+        table.add_row(row["name"], status_cell, row["module"], cfg_cell)
     console.print(table)
 
 

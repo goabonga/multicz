@@ -60,6 +60,9 @@ def test_plugins_command_lists_builtin_deprecation(repo: Path, runner: CliRunner
 
 
 def test_plugins_command_json_shape(repo: Path, runner: CliRunner):
+    """Without an explicit ``[plugins.deprecation]`` section the plugin
+    is shown as discovered-but-inactive: it would not run, even though
+    multicz ships it. Opt-in is explicit."""
     result = runner.invoke(app, ["plugins", "--output", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
@@ -67,10 +70,29 @@ def test_plugins_command_json_shape(repo: Path, runner: CliRunner):
     names = {p["name"] for p in payload["plugins"]}
     assert "deprecation" in names
     dep = next(p for p in payload["plugins"] if p["name"] == "deprecation")
-    # Default enabled state when no [plugins.deprecation] section in toml.
-    assert dep["enabled"] is True
+    assert dep["status"] == "inactive"
+    assert dep["configured"] is False
+    assert dep["enabled"] is False
     assert dep["module"].startswith("multicz.plugins.builtin.deprecation")
     assert dep["class"] == "DeprecationPlugin"
+    assert dep["config"] == {}
+
+
+def test_plugins_command_active_when_section_declared_empty(
+    repo: Path, runner: CliRunner
+):
+    """An empty ``[plugins.deprecation]`` is the minimal opt-in — the
+    plugin must flip to ``active`` even without any keys under it."""
+    (repo / "multicz.toml").write_text(
+        MINIMAL_CONFIG + "\n[plugins.deprecation]\n"
+    )
+    result = runner.invoke(app, ["plugins", "--output", "json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    dep = next(p for p in payload["plugins"] if p["name"] == "deprecation")
+    assert dep["status"] == "active"
+    assert dep["configured"] is True
+    assert dep["enabled"] is True
     assert dep["config"] == {}
 
 
@@ -84,6 +106,8 @@ def test_plugins_command_reflects_disabled_state(repo: Path, runner: CliRunner):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     dep = next(p for p in payload["plugins"] if p["name"] == "deprecation")
+    assert dep["status"] == "disabled"
+    assert dep["configured"] is True
     assert dep["enabled"] is False
     assert dep["config"] == {"enabled": False, "scan": ["src/**/*.py"]}
 
@@ -96,3 +120,13 @@ def test_plugins_command_text_output_mentions_disabled(repo: Path, runner: CliRu
     assert result.exit_code == 0
     assert "deprecation" in result.stdout
     assert "disabled" in result.stdout
+
+
+def test_plugins_command_text_output_mentions_inactive(repo: Path, runner: CliRunner):
+    """Default install with no ``[plugins.*]`` sections — the table must
+    surface ``inactive`` so users know the plugin won't run unless they
+    opt in."""
+    result = runner.invoke(app, ["plugins"])
+    assert result.exit_code == 0
+    assert "deprecation" in result.stdout
+    assert "inactive" in result.stdout

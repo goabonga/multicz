@@ -26,14 +26,17 @@ Behaviour:
 * Surface a pre-flight summary in ``multicz status`` /
   ``multicz plan`` via :meth:`Plugin.status_lines`.
 
-The plugin is enabled by default once installed (i.e. once multicz
-itself registers it via its built-in entry point). Set
-``[plugins.deprecation] enabled = false`` to disable.
+Activation is **explicit opt-in**: even though multicz ships the
+plugin via its own entry point, it only runs when the project
+declares ``[plugins.deprecation]`` in its multicz.toml (an empty
+section is fine — it means "use all defaults"). Without that
+section the plugin is shown as ``inactive`` in ``multicz plugins``
+and never gates a bump. To temporarily disable an already-declared
+section, set ``enabled = false`` under it.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from packaging.version import Version

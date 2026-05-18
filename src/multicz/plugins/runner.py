@@ -39,6 +39,27 @@ def _make_context(config: Any, repo: Path, plan: Plan, plugin_name: str) -> Plug
     )
 
 
+def is_active(config: Any, plugin_name: str) -> bool:
+    """``True`` when the plugin should be invoked by the run_* helpers.
+
+    A plugin is active iff:
+      1. ``[plugins.<name>]`` exists in multicz.toml (even empty) — this
+         is the **explicit opt-in**. Discovery via entry points is not
+         enough to make a plugin run; the project must declare it.
+      2. AND ``enabled`` is not explicitly ``false`` under that section.
+
+    Rationale: a freshly-installed plugin shouldn't silently gate the
+    bump pipeline of every project that happens to have it on PYTHONPATH.
+    Projects opt in by adding the section; an empty ``[plugins.deprecation]``
+    means "yes, please run with all defaults".
+    """
+    plugins_table: dict[str, dict[str, Any]] = getattr(config, "plugins", {}) or {}
+    if plugin_name not in plugins_table:
+        return False
+    section = plugins_table.get(plugin_name) or {}
+    return bool(section.get("enabled", True))
+
+
 def _safe_call(plugin, method_name, *args, **kwargs):
     """Invoke a plugin hook, swallowing exceptions as warnings.
 
@@ -70,6 +91,8 @@ def run_post_plan(
     reg = registry or DEFAULT_REGISTRY
     violations: list[Violation] = []
     for plugin in reg:
+        if not is_active(config, plugin.name):
+            continue
         ctx = _make_context(config, repo, plan, plugin.name)
         results = _safe_call(plugin, "post_plan", ctx)
         violations.extend(results)
@@ -89,6 +112,8 @@ def run_enrich_changelog(
     reg = registry or DEFAULT_REGISTRY
     entries: list[ChangelogEntry] = []
     for plugin in reg:
+        if not is_active(config, plugin.name):
+            continue
         ctx = _make_context(config, repo, plan, plugin.name)
         results = _safe_call(plugin, "enrich_changelog", ctx, component)
         entries.extend(results)
@@ -109,6 +134,8 @@ def run_status_lines(
     reg = registry or DEFAULT_REGISTRY
     lines: list[str] = []
     for plugin in reg:
+        if not is_active(config, plugin.name):
+            continue
         ctx = _make_context(config, repo, plan, plugin.name)
         results = _safe_call(plugin, "status_lines", ctx)
         lines.extend(results)
