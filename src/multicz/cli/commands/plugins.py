@@ -16,25 +16,12 @@ from .._shared import _load
 def plugins_cmd(
     output: str = typer.Option("text", "--output", "-o", help="text | json"),
 ) -> None:
-    """List every plugin discovered via the ``multicz.plugins`` entry-point
-    group, along with its enabled/disabled state and the
-    ``[plugins.<name>]`` config table the plugin will read.
+    """List every plugin discovered via the multicz.plugins entry-point
+    group with its enabled/disabled state and config section.
 
-    Useful to:
-
-    * verify a third-party plugin is being picked up after install
-    * confirm a plugin is disabled via ``enabled = false``
-    * see at a glance which plugins gate the next ``multicz bump``
-
-    \b
-    Example:
-
-    \b
-        $ multicz plugins
-        Plugin       Status     Config section
-        deprecation  enabled    [plugins.deprecation]
-                                  mode = "error"
-                                  scan = ["packages/api/src/**/*.py"]
+    Useful to verify a third-party plugin is picked up after install,
+    confirm one is disabled via ``enabled = false``, or see at a glance
+    which plugins gate the next ``multicz bump``.
     """
     _, config = _load()
     plugins = list(DEFAULT_REGISTRY)
