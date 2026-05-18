@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# multicz config for a single Python component that opts into the
+# built-in deprecation-policy plugin.
+#
+# Layout:
+#   src/legacy_api/        -> Python sources (canonical version)
+#   pyproject.toml         -> [project].version
+#
+# Plugin behavior (declared in [plugins.deprecation] below):
+#   - Scans every `*.py` under src/ for either ``@deprecated(since="..",
+#     remove_in="..")`` decorators or ``# DEPRECATED since=.. remove_in=..``
+#     comments.
+#   - Before any write, ``multicz bump`` invokes the plugin's post_plan
+#     hook: every marker whose ``remove_in`` ≤ the *planned* next version
+#     produces an ``error`` violation and the bump is aborted until the
+#     marker (and the dead code around it) is removed.
+#   - The same scan feeds ``multicz status`` / ``multicz plan`` with an
+#     advice line ("N due for removal, M upcoming") so you don't discover
+#     the violation only when the bump command refuses to run.
+#   - On a successful bump, the changelog and release notes gain two
+#     dedicated sections: ``Deprecated`` (markers newly added in this
+#     release window) and ``Removed`` (markers whose deadline matches
+#     the planned version).
+
+[project]
+commit_convention = "conventional"
+tag_format = "v{version}"
+initial_version = "1.0.0"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [
+  { file = "pyproject.toml", key = "project.version" },
+]
+changelog = "CHANGELOG.md"
+
+# --- Plugin activation ----------------------------------------------------
+#
+# The deprecation plugin ships with multicz but is **inactive by default**;
+# declaring this section is the explicit opt-in. An empty
+# ``[plugins.deprecation]`` would work too — every key below is a tweak,
+# not a requirement.
+#
+# Try it::
+#
+#   $ multicz plugins
+#   ┃ Plugin      ┃ Status   ┃ … ┃
+#   │ deprecation │ active   │ … │   ← because this section exists
+#
+#   $ multicz status
+#   …
+#   → deprecation[api 1.0.0 → 2.0.0]: 1 due for removal, 1 upcoming
+#
+# To temporarily silence the gate without removing the section, set
+# ``enabled = false`` here.
+
+[plugins.deprecation]
+# When omitted, falls back to each component's ``paths`` — perfectly
+# fine for this example, but spelled out here for documentation.
+scan = ["src/**/*.py"]
+# "error" (default) — fail the bump on any past-due marker.
+# "warning"         — print the violation but let the bump proceed.
+mode = "error"
