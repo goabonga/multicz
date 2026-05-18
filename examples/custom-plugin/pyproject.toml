@@ -12,7 +12,7 @@
 name = "newsy"
 version = "0.1.0"
 description = "Towncrier-style news-fragment plugin for multicz."
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 # Depend on multicz so installing the plugin gives you the host CLI too.
 # A real plugin distributed independently would pin a range that matches
 # the stable plugin Protocol (e.g. ``multicz>=1.2,<2``).
