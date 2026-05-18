@@ -515,6 +515,7 @@ def render_release_notes(
             cascades=list(s.cascades) if s.cascades else None,
             cascade_title=config.project.cascade_section_title,
             cascade_format=config.project.cascade_changelog_format,
+            plugin_sections=list(s.plugin_sections) if s.plugin_sections else None,
         )
         if multi:
             range_label = (

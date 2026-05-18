@@ -35,10 +35,14 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..commits import BumpRule, Commit
 from ..config import ChangelogSection, _default_changelog_sections
 from .bucket import bucket_commits
+
+if TYPE_CHECKING:
+    from ..plugins import ChangelogEntry as PluginChangelogEntry
 
 
 @dataclass(frozen=True)
@@ -81,6 +85,7 @@ def render_body(
     cascades: Sequence[CascadeEntry] | None = None,
     cascade_title: str = "Dependencies",
     cascade_format: str = "Track `{upstream}` `{upstream_version}`",
+    plugin_sections: Sequence["PluginChangelogEntry"] | None = None,
 ) -> str:
     """Render the section bodies (no leading H2).
 
@@ -125,7 +130,17 @@ def render_body(
             )
             cascade_groups.setdefault(section_name, []).append(line)
 
-    if bucketed.is_empty and not cascade_groups:
+    # Plugin-contributed sections (e.g. "Deprecated", "Removed" from the
+    # built-in deprecation plugin) — grouped by section name, merged with
+    # any matching commit/cascade bucket.
+    plugin_groups: dict[str, list[str]] = {}
+    if plugin_sections:
+        for entry in plugin_sections:
+            if not entry.section or not entry.lines:
+                continue
+            plugin_groups.setdefault(entry.section, []).extend(entry.lines)
+
+    if bucketed.is_empty and not cascade_groups and not plugin_groups:
         return "_No notable changes._\n"
 
     def _commit_line(commit: Commit) -> str:
@@ -174,6 +189,20 @@ def render_body(
     for title, lines in cascade_groups.items():
         ordered.append((title, list(lines)))
 
+    # Plugin sections land last (after commits + cascades) so they read
+    # as a clear "meta" block — typically Deprecated/Removed notices.
+    # If a plugin reuses an existing title (e.g. "Features"), merge
+    # rather than create a duplicate H3.
+    existing_titles = {title for title, _ in ordered}
+    for title, lines in plugin_groups.items():
+        if title in existing_titles:
+            for entry in ordered:
+                if entry[0] == title:
+                    entry[1].extend(lines)
+                    break
+        else:
+            ordered.append((title, list(lines)))
+
     if not ordered:
         return "_No notable changes._\n"
 
@@ -199,6 +228,7 @@ def render_section(
     cascades: Sequence[CascadeEntry] | None = None,
     cascade_title: str = "Dependencies",
     cascade_format: str = "Track `{upstream}` `{upstream_version}`",
+    plugin_sections: Sequence["PluginChangelogEntry"] | None = None,
 ) -> str:
     """Render the markdown for a single release section."""
     when = (today or date.today()).isoformat()
@@ -211,6 +241,7 @@ def render_section(
         cascades=cascades,
         cascade_title=cascade_title,
         cascade_format=cascade_format,
+        plugin_sections=plugin_sections,
     )
     return f"## [{version}] - {when}\n\n" + body
 
@@ -265,6 +296,7 @@ def update_changelog_file(
     cascades: Sequence[CascadeEntry] | None = None,
     cascade_title: str = "Dependencies",
     cascade_format: str = "Track `{upstream}` `{upstream_version}`",
+    plugin_sections: Sequence["PluginChangelogEntry"] | None = None,
 ) -> None:
     """Render a new section and merge it into ``path`` (creating the file if needed).
 
@@ -283,6 +315,7 @@ def update_changelog_file(
         cascades=cascades,
         cascade_title=cascade_title,
         cascade_format=cascade_format,
+        plugin_sections=plugin_sections,
     )
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     if drop_prereleases:

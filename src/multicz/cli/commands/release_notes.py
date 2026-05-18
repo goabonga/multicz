@@ -18,6 +18,7 @@ from ...commits import (
     tag_prefix,
 )
 from ...config import ComponentMatcher
+from ...plugins import run_enrich_changelog
 from .. import app, err, presenters
 from .._shared import (
     _build_plan_or_exit,
@@ -159,6 +160,12 @@ def release_notes_cmd(
                 # Cascades only attach to upcoming bumps - past tag mode
                 # has no plan reasons to draw from.
                 cascades=tuple(_cascade_entries_for(bump, plan_obj, config)),
+                # Plugin contributions for this component (Deprecated /
+                # Removed sections from the built-in deprecation plugin,
+                # plus anything third-party plugins add).
+                plugin_sections=tuple(
+                    run_enrich_changelog(config, repo, plan_obj, name)
+                ),
             ))
 
     if not sections:

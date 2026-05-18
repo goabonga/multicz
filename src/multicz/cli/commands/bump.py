@@ -15,7 +15,7 @@ import typer
 from ...changelog import update_changelog_file
 from ...config import ComponentMatcher
 from ...formats import write_value
-from ...plugins import has_errors, run_post_plan
+from ...plugins import has_errors, run_enrich_changelog, run_post_plan
 from ...state import (
     STATE_SCHEMA_VERSION,
     ComponentState,
@@ -278,6 +278,11 @@ def bump(
             # this is the only thing that explains *why* the
             # release exists.
             cascade_entries = _cascade_entries_for(planned, plan, config)
+            # Let plugins (e.g. deprecation) contribute custom sections
+            # — Deprecated / Removed / SECURITY / etc.
+            plugin_entries = run_enrich_changelog(
+                config, repo, plan, planned.component
+            )
             changelog_path = repo / comp.changelog
             update_changelog_file(
                 changelog_path,
@@ -291,6 +296,7 @@ def bump(
                 cascades=cascade_entries,
                 cascade_title=config.project.cascade_section_title,
                 cascade_format=config.project.cascade_changelog_format,
+                plugin_sections=plugin_entries,
             )
             if changelog_path not in written:
                 written.append(changelog_path)

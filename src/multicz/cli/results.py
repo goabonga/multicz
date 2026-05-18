@@ -75,6 +75,11 @@ class ReleaseNotesSection:
     Replaces the per-section dict carried through ``sections: list[dict]``.
     ``cascades`` is empty for the ``--tag`` retrospective mode (no plan
     reasons exist).
+
+    ``plugin_sections`` carries the output of every plugin's
+    :meth:`enrich_changelog` for this component — Deprecated/Removed
+    notices, security advisories, etc. — appended below the commit-driven
+    sections at render time.
     """
 
     component: str
@@ -82,6 +87,7 @@ class ReleaseNotesSection:
     to_version: str
     commits: tuple[Commit, ...]
     cascades: tuple[CascadeEntry, ...] = ()
+    plugin_sections: tuple = ()
 
 
 # ============ validate ============
