@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.4.0] - 2026-06-14
+
+### Features
+
+- **cli**: propagate mirror + depends_on cascades through `multicz changed` (`993d504`)
+
 ## [1.3.0] - 2026-05-18
 
 ### Features
