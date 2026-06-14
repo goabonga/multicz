@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.5.0] - 2026-06-14
+
+### Features
+
+- **changelog**: aggregated cross-component root CHANGELOG.md (`5c0544d`)
+
 ## [1.4.0] - 2026-06-14
 
 ### Features
