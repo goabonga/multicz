@@ -40,10 +40,16 @@ from .markdown import (
     render_section,
     update_changelog_file,
 )
+from .root import (
+    ComponentBumpDigest,
+    render_root_section,
+    update_root_changelog_file,
+)
 
 __all__ = [
     "BucketedCommits",
     "CascadeEntry",
+    "ComponentBumpDigest",
     "DebianStanza",
     "bucket_commits",
     "drop_prerelease_stanzas",
@@ -55,9 +61,11 @@ __all__ = [
     "parse_top_version",
     "prepend_stanza",
     "render_body",
+    "render_root_section",
     "render_section",
     "render_stanza",
     "to_debian_pre",
     "update_changelog_file",
+    "update_root_changelog_file",
     "upstream_version",
 ]

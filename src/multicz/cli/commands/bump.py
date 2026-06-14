@@ -338,6 +338,60 @@ def bump(
             kind=planned.kind,
         ))
 
+    # 4. Root CHANGELOG.md (aggregated cross-component view). Opt-in
+    # via `[project] root_changelog = "<path>"`. Built from the same
+    # per-component commit lookup the markdown writer used above so the
+    # root and per-component files stay consistent.
+    root_changelog_setting = config.project.root_changelog
+    if root_changelog_setting and not no_changelog and not dry_run and applied:
+        from ...changelog import ComponentBumpDigest, update_root_changelog_file
+        from ...planner.reasons import MirrorReason, TriggerReason
+
+        digests: list[ComponentBumpDigest] = []
+        for planned in plan:
+            comp = config.components[planned.component]
+            is_final_d = _is_finalize(planned)
+            use_stable_d = is_final_d and config.project.finalize_strategy in {
+                "consolidate", "promote",
+            }
+            commits = tuple(_component_relevant_commits(
+                planned.component, config, repo, matcher,
+                since_stable=use_stable_d,
+            ))
+            cascade_from: str | None = None
+            for reason in planned.reasons:
+                if isinstance(reason, (MirrorReason, TriggerReason)):
+                    upstream_version = next(
+                        (str(p.next) for p in plan if p.component == reason.upstream),
+                        None,
+                    )
+                    cascade_from = (
+                        f"{reason.upstream} {upstream_version}"
+                        if upstream_version
+                        else reason.upstream
+                    )
+                    break
+            digests.append(ComponentBumpDigest(
+                component=planned.component,
+                current=str(planned.current),
+                next_version=str(planned.next),
+                kind=planned.kind,
+                cascade_from=cascade_from,
+                commits=commits,
+            ))
+        root_path = repo / root_changelog_setting
+        update_root_changelog_file(
+            root_path,
+            digests,
+            sections=config.project.changelog_sections,
+            bump_rules=config.project.bump_rules,
+            breaking_title=config.project.breaking_section_title,
+            other_title=config.project.other_section_title,
+        )
+        if root_path not in written:
+            written.append(root_path)
+        changelogs_updated.append(str(root_changelog_setting))
+
     commit_sha: str | None = None
     pushed = False
     # Optional state file: written before the commit so it lands in the

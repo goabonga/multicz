@@ -235,6 +235,74 @@ def test_bump_no_changelog_flag(repo: Path, runner: CliRunner):
     assert not (repo / "CHANGELOG.md").exists()
 
 
+def test_bump_writes_root_changelog(repo: Path, runner: CliRunner):
+    # api has its own CHANGELOG.md per CONFIG (file = "CHANGELOG.md"), so
+    # to test the aggregated root I rewrite both to point elsewhere: api
+    # gets `docs/api.md`, chart gets `docs/chart.md`, and the root lands
+    # at the repo's CHANGELOG.md. That way the assertions below can key
+    # off the root file alone without collision with the per-component
+    # writes the existing tests already cover.
+    (repo / "multicz.toml").write_text("""
+[project]
+root_changelog = "CHANGELOG.md"
+
+[components.api]
+paths = ["src/**", "pyproject.toml"]
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+mirrors = [{ file = "charts/myapp/Chart.yaml", key = "appVersion" }]
+changelog = "docs/api.md"
+
+[components.chart]
+paths = ["charts/**"]
+bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
+changelog = "docs/chart.md"
+""")
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
+    _commit(repo, {"src/main.py": "x = 3\n"}, "fix(api): null token")
+
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 0, result.stdout
+
+    root_log = (repo / "CHANGELOG.md").read_text()
+    # Preamble is written on first creation.
+    assert "All notable changes across components" in root_log
+    # Single H2 date heading aggregating every bumped component.
+    assert root_log.count("## 20") == 1, root_log
+    # Releases section lists every component that bumped, with the
+    # cascade source surfaced as a parenthetical (api drove chart
+    # through the appVersion mirror).
+    assert "### Releases" in root_log
+    assert "**api** minor —" in root_log
+    assert "**chart** patch —" in root_log
+    assert "_(cascade from api" in root_log
+    # Type-grouped sections aggregate commits across every digest with
+    # a `**<comp>**:` prefix so the source component is visible.
+    assert "### Features" in root_log
+    assert "- **api**: add login" in root_log
+    assert "### Fixes" in root_log
+    assert "- **api**: null token" in root_log
+
+
+def test_bump_root_changelog_skipped_when_unset(repo: Path, runner: CliRunner):
+    # The default CONFIG fixture leaves `root_changelog` unset, so a
+    # plain bump must not create one — verifies the feature is purely
+    # opt-in.
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
+    result = runner.invoke(app, ["bump"])
+    assert result.exit_code == 0, result.stdout
+    # The fixture's per-component config writes to `CHANGELOG.md`; even
+    # so, the root-changelog branch is untaken (no extra root file
+    # produced — and the existing per-component file isn't touched by
+    # the root logic).
+    log = (repo / "CHANGELOG.md").read_text()
+    # The per-component renderer writes `[version]` H2 headings; the
+    # root renderer writes plain date headings. So the absence of any
+    # plain `## 20…` line proves the root branch didn't fire on top of
+    # the per-component file.
+    assert "## [1.3.0]" in log
+    assert "All notable changes across components" not in log
+
+
 def test_bump_commit_includes_changelog(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
     runner.invoke(app, ["bump", "--commit", "--tag"])

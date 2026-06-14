@@ -285,6 +285,14 @@ class ProjectSettings(BaseModel):
         default_factory=lambda: dict(DEFAULT_BUMP_RULES)
     )
     state_file: Path | None = None  # opt-in JSON snapshot, written on bump
+    # Path (repo-relative) of an aggregated cross-component
+    # CHANGELOG.md. When set, every ``multicz bump`` appends a single
+    # section listing every component that bumped on that commit + a
+    # type-grouped digest of the driving commits, with a ``**<comp>**:``
+    # prefix on each bullet. Lets readers see what changed across the
+    # whole release without having to open N per-component changelogs.
+    # When unset (default), no root file is written.
+    root_changelog: Path | None = None
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
     sign_commits: bool = False  # gpg-sign release commits (git commit -S)
     sign_tags: bool = False     # gpg-sign tags (git tag -s)
