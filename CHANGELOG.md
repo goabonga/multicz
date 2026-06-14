@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.5.1] - 2026-06-14
+
+### Fixes
+
+- **release-notes**: surface cascade entries when rendering past tags (`a645a32`)
+
 ## [1.5.0] - 2026-06-14
 
 ### Features
