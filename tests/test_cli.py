@@ -617,18 +617,27 @@ def test_changed_text_output_lists_changed_components(repo: Path, runner: CliRun
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     result = runner.invoke(app, ["changed"])
     assert result.exit_code == 0, result.stdout
-    # api was touched; chart wasn't (but chart is empty in the fixture; the
-    # mirror cascade is a release concept, not a "changed" one)
-    assert "api" in result.stdout.split()
+    # api was directly touched AND cascades into chart via the
+    # appVersion mirror declared in the fixture CONFIG; both should
+    # show up so CI gating on ``changed`` matches what ``plan`` would
+    # actually bump.
+    tokens = result.stdout.split()
+    assert "api" in tokens
+    assert "chart" in tokens
 
 
-def test_changed_json_includes_unchanged(repo: Path, runner: CliRunner):
+def test_changed_json_includes_cascade_targets(repo: Path, runner: CliRunner):
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     result = runner.invoke(app, ["changed", "--output", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert "api" in payload["changed"]
-    assert "chart" in payload["unchanged"]
+    # api is the direct change. chart is a cascade target via the
+    # ``mirrors`` config (api's appVersion writes into chart's
+    # Chart.yaml), so it MUST land in ``changed`` — otherwise CI
+    # matrices keying on this output silently skip the chart's build
+    # even though ``plan`` will bump it on the same run.
+    assert set(payload["changed"]) == {"api", "chart"}
+    assert payload["unchanged"] == []
 
 
 def test_changed_against_explicit_since(repo: Path, runner: CliRunner):

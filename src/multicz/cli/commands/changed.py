@@ -61,8 +61,7 @@ def changed(
     matcher = ComponentMatcher(config.components)
     release_re = re.compile(config.project.release_commit_pattern)
 
-    changed_list: list[str] = []
-    unchanged_list: list[str] = []
+    direct_changed: set[str] = set()
     for name in config.components:
         if since is None:
             prefix = tag_prefix(config.tag_format_for(name), name)
@@ -70,20 +69,22 @@ def changed(
         else:
             ref = since
         commits = commits_since(repo, ref)
-        owns_change = False
         for c in commits:
             if release_re.match(_commit_header(c)):
                 continue
-            for f in c.files:
-                if matcher.match(f) == name:
-                    owns_change = True
-                    break
-            if owns_change:
+            if any(matcher.match(f) == name for f in c.files):
+                direct_changed.add(name)
                 break
-        if owns_change:
-            changed_list.append(name)
-        else:
-            unchanged_list.append(name)
+
+    # Cascade closure — propagate ``mirrors`` and ``depends_on`` edges
+    # so the output matches what ``multicz plan`` would actually bump.
+    # Without this, CI gating by ``changed`` misses cascade-only bumps:
+    # e.g. an api source change cascade-bumps chart-api via the
+    # appVersion ``mirror`` declared in the config, but the chart files
+    # themselves don't appear in the diff, so chart-api would otherwise
+    # stay in ``unchanged`` even though it WILL bump at release time.
+    changed_list = _propagate_cascades(config, matcher, direct_changed)
+    unchanged_list = [n for n in config.components if n not in set(changed_list)]
 
     presenters.render_changed(
         ChangedReport(
@@ -92,3 +93,43 @@ def changed(
         ),
         output=output,
     )
+
+
+def _propagate_cascades(
+    config,
+    matcher: ComponentMatcher,
+    seed: set[str],
+) -> list[str]:
+    """Transitively close ``seed`` over ``mirrors`` + ``depends_on``.
+
+    Mirrors a component file into another component's tracked path,
+    so a bump on the upstream component writes (and therefore bumps)
+    the downstream one — same logic as
+    :func:`multicz.planner.build._mirror_pass`, simplified to "which
+    components are affected" instead of "what kind of bump".
+
+    ``depends_on`` declares an upstream → downstream cascade (the
+    planner's ``_triggers_pass``); identical closure here.
+
+    Returns the components in the same order as
+    ``config.components`` (insertion order from the TOML) so the
+    output is deterministic regardless of how the set was reached.
+    """
+    closure = set(seed)
+    changed = True
+    while changed:
+        changed = False
+        for name, comp in config.components.items():
+            if name in closure:
+                for mirror in comp.mirrors:
+                    target = matcher.match(str(mirror.file))
+                    if target is not None and target != name and target not in closure:
+                        closure.add(target)
+                        changed = True
+            if name not in closure:
+                for upstream in comp.depends_on:
+                    if upstream in closure:
+                        closure.add(name)
+                        changed = True
+                        break
+    return [n for n in config.components if n in closure]
