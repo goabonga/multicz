@@ -26,6 +26,7 @@ from .git import (
     latest_version,
     previous_stable_tag,
     previous_tag,
+    tags_pointing_at,
 )
 from .parse import (
     DEFAULT_BUMP_RULES,
@@ -56,5 +57,6 @@ __all__ = [
     "previous_stable_tag",
     "previous_tag",
     "tag_prefix",
+    "tags_pointing_at",
     "validate_message",
 ]

@@ -59,6 +59,29 @@ def latest_tag(cwd: Path, prefix: str) -> str | None:
     return versioned[-1][1]
 
 
+def tags_pointing_at(cwd: Path, rev: str) -> list[str]:
+    """Return every tag whose name points at the same commit as ``rev``.
+
+    Used by ``release-notes --tag`` to reconstruct cascade entries from
+    sibling tags created in the same chore(release) commit: when a
+    release commit bumps api / chart-api / docs in one go, every tag
+    lands on the same SHA, and the static config + that sibling list is
+    enough to infer "chart-api cascaded from api X.Y.Z" without having
+    to rebuild the planner state at the tag's time of writing.
+
+    Always resolves ``rev`` to its underlying commit via ``^{commit}``
+    first, so it works regardless of whether ``rev`` is a lightweight
+    tag (which already points at the commit) or an annotated tag
+    (where ``rev-parse`` returns the tag object's SHA, not the
+    commit's). Otherwise ``git tag --points-at`` would only return the
+    queried tag itself and the sibling-tag inference would silently
+    collapse to a no-op.
+    """
+    commit_sha = _run_git(["rev-parse", f"{rev}^{{commit}}"], cwd).strip()
+    out = _run_git(["tag", "--points-at", commit_sha], cwd)
+    return [name.strip() for name in out.splitlines() if name.strip()]
+
+
 def latest_version(cwd: Path, prefix: str) -> Version | None:
     tag = latest_tag(cwd, prefix)
     if tag is None:

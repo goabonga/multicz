@@ -11,11 +11,13 @@ from pathlib import Path
 import typer
 from packaging.version import Version
 
+from ...changelog import CascadeEntry
 from ...commits import (
     commits_in_range,
     previous_stable_tag,
     previous_tag,
     tag_prefix,
+    tags_pointing_at,
 )
 from ...config import ComponentMatcher
 from ...plugins import run_enrich_changelog
@@ -57,6 +59,70 @@ def _filtered_commits_in_range(
         and c.type.lower() not in ignored
         and any(matcher.match(f) == name for f in c.files)
     ]
+
+
+def _cascade_entries_from_sibling_tags(
+    config, repo: Path, matcher, tag: str, owner: str
+) -> list[CascadeEntry]:
+    """Reconstruct cascade entries for a past tag from sibling tags.
+
+    The ``--tag`` path of ``release-notes`` runs against a tag that
+    already exists, so the planner state that produced the cascade isn't
+    available anymore. But every component that bumped on the same
+    chore(release) commit has its tag pointing at the same SHA, and the
+    config's ``mirrors`` / ``depends_on`` graph is static — together
+    they tell us which siblings cascaded into ``owner``:
+
+    * **depends_on**: when ``owner.depends_on`` lists a sibling
+      component that also tagged at this SHA, that's a trigger cascade.
+    * **mirrors**: when a sibling's ``mirrors`` writes into ``owner``'s
+      tracked paths, that's a mirror cascade — the optional
+      ``changelog_section`` / ``changelog_format`` overrides on the
+      mirror declaration are picked up too, so the rendered line
+      matches what ``bump`` wrote into the per-component CHANGELOG.
+
+    First entry per upstream wins (depends_on takes priority over
+    mirrors when both apply), mirroring the dedup behavior of
+    ``_cascade_entries_for``.
+    """
+    sibling_tags = tags_pointing_at(repo, tag)
+    sibling_versions: dict[str, str] = {}
+    for sib in sibling_tags:
+        if sib == tag:
+            continue
+        sib_owner = _component_for_tag(config, sib)
+        if sib_owner is None or sib_owner == owner:
+            continue
+        sib_prefix = tag_prefix(config.tag_format_for(sib_owner), sib_owner)
+        sibling_versions[sib_owner] = sib[len(sib_prefix):]
+
+    entries: list[CascadeEntry] = []
+    seen: set[str] = set()
+    owner_comp = config.components[owner]
+
+    for upstream in owner_comp.depends_on:
+        if upstream in sibling_versions and upstream not in seen:
+            entries.append(CascadeEntry(
+                upstream=upstream,
+                upstream_version=sibling_versions[upstream],
+            ))
+            seen.add(upstream)
+
+    for sib_name, sib_version in sibling_versions.items():
+        if sib_name in seen:
+            continue
+        sib_comp = config.components[sib_name]
+        for mirror in sib_comp.mirrors:
+            if matcher.match(str(mirror.file)) == owner:
+                entries.append(CascadeEntry(
+                    upstream=sib_name,
+                    upstream_version=sib_version,
+                    section=mirror.changelog_section,
+                    format=mirror.changelog_format,
+                ))
+                seen.add(sib_name)
+                break
+    return entries
 
 
 @app.command(name="release-notes")
@@ -133,6 +199,9 @@ def release_notes_cmd(
             from_version=prev[len(prefix):] if prev else None,
             to_version=str(target_version),
             commits=tuple(commits),
+            cascades=tuple(_cascade_entries_from_sibling_tags(
+                config, repo, matcher, tag, owner,
+            )),
         ))
     else:
         plan_obj = _build_plan_or_exit(repo, config)

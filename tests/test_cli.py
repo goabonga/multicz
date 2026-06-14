@@ -939,6 +939,32 @@ def test_release_notes_unknown_tag_errors(repo: Path, runner: CliRunner):
     assert "doesn't match any component" in result.output
 
 
+def test_release_notes_past_tag_surfaces_cascade_from_sibling_tags(
+    repo: Path, runner: CliRunner
+):
+    """``release-notes --tag <chart-tag>`` should surface the cascade
+    source from sibling tags pointing at the same chore(release) commit.
+
+    The chart in the fixture has no commits of its own — it only bumps
+    via the appVersion mirror from api. Without the sibling-tag
+    inference fixed in this change, the rendered notes for
+    ``chart-v0.4.1`` would lose the cascade line and fall back to the
+    "no notable changes" placeholder, leaving the GitHub release
+    obscure. The fix walks the sibling tags at the same SHA and
+    re-attaches ``Track api 1.3.0`` via the config's mirror graph.
+    """
+    _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
+    runner.invoke(app, ["bump", "--commit", "--tag"])
+
+    result = runner.invoke(app, ["release-notes", "--tag", "chart-v0.4.1"])
+    assert result.exit_code == 0, result.stdout
+    # The cascade entry now lands under the project-level
+    # `cascade_section_title` ("Dependencies" by default).
+    assert "### Dependencies" in result.stdout
+    assert "api" in result.stdout
+    assert "1.3.0" in result.stdout
+
+
 def test_release_notes_arg_required(repo: Path, runner: CliRunner):
     result = runner.invoke(app, ["release-notes"])
     assert result.exit_code == 1
