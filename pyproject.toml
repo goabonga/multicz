@@ -40,6 +40,7 @@ multicz = "multicz.cli:app"
 # privileged loader path.
 [project.entry-points."multicz.plugins"]
 deprecation = "multicz.plugins.builtin.deprecation:DeprecationPlugin"
+upstream-notes = "multicz.plugins.builtin.upstream_notes:UpstreamNotesPlugin"
 
 [project.urls]
 Homepage = "https://github.com/goabonga/multicz"
