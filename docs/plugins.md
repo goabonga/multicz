@@ -187,6 +187,64 @@ worker = ["src/worker/**/*.py"]
 
 Runnable example: [`examples/deprecation-plugin/`](https://github.com/goabonga/multicz/tree/main/examples/deprecation-plugin).
 
+### `upstream-notes` { #upstream-notes }
+
+Injects the *commits* of upstream components — not just their version
+— into a downstream component's changelog and release notes. Aimed at
+`depends_on` chains where a deploy pipeline commits **after** the
+upstream release (Terraform, GitOps rollouts, chart-of-charts):
+
+```
+module  --(depends_on)-->  root  --(deploy pipeline)-->  config-*
+```
+
+When `config-prod` bumps via a `deploy:` commit, the plugin adds one
+section per upstream, listing the commits merged since the previous
+`config-prod` release:
+
+```markdown
+### Upstream: root (v1.3.0 → v1.4.0)
+- feat(network): add private endpoint subnet (a1b2c3d)
+
+### Upstream: module (v0.9.1 → v0.9.2)
+- fix: pin azurerm provider (d4e5f6a)
+```
+
+Baseline resolution — for each upstream, the "previous" version is the
+highest upstream tag **merged into the downstream's previously
+released tag** (`git tag --merged <comp-prev-tag>`); the "new" version
+is the latest upstream tag reachable from HEAD. So even when the
+deploy commit lands *after* the upstream release (separate pipeline
+run), everything tagged upstream since the last downstream release is,
+by construction, what this deployment ships.
+
+Behaviour:
+
+- **`enrich_changelog`** — one `Upstream: <name> (v… → v…)` section per
+  upstream whose tag advanced. Commits are filtered by the same
+  `release_commit_pattern` and per-component `ignored_types` that the
+  planner uses, and only commits touching files owned by the upstream
+  are kept.
+- **`status_lines`** — advertises pending drift in `multicz status` /
+  `multicz plan` so the section isn't a surprise at bump time.
+
+Config keys:
+
+```toml
+[plugins.upstream-notes]
+# Max bullets per Upstream section; the plugin appends "… and N more"
+# past this cap.
+max_commits = 30
+# When true, prereleases (rc / beta / …) count as valid upstream heads.
+include_prereleases = false
+
+# Explicit upstream mapping. When absent, falls back to the transitive
+# closure of each component's ``depends_on``.
+[plugins.upstream-notes.upstreams]
+config-prod    = ["root", "module"]
+config-staging = ["root", "module"]
+```
+
 ## Writing a plugin { #authoring }
 
 The fastest path is to subclass `BasePlugin`, which provides no-op
