@@ -3,7 +3,7 @@
 
 [project]
 name = "multicz"
-version = "1.5.1"
+version = "1.6.0"
 description = "Multi-component versioning for monorepos: bump apps, charts, and images independently from conventional commits."
 readme = "README.md"
 authors = [

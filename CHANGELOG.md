@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.6.0] - 2026-07-04
+
+### Features
+
+- **plugins**: add built-in upstream-notes plugin (`c1aec96`)
+
 ## [1.5.1] - 2026-06-14
 
 ### Fixes
