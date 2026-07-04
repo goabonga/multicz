@@ -15,6 +15,9 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # Needed by the "purge stale artifact" step to DELETE prior-attempt
+  # ``github-pages`` artifacts via the GitHub API.
+  actions: write
 jobs:
   deploy:
     environment:
@@ -29,6 +32,27 @@ jobs:
           python-version: 3.x
       - run: pip install zensical
       - run: zensical build --clean
+
+      # On a retried run, the previous attempt's ``github-pages`` artifact
+      # still exists — ``upload-pages-artifact`` cannot overwrite it, so
+      # ``deploy-pages`` sees two artifacts of the same name and aborts with
+      # ``Multiple artifacts named "github-pages" were unexpectedly found for
+      # this workflow run``. Delete stale artifacts of this run before
+      # uploading so retries recover automatically.
+      - name: Purge stale github-pages artifact from previous attempt
+        if: github.run_attempt != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          ids=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+                  --jq '.artifacts[] | select(.name=="github-pages") | .id')
+          for id in $ids; do
+            echo "Deleting stale artifact $id"
+            gh api -X DELETE "repos/$REPO/actions/artifacts/$id"
+          done
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
