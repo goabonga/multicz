@@ -1,8 +1,15 @@
-# multicz
+<h1 align="center">
+  <img src="https://github.com/goabonga/multicz/raw/main/docs/multicz.svg" alt="multicz" width="120" /><br/>
+  multicz
+</h1>
 
-Multi-component versioning for monorepos. Bump a Python app, its Docker image,
-and the Helm chart that deploys it from a single conventional-commit history -
-each with its own version line and its own git tag.
+<p align="center">
+  <em>Multi-component versioning for monorepos.</em>
+</p>
+
+Bump a Python app, its Docker image, and the Helm chart that deploys it from a
+single conventional-commit history - each with its own version line and its own
+git tag.
 
 <p align="center">
   <img src="https://github.com/goabonga/multicz/raw/main/docs/demo.gif" alt="multicz demo" width="720">
