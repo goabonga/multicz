@@ -31,3 +31,26 @@ ref  = "multicz=={version}"
 [[components.multicz.artifacts]]
 type = "github-release"
 ref  = "multicz-v{version}"
+
+# `docs` is a release-tracked component for the Zensical site. It ships
+# no artifact - the "release" is the GitHub Pages deploy - but giving
+# the site a version and a tag is what lets multicz answer "did the
+# docs move?" the same tag-aware way it answers it for the package,
+# which is what the `docs` CI job gates on.
+#
+# `depends_on` the package so a code release also cascades a docs
+# patch: the site documents the CLI and the config schema, so a feature
+# release invalidates the rendered output even when no markdown file
+# was touched in the same push.
+#
+# `bump_rules` here MERGES into `[project.bump_rules]`, adding `docs`
+# on top of the inherited feat/fix/perf/revert. A `docs:` commit
+# therefore bumps this component and nothing else - the package
+# inherits the project rules, where `docs` is absent.
+[components.docs]
+paths = ["docs/**", "zensical.toml"]
+bump_files = [
+    {file = "zensical.toml", key = "project.extra.versions.docs"},
+]
+depends_on = ["multicz"]
+bump_rules = { docs = "patch" }
