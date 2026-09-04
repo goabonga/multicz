@@ -32,6 +32,16 @@ site_author = "Chris"
 # Read more: https://zensical.org/docs/setup/basics/#site_url
 site_url = "https://goabonga.github.io/multicz/"
 
+# The repository the site documents. Setting it is what renders the
+# source block in the top-right of the header: the host icon, the
+# `owner/name` label, and the facts strip underneath it - latest release
+# tag, stars, forks - which Zensical fetches from the GitHub API at
+# build time.
+#
+# Read more: https://zensical.org/docs/setup/repository/
+repo_url = "https://github.com/goabonga/multicz"
+repo_name = "goabonga/multicz"
+
 # The copyright notice appears in the page footer and can contain an HTML
 # fragment.
 #
