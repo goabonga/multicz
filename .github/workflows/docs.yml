@@ -1,16 +1,43 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Chris <goabonga@pm.me>
 
-name: Documentation
+name: docs
+
+# Build the Zensical site and deploy it to GitHub Pages.
+#
+# There is no push trigger any more. The deploy is driven by the release
+# pipeline, which calls this workflow once multicz has bumped and tagged
+# whatever moved on `main`. The `docs` component (paths `docs/**` +
+# `zensical.toml`) turns "did the docs change?" into a tag-aware question
+# answered by the same planner that decides the package release, instead
+# of a paths filter that would fire once before the release commit exists
+# and again after it rewrites zensical.toml.
+#
+# Building from the ref the caller passes - `main` after the release
+# push - is what makes the published site the released tree rather than
+# the tree that triggered CI.
+#
+# `workflow_dispatch` stays as the manual escape hatch: redeploy the
+# current site without cutting a release.
+
 on:
-  push:
-    branches:
-      - master
-      - main
-    paths:
-      - "docs/**"
-      - "zensical.toml"
-      - ".github/workflows/docs.yml"
+  workflow_call:
+    inputs:
+      ref:
+        description: Ref to build the site from.
+        type: string
+        default: main
+      bumped:
+        description: Space-separated components the calling release bumped.
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref to build the site from.
+        type: string
+        default: main
+
 permissions:
   contents: read
   pages: write
@@ -18,6 +45,7 @@ permissions:
   # Needed by the "purge stale artifact" step to DELETE prior-attempt
   # ``github-pages`` artifacts via the GitHub API.
   actions: write
+
 jobs:
   deploy:
     environment:
@@ -26,15 +54,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/configure-pages@v6
+
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
         with:
-          python-version: 3.x
-      - run: pip install zensical
-      - run: zensical build --clean
+          # The release commit and tags multicz just pushed, so the site
+          # is built from the tree that was actually released.
+          ref: ${{ inputs.ref }}
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Build site
+        # `--only-group docs` installs the locked Zensical without the
+        # dev group or the project itself - Zensical imports no multicz
+        # code. Locked rather than `pip install zensical` so a Zensical
+        # release cannot break Pages between two unrelated pushes. It
+        # has to be one `uv run`: a separate `uv sync --only-group docs`
+        # is undone by the next `uv run`, which re-adds the project.
+        run: uv run --frozen --only-group docs zensical build --clean
 
       # On a retried run, the previous attempt's ``github-pages`` artifact
-      # still exists — ``upload-pages-artifact`` cannot overwrite it, so
+      # still exists - ``upload-pages-artifact`` cannot overwrite it, so
       # ``deploy-pages`` sees two artifacts of the same name and aborts with
       # ``Multiple artifacts named "github-pages" were unexpectedly found for
       # this workflow run``. Delete stale artifacts of this run before
@@ -56,5 +97,20 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
+
       - uses: actions/deploy-pages@v5
         id: deployment
+
+      - name: Write step summary
+        if: always()
+        run: |
+          {
+            echo "## Docs deploy"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Ref | \`${{ inputs.ref }}\` |"
+            echo "| Bumped by the caller | \`${{ inputs.bumped }}\` |"
+            echo "| Status | \`${{ job.status }}\` |"
+            echo "| URL | ${{ steps.deployment.outputs.page_url }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

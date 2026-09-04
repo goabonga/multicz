@@ -11,8 +11,13 @@ name: release
 #   3. bump pyproject.toml + CHANGELOG.md, commit, tag, push
 #   4. build the wheel + sdist (uv build)
 #   5. publish to PyPI via Trusted Publishing (OIDC, no token needed)
-#   6. open a GitHub Release per new tag, with notes from
+#   6. open a GitHub Release per new package tag, with notes from
 #      `multicz release-notes`
+#   7. rebuild and publish the documentation site to GitHub Pages
+#
+# Steps 4-6 are skipped on a docs-only release: the `docs` component has
+# no wheel and no PyPI project, so `uv build` would rebuild the unchanged
+# package version and PyPI would reject the duplicate upload.
 #
 # Setup: configure PyPI trusted publishing for the repo
 # (https://docs.pypi.org/trusted-publishers/) - no PYPI_TOKEN secret
@@ -35,7 +40,9 @@ on:
 
 permissions:
   contents: write   # push the release commit and tags
-  id-token: write   # OIDC claim for PyPI Trusted Publishing
+  id-token: write   # OIDC claim for PyPI Trusted Publishing (and Pages)
+  pages: write      # deploy the documentation site
+  actions: write    # let the docs job purge stale Pages artifacts
 
 jobs:
   release:
@@ -46,6 +53,9 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/p/multicz
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      bumped:  ${{ steps.plan.outputs.bumped }}
     # Only run when CI was green AND the trigger wasn't our own
     # `chore(release)` commit (which would loop forever).
     if: >-
@@ -119,11 +129,24 @@ jobs:
         run: |
           uv run multicz plan --summary "$GITHUB_STEP_SUMMARY" \
             --output json | tee /tmp/plan.json
-          if [ "$(jq '.bumps | length' /tmp/plan.json)" = "0" ]; then
+          BUMPED=$(jq -r '.bumps | keys | join(" ")' /tmp/plan.json)
+          echo "bumped=$BUMPED" >> "$GITHUB_OUTPUT"
+          if [ -z "$BUMPED" ]; then
             echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "package=false" >> "$GITHUB_OUTPUT"
             echo "no release pending"
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
+            # `docs` is a tracked component with no wheel and no PyPI
+            # project, so it can be the only thing that moved. Build and
+            # publish gate on the package specifically: otherwise a
+            # docs-only release would rebuild the unchanged multicz
+            # version and PyPI would reject the duplicate upload.
+            if jq -e '.bumps | has("multicz")' /tmp/plan.json > /dev/null; then
+              echo "package=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "package=false" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Bump, commit, tag, push (signed)
@@ -141,23 +164,57 @@ jobs:
             | tee /tmp/release.json
 
       - name: Reinstall (pick up the new version)
-        if: steps.plan.outputs.release == 'true'
+        if: steps.plan.outputs.package == 'true'
         run: uv sync --frozen
 
       - name: Build wheel and sdist
-        if: steps.plan.outputs.release == 'true'
+        if: steps.plan.outputs.package == 'true'
         run: uv build
 
       - name: Publish to PyPI (Trusted Publishing via OIDC)
-        if: steps.plan.outputs.release == 'true'
+        if: steps.plan.outputs.package == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
 
       - name: Create GitHub Release
-        if: steps.plan.outputs.release == 'true'
+        # Package tags only. `docs` declares no `github-release`
+        # artifact - its release is the Pages deploy below - so a
+        # `docs-v*` tag pointing at the same commit must not open an
+        # entry on a Releases page people read for package changes.
+        if: steps.plan.outputs.package == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for tag in $(git tag --points-at HEAD); do
+          for tag in $(git tag --points-at HEAD --list 'multicz-v*'); do
             uv run multicz release-notes --tag "$tag" \
               | gh release create "$tag" --title "$tag" --notes-file -
           done
+
+  # Rebuild and publish the documentation site.
+  #
+  # Gated on the release job having RUN and succeeded, nothing finer.
+  # Not on `outputs.release`: an output is the one term whose
+  # server-side value cannot be inspected from outside a run, and a
+  # sibling project lost a first deploy to exactly that gate evaluating
+  # false with every visible input satisfied.
+  #
+  # Nothing is lost by leaving it out. The release job already refuses
+  # to run on a red CI, off `main`, or on its own `chore(release)`
+  # commit, and rebuilding the site is idempotent. The case this would
+  # have excluded - release ran, planner bumped nothing - costs one
+  # redundant redeploy of a site that should mirror `main` anyway.
+  docs:
+    needs: [release]
+    if: >-
+      ${{ !cancelled() && needs.release.result == 'success' }}
+    uses: ./.github/workflows/docs.yml
+    with:
+      # `main`, not the triggering SHA: multicz has just pushed the
+      # release commit and tags on top of it, and the published site
+      # should be the released tree.
+      ref: ${{ github.event.workflow_run.head_branch }}
+      bumped: ${{ needs.release.outputs.bumped }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: write
