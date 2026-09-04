@@ -348,7 +348,7 @@ generator = false
 # the component's only version file - the site does not render the
 # number anywhere, the point is that the docs get a tag of their own.
 [project.extra.versions]
-docs = "0.0.0"
+docs = "1.0.0"
 
 # ----------------------------------------------------------------------------
 # In this section you can configure the Markdown extensions that are used when
