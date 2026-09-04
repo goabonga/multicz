@@ -417,7 +417,7 @@ revert = "patch"
 ```
 
 Accepted values: `"major"`, `"minor"`, `"patch"`, `"none"`. User
-entries merge on top of the defaults — adding `refactor = "patch"`
+entries merge on top of the defaults - adding `refactor = "patch"`
 doesn't silently drop `feat`/`fix`/`perf`/`revert`.
 
 A type set to `"none"` is fully silenced, **including its breaking
@@ -440,7 +440,7 @@ hook time.
 
 The core can be extended via [plugins](plugins.md): external Python
 packages that register under the `multicz.plugins` entry-point group
-and participate in three places of the release flow — gating the
+and participate in three places of the release flow - gating the
 bump, enriching the changelog, and surfacing pre-flight advice in
 `multicz status` / `multicz plan`. Plugins are **opt-in**: a
 discovered plugin only runs when the project declares

@@ -39,7 +39,7 @@ All notable changes to this component are documented here.
 
 ### Fixes
 
-- **cli**: plugins command docstring — drop backticks + <name> mangled by Rich markup (`05a3454`)
+- **cli**: plugins command docstring - drop backticks + <name> mangled by Rich markup (`05a3454`)
 - **plugins**: require explicit [plugins.<name>] section to activate a plugin (`e922b19`)
 - **examples**: bump custom-plugin requires-python to >=3.12 to match multicz (`a97ded5`)
 - **examples**: bump deprecation-plugin requires-python to >=3.12 to match multicz (`57186da`)

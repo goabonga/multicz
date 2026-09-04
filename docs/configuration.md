@@ -154,7 +154,7 @@ Resolution at planning time:
 Custom types declared in `bump_rules` are also accepted by
 [`multicz check`](cli.md#check) at commit-msg hook time.
 
-A per-component override is available — see
+A per-component override is available - see
 [`bump_rules` (component)](#bump_rules_component).
 
 ### `state_file` { #state_file }
@@ -209,8 +209,8 @@ dependent's bump kind.
 
 | value | behaviour |
 |---|---|
-| `patch` (default) | dependent always patches when its upstream bumps — a Helm chart referencing a new app version doesn't *gain* the feature, it just needs a fresh build |
-| `match-upstream` | dependent inherits the upstream's kind (`api` minor → `chart` minor) — use when the dependent's release semantics genuinely track the upstream's |
+| `patch` (default) | dependent always patches when its upstream bumps - a Helm chart referencing a new app version doesn't *gain* the feature, it just needs a fresh build |
+| `match-upstream` | dependent inherits the upstream's kind (`api` minor → `chart` minor) - use when the dependent's release semantics genuinely track the upstream's |
 
 ## Component settings
 
@@ -343,7 +343,7 @@ multicz just wrote.
 
 ```toml
 [project]
-post_bump_policy = "allow"   # opt in — see below
+post_bump_policy = "allow"   # opt in - see below
 
 [components.api]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -354,7 +354,7 @@ post_bump  = ["uv lock"]
     Hooks only run when
     [`[project].post_bump_policy = "allow"`](#post_bump_policy). The
     default is `"deny"` because `post_bump` is the single feature
-    that executes arbitrary shell commands from the config —
+    that executes arbitrary shell commands from the config -
     enabling it should be a reviewable change.
 
 Each entry is parsed via `shlex.split` and executed in the repo root.
@@ -375,7 +375,7 @@ table with a `type` discriminator. The current writer kinds:
 |---|---|
 | `debian-changelog` | prepends a fresh stanza to a `debian/changelog`-format file. When the component has no `bump_files`, this writer also acts as the version source of truth (parses the topmost stanza). |
 
-Example — Python wheel + .deb (bump_files is the source, writer is a sink):
+Example - Python wheel + .deb (bump_files is the source, writer is a sink):
 
     [components.api]
     paths = ["src/**", "pyproject.toml"]
@@ -387,7 +387,7 @@ Example — Python wheel + .deb (bump_files is the source, writer is a sink):
     distribution = "unstable"
     debian_revision = 1
 
-Example — pure Debian source package (no bump_files; writer is the source):
+Example - pure Debian source package (no bump_files; writer is the source):
 
     [components.foo]
     paths = ["debian/**"]
@@ -406,7 +406,7 @@ Per-writer fields for `debian-changelog`:
 | `debian_revision` | `1` | appended as `-<n>` to the upstream version |
 | `epoch` | `null` | rare; prepended as `<n>:` |
 
-Requires `version_scheme = "semver"` (default) — the renderer's `~rc1`
+Requires `version_scheme = "semver"` (default) - the renderer's `~rc1`
 pre-release notation depends on the canonical semver form.
 
 ## Full example

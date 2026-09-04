@@ -9,12 +9,12 @@ comments), then participates in three places along the release flow:
 | where | what the plugin contributes |
 |---|---|
 | `multicz status` / `multicz plan` | one summary line per component: how many markers are newly *added*, *due for removal*, *upcoming* relative to the planned next version |
-| `multicz bump` (gate) | a `post_plan` violation per marker whose `remove_in ≤ next` — the bump is aborted until the dead code is actually removed |
+| `multicz bump` (gate) | a `post_plan` violation per marker whose `remove_in ≤ next` - the bump is aborted until the dead code is actually removed |
 | `multicz changelog` / `release-notes` | adds a `Deprecated` section (markers landing in the release window) and a `Removed` section (markers whose deadline lines up with this release) |
 
 ```
 .
-├── multicz.toml          # config — declares [plugins.deprecation] to opt in
+├── multicz.toml          # config - declares [plugins.deprecation] to opt in
 ├── pyproject.toml        # [project].version = canonical api version (1.0.0)
 └── src/legacy_api/
     ├── __init__.py
@@ -40,7 +40,7 @@ Confirm with `multicz plugins`:
 │             │        │                           │ mode='error'              │
 ```
 
-Without the section the same plugin would render as `inactive` — and
+Without the section the same plugin would render as `inactive` - and
 none of its hooks would run.
 
 ## Behaviour in the release flow
@@ -62,7 +62,7 @@ forgotten:
 ### 2. Major bump (marker becomes due)
 
 A `feat!:` (or `BREAKING CHANGE:`) commit proposes `1.0.0 → 2.0.0`.
-`v1.py`'s decorator says `remove_in="2.0.0"` — i.e. the dead code was
+`v1.py`'s decorator says `remove_in="2.0.0"` - i.e. the dead code was
 supposed to be gone before shipping `2.0.0`. The plugin emits an `error`
 violation and the bump is **refused**:
 
@@ -77,7 +77,7 @@ violation and the bump is **refused**:
 
 `multicz bump` exits with a non-zero status; CI fails. To unblock the
 release, actually delete `old_endpoint` (and the decorator line that
-flagged it) — then re-run `multicz bump`.
+flagged it) - then re-run `multicz bump`.
 
 ### 3. Changelog enrichment
 
@@ -91,10 +91,10 @@ sections, merged in alongside the conventional-commit buckets:
 - drop body kwarg from v2 endpoint
 
 ### Removed
-- `src/legacy_api/v1.py:26` (since 1.0.0, remove in 2.0.0) — use new_endpoint
+- `src/legacy_api/v1.py:26` (since 1.0.0, remove in 2.0.0) - use new_endpoint
 
 ### Deprecated
-- `src/legacy_api/v2.py:14` (since 1.2.0, remove in 3.0.0) — body kwarg is going away, pass payload instead
+- `src/legacy_api/v2.py:14` (since 1.2.0, remove in 3.0.0) - body kwarg is going away, pass payload instead
 ```
 
 The same sections appear in `multicz release-notes`, ready to ship to
@@ -104,7 +104,7 @@ GitHub Releases.
 
 ```toml
 [plugins.deprecation]
-# Default behaviour — fail the bump on a past-due marker.
+# Default behaviour - fail the bump on a past-due marker.
 mode = "error"
 
 # Override the scan globs. When omitted, falls back to each component's
@@ -121,7 +121,7 @@ worker = ["src/worker/**/*.py"]
 ```
 
 `mode = "warning"` keeps the violation visible in the CLI but lets the
-bump proceed — useful when introducing the policy on an existing repo
+bump proceed - useful when introducing the policy on an existing repo
 and you need a grace period to clean up the historic markers.
 
 ## Try it

@@ -36,7 +36,7 @@ are skipped and a warning surfaces on stderr pointing to the policy
 knob. To disable hooks for a single run regardless of policy, pass
 `multicz bump --no-post-bump` (the flag also silences the deny
 warning). Treat enabling `post_bump_policy` like any other CI shell
-hook — review what's there, and keep `multicz.toml` itself under
+hook - review what's there, and keep `multicz.toml` itself under
 the same code-review process as the rest of the repo.
 
 ## Hardening options

@@ -28,7 +28,7 @@ stays dormant until the project's `multicz.toml` declares it:
 [plugins.deprecation]
 ```
 
-The empty section is the minimum opt-in — it means "run with all
+The empty section is the minimum opt-in - it means "run with all
 defaults". Three states are possible per plugin:
 
 | state | meaning |
@@ -42,11 +42,11 @@ state:
 
 ```
 ┃ Plugin      ┃ Status   ┃ Module                       ┃ Config section            ┃
-│ deprecation │ inactive │ multicz.plugins.builtin.…    │ (not in multicz.toml — add [plugins.deprecation] to activate) │
+│ deprecation │ inactive │ multicz.plugins.builtin.…    │ (not in multicz.toml - add [plugins.deprecation] to activate) │
 │ newsy       │ active   │ newsy                        │ [plugins.newsy] directory='changes.d', …                       │
 ```
 
-Same command with `--output json` for CI consumption — each row
+Same command with `--output json` for CI consumption - each row
 carries `status`, `configured`, and `enabled` fields plus the
 plugin's resolved `module` / `class` / `config` dict.
 
@@ -54,7 +54,7 @@ plugin's resolved `module` / `class` / `config` dict.
 
     A plugin you don't recognize in `multicz plugins` came in via a
     transitive dependency. Until you add `[plugins.<name>]`, it
-    can't affect your bumps — so the safe default for an unfamiliar
+    can't affect your bumps - so the safe default for an unfamiliar
     plugin is to leave it `inactive`.
 
 ## Hooks { #hooks }
@@ -83,7 +83,7 @@ Every hook receives the same `PluginContext`:
 
 | field | content |
 |---|---|
-| `ctx.config`        | the parsed multicz config (whole file — read other sections if you need them) |
+| `ctx.config`        | the parsed multicz config (whole file - read other sections if you need them) |
 | `ctx.repo`          | absolute `Path` to the repository root |
 | `ctx.plan`          | the computed `Plan`; iterate `ctx.plan` or look up `ctx.plan.bumps[component]` |
 | `ctx.plugin_config` | **only** the `[plugins.<name>]` slice of the user's config, defaulted to `{}` if absent |
@@ -117,7 +117,7 @@ Called per component during changelog / release-notes rendering.
 Return [`ChangelogEntry`](#changelog-entry) objects; each one becomes a
 section in the rendered markdown. Sections returned with the same
 title (`section="Removed"`, etc.) merge with whatever the
-conventional-commit renderer produced — no duplicate H3.
+conventional-commit renderer produced - no duplicate H3.
 
 ### `status_lines` { #status_lines }
 
@@ -127,7 +127,7 @@ def status_lines(self, ctx: PluginContext) -> list[str]: ...
 
 Called by `multicz status` and `multicz plan`. Each returned string is
 printed verbatim under the bump table, prefixed with a magenta arrow.
-Rich markup (`[bold]`, `[red]`, …) is supported — escape literal
+Rich markup (`[bold]`, `[red]`, …) is supported - escape literal
 brackets with `\[` if you mean them literally.
 
 ## Data types { #data-types }
@@ -162,13 +162,13 @@ class ChangelogEntry:
 Enforces a removal policy on `@deprecated(since=..., remove_in=...)`
 markers (and `# DEPRECATED since=.. remove_in=..` comments). Behaviour:
 
-- **`post_plan`** — every marker whose `remove_in ≤ next_version`
+- **`post_plan`** - every marker whose `remove_in ≤ next_version`
   raises a violation. By default `Severity.error`; flip to a warning
   with `mode = "warning"` during initial rollout.
-- **`enrich_changelog`** — emits a `Deprecated` section for markers
+- **`enrich_changelog`** - emits a `Deprecated` section for markers
   newly added in this release window and a `Removed` section for
   markers whose deadline matches the planned version.
-- **`status_lines`** — one summary line per component:
+- **`status_lines`** - one summary line per component:
   `deprecation[api 1.0.0 → 2.0.0]: 1 added, 1 due for removal, 1 upcoming`.
 
 Config keys:
@@ -189,8 +189,8 @@ Runnable example: [`examples/deprecation-plugin/`](https://github.com/goabonga/m
 
 ### `upstream-notes` { #upstream-notes }
 
-Injects the *commits* of upstream components — not just their version
-— into a downstream component's changelog and release notes. Aimed at
+Injects the *commits* of upstream components - not just their version
+- into a downstream component's changelog and release notes. Aimed at
 `depends_on` chains where a deploy pipeline commits **after** the
 upstream release (Terraform, GitOps rollouts, chart-of-charts):
 
@@ -210,7 +210,7 @@ section per upstream, listing the commits merged since the previous
 - fix: pin azurerm provider (d4e5f6a)
 ```
 
-Baseline resolution — for each upstream, the "previous" version is the
+Baseline resolution - for each upstream, the "previous" version is the
 highest upstream tag **merged into the downstream's previously
 released tag** (`git tag --merged <comp-prev-tag>`); the "new" version
 is the latest upstream tag reachable from HEAD. So even when the
@@ -220,12 +220,12 @@ by construction, what this deployment ships.
 
 Behaviour:
 
-- **`enrich_changelog`** — one `Upstream: <name> (v… → v…)` section per
+- **`enrich_changelog`** - one `Upstream: <name> (v… → v…)` section per
   upstream whose tag advanced. Commits are filtered by the same
   `release_commit_pattern` and per-component `ignored_types` that the
   planner uses, and only commits touching files owned by the upstream
   are kept.
-- **`status_lines`** — advertises pending drift in `multicz status` /
+- **`status_lines`** - advertises pending drift in `multicz status` /
   `multicz plan` so the section isn't a surprise at bump time.
 
 Config keys:
@@ -266,7 +266,7 @@ class NewsyPlugin(BasePlugin):
         return [] if self._fragments(ctx) else [
             Violation(
                 severity=Severity.error,
-                message="no changelog fragments — add one under changes.d/",
+                message="no changelog fragments - add one under changes.d/",
                 plugin=self.name,
             )
         ]
@@ -286,7 +286,7 @@ class NewsyPlugin(BasePlugin):
    `multicz.toml`. Pick something short, kebab-case, namespace-y if
    collisions are likely.
 
-Register it via the entry-point group — this is what makes it
+Register it via the entry-point group - this is what makes it
 discoverable to any multicz install:
 
 ```toml title="pyproject.toml"

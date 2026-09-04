@@ -1,4 +1,4 @@
-# Custom plugin — `newsy`
+# Custom plugin - `newsy`
 
 A worked example of writing your own multicz plugin. `newsy` is a
 towncrier-flavoured news-fragment plugin: every change drops a small
@@ -18,7 +18,7 @@ those files become changelog sections grouped by `<type>`.
     └── app/__init__.py       # the component being versioned
 ```
 
-The plugin exercises every hook of the multicz Plugin Protocol — read
+The plugin exercises every hook of the multicz Plugin Protocol - read
 [`src/newsy/__init__.py`](src/newsy/__init__.py) alongside this
 walkthrough.
 
@@ -39,7 +39,7 @@ dependencies = ["multicz"]
 newsy = "newsy:NewsyPlugin"   # key = plugin name, value = "module:ClassName"
 ```
 
-The class implements the Protocol — easiest path is to subclass
+The class implements the Protocol - easiest path is to subclass
 `BasePlugin`, which provides no-op defaults so you only override the
 hooks you care about:
 
@@ -58,7 +58,7 @@ The `ctx` object passed to every hook carries:
 
 | field | content |
 |---|---|
-| `ctx.config` | the parsed multicz config (whole file — read other sections if you need them) |
+| `ctx.config` | the parsed multicz config (whole file - read other sections if you need them) |
 | `ctx.repo` | absolute `Path` to the repository root |
 | `ctx.plan` | the `Plan` multicz computed (`ctx.plan.bumps[component]` for each `PlannedBump`) |
 | `ctx.plugin_config` | **only** the `[plugins.<name>]` slice of the user's config, defaulted to `{}` if absent |
@@ -83,11 +83,11 @@ $ multicz plugins
 ```
 
 Without that section the plugin renders as `inactive` and none of its
-hooks run — explicit opt-in, same as built-in plugins.
+hooks run - explicit opt-in, same as built-in plugins.
 
 ## Behaviour in the release flow
 
-### 1. With fragments — status + enriched changelog
+### 1. With fragments - status + enriched changelog
 
 A `feat:` commit proposes `0.1.0 → 0.2.0`. The status line reports the
 fragment inventory:
@@ -105,7 +105,7 @@ side-by-side with the conventional-commit bullets:
 ```markdown
 ### Features
 - **app**: stream responses line-by-line (`8bafd47`)
-- Streaming responses are now flushed line-by-line instead of buffered to EOF — long-running endpoints feel responsive again.
+- Streaming responses are now flushed line-by-line instead of buffered to EOF - long-running endpoints feel responsive again.
 
 ### Fixes
 - Stopped logging the session token in the request-id header tap.
@@ -114,14 +114,14 @@ side-by-side with the conventional-commit bullets:
 - Migrated CI to the shared workflow library, dropping ~200 lines of copy-pasted YAML.
 ```
 
-### 2. With zero fragments — gate
+### 2. With zero fragments - gate
 
 Remove `changes.d/` (or empty it) and the `post_plan` hook refuses the
 bump:
 
 ```
 $ multicz bump --dry-run
-  ✗ no changelog fragments under changes.d/ — add at least one
+  ✗ no changelog fragments under changes.d/ - add at least one
     <id>.<type>.md file or set ``require_fragment_for_bump = false``
     under [plugins.newsy] (from newsy)
 ```
@@ -139,12 +139,12 @@ either to add a fragment or to relax the gate by setting
   informational annotations.
 * **`enrich_changelog` is called per-component.** Sections you return
   are merged into the rendered changelog under their `section` title
-  — so two plugins that both return a `"Removed"` section coalesce
+  - so two plugins that both return a `"Removed"` section coalesce
   cleanly into one bucket. The same return value is reused for
   `multicz release-notes`.
 * **`status_lines` is text-only.** It's printed verbatim after the
   bump table in `multicz status` / `multicz plan`. Rich markup is
-  supported (`[bold]`, `[red]`, etc.) — escape literal brackets with
+  supported (`[bold]`, `[red]`, etc.) - escape literal brackets with
   `\[` if you mean them literally.
 * **Config defaults belong to the plugin.** multicz only injects the
   raw `[plugins.<name>]` dict; defaulting and validation are entirely

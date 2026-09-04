@@ -8,7 +8,7 @@ Each subdirectory shows a different way to set up `multicz`.
 | [`inline-pyproject/`](inline-pyproject/) | FastAPI backend + React SPA, no separate config file | `pyproject.toml` `[tool.multicz]` |
 | [`inline-package-json/`](inline-package-json/) | npm-workspace monorepo (`web`, `mobile`, `shared`) | `package.json` `"multicz"` key |
 | [`deprecation-plugin/`](deprecation-plugin/) | Opting into the built-in deprecation-policy plugin (gate + changelog sections) | `multicz.toml` (`[plugins.deprecation]`) |
-| [`custom-plugin/`](custom-plugin/) | Writing your own plugin (`newsy`, towncrier-style fragments) — entry-point registration and all three hooks | `multicz.toml` (`[plugins.newsy]`) |
+| [`custom-plugin/`](custom-plugin/) | Writing your own plugin (`newsy`, towncrier-style fragments) - entry-point registration and all three hooks | `multicz.toml` (`[plugins.newsy]`) |
 | [`ci/`](ci/) | Drop-in pipelines for GitHub Actions, GitLab CI, Azure Pipelines | n/a (CI files) |
 
 Search order at every directory level (walked up from `cwd`):

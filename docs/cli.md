@@ -169,7 +169,7 @@ Notable flags:
 - `--no-post-bump` - skip
   [`post_bump`](configuration.md#post_bump) shell hooks for this run,
   even when `[project].post_bump_policy = "allow"`. When the policy is
-  `"deny"` (default), hooks are already skipped — this flag silences
+  `"deny"` (default), hooks are already skipped - this flag silences
   the warning.
 
 `bump` intentionally does **not** take `--since` - combining a custom
@@ -198,7 +198,7 @@ implemented today - only `version` is exposed.
 
 Print the *effective* configuration: every default applied, every
 alias normalised, every sparse override merged. Useful when an option
-isn't behaving as you expected — `config` shows you what multicz
+isn't behaving as you expected - `config` shows you what multicz
 actually parsed, not what you typed.
 
 ```bash
@@ -237,16 +237,16 @@ key  = "project.version"
 
 Notable flags:
 
-- `--output toml` (default) — round-trippable; you can copy the output
+- `--output toml` (default) - round-trippable; you can copy the output
   back into a `multicz.toml` and it parses identically. Internally
   goes through Pydantic's JSON dump and strips `null` values (TOML
   has no null).
-- `--output json` — mirrors the Pydantic schema with `Path` objects
+- `--output json` - mirrors the Pydantic schema with `Path` objects
   rendered as strings. Pipe to `jq` in CI to extract a specific
   field.
 - `-c <name>` keeps the `[project]` table in the output (defaults are
   the most useful debugging context) and exactly one component.
-- `--source` — writes the path of the loaded `multicz.toml` /
+- `--source` - writes the path of the loaded `multicz.toml` /
   `pyproject.toml` / `package.json` to **stderr**, so it doesn't
   pollute the JSON/TOML on stdout.
 
@@ -255,12 +255,12 @@ Common debugging checks:
 | concern | look for |
 |---|---|
 | my `bump_rules` override isn't applied | `[project.bump_rules]` or `[components.X.bump_rules]` shows the resolved map; if a key is absent, the user table didn't reach Pydantic. |
-| a writer isn't firing | `[[components.X.writers]]` array — check `type`, `file`, and that the entry survived schema validation. |
+| a writer isn't firing | `[[components.X.writers]]` array - check `type`, `file`, and that the entry survived schema validation. |
 | `multicz` is reading the wrong file | run with `--source` to confirm which config path was discovered. |
 
 ## `graph`
 
-Render the cascade DAG between components — the synoptic answer to
+Render the cascade DAG between components - the synoptic answer to
 "if I bump X, what else bumps?". Two kinds of edges contribute, both
 directed upstream → downstream:
 
@@ -291,19 +291,19 @@ web
 
 Each tree root is a component with no incoming cascade edge. A DAG
 sink reached from multiple roots (here: `chart`) is rendered under
-*each* parent — the ASCII tree flattens the DAG by duplication so the
+*each* parent - the ASCII tree flattens the DAG by duplication so the
 full propagation is visible at a glance. Cycles (forbidden by
 `multicz validate`) get a `↻ cycle back to <name>` marker if they
 slip through.
 
 Notable flags:
 
-- `--output tree` (default) — Rich-rendered ASCII tree; one root per
+- `--output tree` (default) - Rich-rendered ASCII tree; one root per
   pass, blank line between.
-- `--output mermaid` — `graph LR` block ready for Markdown / GitHub
+- `--output mermaid` - `graph LR` block ready for Markdown / GitHub
   PR descriptions / MkDocs. Edge labels are the same as the tree
   view (`mirror <file>:<key>` or `depends_on`).
-- `--output dot` — Graphviz DOT for offline rendering. Pipe into
+- `--output dot` - Graphviz DOT for offline rendering. Pipe into
   `dot -Tsvg > graph.svg` or `dot -Tpng`.
 - `-c <name>` filters to the *downstream* cascade rooted at `name`,
   for any of the three formats. Useful when scoping a review to a
@@ -395,7 +395,7 @@ multicz plugins --output json
 ```
 
 Three states are surfaced per plugin (`active`, `disabled`,
-`inactive`) — see [Plugins → Activation](plugins.md#activation) for
+`inactive`) - see [Plugins → Activation](plugins.md#activation) for
 the full model.
 
 ## `state`
@@ -464,7 +464,7 @@ Without `--type`, the allowed-types vocabulary is the union of the
 conventional-commits default set and the keys of
 [`[project.bump_rules]`](configuration.md#bump_rules) (loaded by
 walking up from the current directory). This means a custom type
-declared in your config — e.g. `infra = "patch"` — is accepted by the
+declared in your config - e.g. `infra = "patch"` - is accepted by the
 hook without extra flags.
 
 ## `--since` { #since }

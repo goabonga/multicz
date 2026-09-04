@@ -298,7 +298,7 @@ CI fails. Use `post_bump`:
 
 ```toml
 [project]
-post_bump_policy = "allow"   # opt in — see security note
+post_bump_policy = "allow"   # opt in - see security note
 
 [components.api]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
