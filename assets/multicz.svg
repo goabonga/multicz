@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2025 Chris <goabonga@pm.me>
+
+  multicz master logo. Regenerate the derived assets (docs/multicz.svg,
+  docs/favicon.ico) with `scripts/regen-icons.sh` after editing.
+
+  One trunk, three heads: a single conventional-commit history fanning
+  out into per-component version lines. The heads deliberately stop at
+  three different depths - components released independently do not
+  share a version number, which is the whole premise of the tool.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Rounded shell: the monorepo the components share -->
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="#311B92"/>
+  <rect x="34" y="34" width="188" height="188" rx="40" fill="#5E35B1"/>
+  <!-- Trunk plus the three branches split off it -->
+  <g stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M78 74 L78 182"/>
+    <path d="M78 108 q0 -34 34 -34 h38"/>
+    <path d="M78 128 h100"/>
+    <path d="M78 148 q0 34 34 34 h20"/>
+  </g>
+  <!-- Tag heads, each at its own version -->
+  <g fill="#FFFFFF">
+    <circle cx="150" cy="74" r="19"/>
+    <circle cx="178" cy="128" r="19"/>
+    <circle cx="132" cy="182" r="19"/>
+  </g>
+  <g fill="#5E35B1">
+    <circle cx="150" cy="74" r="8"/>
+    <circle cx="178" cy="128" r="8"/>
+    <circle cx="132" cy="182" r="8"/>
+  </g>
+</svg>
