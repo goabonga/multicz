@@ -60,6 +60,14 @@ dev = [
 docs = [
     "zensical>=0.0.39",
 ]
+# Branding-asset tooling, isolated from `dev` and `docs` so neither the
+# quality pipeline nor the docs build drags a native cairo stack in.
+# Only `scripts/regen-icons.sh` installs it, on demand, via
+# `uv run --only-group favicon`.
+favicon = [
+    "cairosvg>=2.7",
+    "pillow>=10.0",
+]
 
 [tool.ruff]
 line-length = 100
