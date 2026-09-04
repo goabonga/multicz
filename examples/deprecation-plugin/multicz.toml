@@ -40,7 +40,7 @@ changelog = "CHANGELOG.md"
 #
 # The deprecation plugin ships with multicz but is **inactive by default**;
 # declaring this section is the explicit opt-in. An empty
-# ``[plugins.deprecation]`` would work too — every key below is a tweak,
+# ``[plugins.deprecation]`` would work too - every key below is a tweak,
 # not a requirement.
 #
 # Try it::
@@ -57,9 +57,9 @@ changelog = "CHANGELOG.md"
 # ``enabled = false`` here.
 
 [plugins.deprecation]
-# When omitted, falls back to each component's ``paths`` — perfectly
+# When omitted, falls back to each component's ``paths`` - perfectly
 # fine for this example, but spelled out here for documentation.
 scan = ["src/**/*.py"]
-# "error" (default) — fail the bump on any past-due marker.
-# "warning"         — print the violation but let the bump proceed.
+# "error" (default) - fail the bump on any past-due marker.
+# "warning"         - print the violation but let the bump proceed.
 mode = "error"

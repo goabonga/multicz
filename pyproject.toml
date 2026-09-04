@@ -36,7 +36,7 @@ multicz = "multicz.cli:app"
 
 # Built-in plugins registered via the same entry-point group third-
 # party plugins use. Disable a built-in by setting
-# `[plugins.<name>] enabled = false` in multicz.toml — there is no
+# `[plugins.<name>] enabled = false` in multicz.toml - there is no
 # privileged loader path.
 [project.entry-points."multicz.plugins"]
 deprecation = "multicz.plugins.builtin.deprecation:DeprecationPlugin"
