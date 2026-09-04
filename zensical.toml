@@ -36,8 +36,14 @@ site_url = "https://goabonga.github.io/multicz/"
 # fragment.
 #
 # Read more: https://zensical.org/docs/setup/basics/#copyright
+# `copyright` renders in the highlighted slot of the theme's copyright
+# partial, above its own attribution line; `extra.generator = false`
+# (further down) is the switch that partial reads to drop that line,
+# leaving this as the only footer text. Raw HTML, not Markdown - the
+# value is interpolated into the template as-is.
 copyright = """
-Copyright &copy; 2026 Chris
+Made with <span style="color: #e25555;">&#10084;</span> by
+<a href="https://github.com/goabonga" target="_blank" rel="noopener">goabonga</a>
 """
 
 # Zensical supports both implicit navigation and explicitly defined navigation.
@@ -331,6 +337,11 @@ toggle.name = "Switch to dark mode"
 #[[project.extra.social]]
 #icon = "fontawesome/brands/github"
 #link = "https://github.com/user/repo"
+
+# Drops the theme's "Made with Zensical" footer line, so the footer
+# carries one credit - `copyright` above - instead of two.
+[project.extra]
+generator = false
 
 # ----------------------------------------------------------------------------
 # In this section you can configure the Markdown extensions that are used when
