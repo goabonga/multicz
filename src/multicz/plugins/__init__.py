@@ -17,6 +17,7 @@ See :mod:`multicz.plugins.protocol` for the hook contract.
 from .protocol import (
     BasePlugin,
     ChangelogEntry,
+    OwnershipContext,
     Plugin,
     PluginContext,
     Severity,
@@ -25,6 +26,7 @@ from .protocol import (
 from .registry import DEFAULT_REGISTRY, ENTRY_POINT_GROUP, PluginRegistry
 from .runner import (
     has_errors,
+    run_affects,
     run_enrich_changelog,
     run_post_plan,
     run_status_lines,
@@ -35,12 +37,14 @@ __all__ = [
     "ENTRY_POINT_GROUP",
     "BasePlugin",
     "ChangelogEntry",
+    "OwnershipContext",
     "Plugin",
     "PluginContext",
     "PluginRegistry",
     "Severity",
     "Violation",
     "has_errors",
+    "run_affects",
     "run_enrich_changelog",
     "run_post_plan",
     "run_status_lines",

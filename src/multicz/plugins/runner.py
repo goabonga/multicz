@@ -20,22 +20,37 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .protocol import ChangelogEntry, PluginContext, Severity, Violation
+from .protocol import ChangelogEntry, OwnershipContext, PluginContext, Severity, Violation
 from .registry import DEFAULT_REGISTRY, PluginRegistry
 
 if TYPE_CHECKING:
     from ..planner import Plan
 
 
+def _plugin_config(config: Any, plugin_name: str) -> dict[str, Any]:
+    """The ``[plugins.<plugin_name>]`` slice of ``config``, or ``{}``."""
+    plugins_table: dict[str, dict[str, Any]] = getattr(config, "plugins", {}) or {}
+    return plugins_table.get(plugin_name, {})
+
+
 def _make_context(config: Any, repo: Path, plan: Plan, plugin_name: str) -> PluginContext:
     """Build a :class:`PluginContext` slicing the plugin's own config
     section out of ``config.plugins[plugin_name]`` (default empty dict)."""
-    plugins_table: dict[str, dict[str, Any]] = getattr(config, "plugins", {}) or {}
     return PluginContext(
         config=config,
         repo=repo,
         plan=plan,
-        plugin_config=plugins_table.get(plugin_name, {}),
+        plugin_config=_plugin_config(config, plugin_name),
+    )
+
+
+def _make_ownership_context(config: Any, repo: Path, plugin_name: str) -> OwnershipContext:
+    """Build an :class:`OwnershipContext` for :meth:`Plugin.affects` -
+    same config slicing as :func:`_make_context`, no ``plan`` to carry."""
+    return OwnershipContext(
+        config=config,
+        repo=repo,
+        plugin_config=_plugin_config(config, plugin_name),
     )
 
 
@@ -60,12 +75,13 @@ def is_active(config: Any, plugin_name: str) -> bool:
     return bool(section.get("enabled", True))
 
 
-def _safe_call(plugin, method_name, *args, **kwargs):
+def _safe_call(plugin, method_name, *args, default=None, **kwargs):
     """Invoke a plugin hook, swallowing exceptions as warnings.
 
     A plugin that crashes during one invocation MUST NOT take down the
     rest of the run — multicz emits a ``RuntimeWarning`` and treats the
-    hook as if it returned an empty list."""
+    hook as if it returned ``default`` (an empty list for every
+    list-returning hook, the default here; ``affects`` passes ``False``)."""
     try:
         return getattr(plugin, method_name)(*args, **kwargs)
     except Exception as exc:
@@ -74,7 +90,7 @@ def _safe_call(plugin, method_name, *args, **kwargs):
             RuntimeWarning,
             stacklevel=2,
         )
-        return []
+        return [] if default is None else default
 
 
 def run_post_plan(
@@ -140,6 +156,31 @@ def run_status_lines(
         results = _safe_call(plugin, "status_lines", ctx)
         lines.extend(results)
     return lines
+
+
+def run_affects(
+    config: Any,
+    repo: Path,
+    component: str,
+    paths: list[str],
+    *,
+    registry: PluginRegistry | None = None,
+) -> bool:
+    """``True`` if any active plugin's :meth:`Plugin.affects` claims
+    ``component`` for any of ``paths``.
+
+    Short-circuits on the first plugin that claims it - callers only
+    ever need a yes/no answer, and ``affects`` is documented as
+    something a plugin may call out to an external, possibly
+    expensive, process to compute."""
+    reg = registry or DEFAULT_REGISTRY
+    for plugin in reg:
+        if not is_active(config, plugin.name):
+            continue
+        ctx = _make_ownership_context(config, repo, plugin.name)
+        if _safe_call(plugin, "affects", ctx, component, paths, default=False):
+            return True
+    return False
 
 
 def has_errors(violations: list[Violation]) -> bool:

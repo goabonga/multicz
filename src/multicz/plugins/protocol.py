@@ -18,9 +18,27 @@ Hooks are wired into specific stages of the bump pipeline:
   ``multicz plan`` to add actionable lines (e.g. "3 deprecations marked
   for removal in v3.0 — your plan bumps to v3.0, please drop them").
 
+* :meth:`Plugin.affects` runs BEFORE a plan exists, while ``multicz
+  changed`` and the planner's own direct-change pass are each deciding
+  which components a changed path touches. Return ``True`` to claim
+  ``component`` for ``paths`` beyond whatever ``multicz.toml``'s own
+  ``paths`` glob patterns already matched - the escape hatch for
+  ownership a glob cannot express, such as a language's own real
+  import graph. The two callers OR this in with their path-based
+  match; a plugin with no opinion returns ``False`` and changes
+  nothing. Call frequency varies by caller - see below.
+
 Plugins are read-only with respect to the plan and config; they MUST
 NOT mutate either. Side effects (logging, network) are allowed but
-discouraged — keep hooks fast (<500ms).
+discouraged — keep hooks fast (<500ms). Call frequency for ``affects``
+varies by caller: ``multicz changed`` calls it once per component with
+every changed path in its comparison window already batched together;
+the planner's direct-change pass calls it once per (component, commit)
+pair, but only when that commit's files did not already match via
+``paths`` - most commits never reach it. Either way, a plugin backed
+by an expensive external call (a compiler's dependency graph, say)
+should memoize per component internally rather than recomputing it on
+every invocation.
 """
 
 from __future__ import annotations
@@ -88,6 +106,20 @@ class PluginContext:
     plugin_config: dict[str, Any]
 
 
+@dataclass
+class OwnershipContext:
+    """Read-only context handed to :meth:`Plugin.affects`.
+
+    Lighter than :class:`PluginContext`: ``affects`` runs while multicz
+    is still deciding which components a change touches, before any
+    :class:`Plan` exists to put in one.
+    """
+
+    config: Any  # multicz.config.Config — Any to avoid circular import
+    repo: Path
+    plugin_config: dict[str, Any]
+
+
 @runtime_checkable
 class Plugin(Protocol):
     """Public protocol every multicz plugin satisfies.
@@ -109,6 +141,10 @@ class Plugin(Protocol):
     ) -> list[ChangelogEntry]: ...
 
     def status_lines(self, ctx: PluginContext) -> list[str]: ...
+
+    def affects(
+        self, ctx: OwnershipContext, component: str, paths: list[str]
+    ) -> bool: ...
 
 
 class BasePlugin:
@@ -135,3 +171,8 @@ class BasePlugin:
 
     def status_lines(self, ctx: PluginContext) -> list[str]:
         return []
+
+    def affects(
+        self, ctx: OwnershipContext, component: str, paths: list[str]
+    ) -> bool:
+        return False

@@ -12,11 +12,13 @@ from types import SimpleNamespace
 from multicz.plugins import (
     BasePlugin,
     ChangelogEntry,
+    OwnershipContext,
     PluginContext,
     PluginRegistry,
     Severity,
     Violation,
     has_errors,
+    run_affects,
     run_enrich_changelog,
     run_post_plan,
     run_status_lines,
@@ -271,3 +273,159 @@ def test_config_without_plugins_attribute_is_handled():
     bare_config = SimpleNamespace()  # no .plugins attribute
     run_post_plan(bare_config, _FAKE_REPO, _FAKE_PLAN, registry=PluginRegistry([P()]))
     assert captured == []
+
+
+# ---------------------------------------------------------------------------
+# run_affects
+# ---------------------------------------------------------------------------
+
+
+def test_affects_receives_component_and_paths():
+    captured: list[tuple[OwnershipContext, str, list[str]]] = []
+
+    class P(BasePlugin):
+        name = "p"
+
+        def affects(self, ctx, component, paths):
+            captured.append((ctx, component, paths))
+            return False
+
+    run_affects(
+        _config_with("p"),
+        _FAKE_REPO,
+        "api",
+        ["internal/auth/token.go"],
+        registry=PluginRegistry([P()]),
+    )
+    assert len(captured) == 1
+    ctx, component, paths = captured[0]
+    assert isinstance(ctx, OwnershipContext)
+    assert ctx.repo == _FAKE_REPO
+    assert component == "api"
+    assert paths == ["internal/auth/token.go"]
+
+
+def test_affects_true_short_circuits_remaining_plugins():
+    """The first plugin to claim the component wins - a later one is
+    never even asked, since the caller only needs a yes/no answer."""
+    called: list[str] = []
+
+    class Yes(BasePlugin):
+        name = "yes"
+
+        def affects(self, ctx, component, paths):
+            called.append(self.name)
+            return True
+
+    class Never(BasePlugin):
+        name = "never"
+
+        def affects(self, ctx, component, paths):
+            called.append(self.name)
+            return True
+
+    out = run_affects(
+        _config_with("yes", "never"),
+        _FAKE_REPO,
+        "api",
+        ["x"],
+        registry=PluginRegistry([Yes(), Never()]),
+    )
+    assert out is True
+    assert called == ["yes"]
+
+
+def test_affects_false_tries_every_plugin():
+    called: list[str] = []
+
+    class A(BasePlugin):
+        name = "a"
+
+        def affects(self, ctx, component, paths):
+            called.append(self.name)
+            return False
+
+    class B(BasePlugin):
+        name = "b"
+
+        def affects(self, ctx, component, paths):
+            called.append(self.name)
+            return False
+
+    out = run_affects(
+        _config_with("a", "b"),
+        _FAKE_REPO,
+        "api",
+        ["x"],
+        registry=PluginRegistry([A(), B()]),
+    )
+    assert out is False
+    assert called == ["a", "b"]
+
+
+def test_affects_default_base_plugin_returns_false():
+    """A plugin that doesn't override ``affects`` has no opinion."""
+
+    class Quiet(BasePlugin):
+        name = "quiet"
+
+    out = run_affects(
+        _config_with("quiet"),
+        _FAKE_REPO,
+        "api",
+        ["x"],
+        registry=PluginRegistry([Quiet()]),
+    )
+    assert out is False
+
+
+def test_affects_inactive_plugin_is_skipped():
+    class Yes(BasePlugin):
+        name = "yes"
+
+        def affects(self, ctx, component, paths):
+            return True
+
+    out = run_affects(
+        _FAKE_CONFIG,  # only "speaker" is opted in
+        _FAKE_REPO,
+        "api",
+        ["x"],
+        registry=PluginRegistry([Yes()]),
+    )
+    assert out is False
+
+
+def test_affects_with_no_plugins_returns_false():
+    out = run_affects(_FAKE_CONFIG, _FAKE_REPO, "api", ["x"], registry=PluginRegistry([]))
+    assert out is False
+
+
+def test_affects_crashing_plugin_treated_as_false():
+    """A plugin that raises in ``affects`` must not abort ownership
+    resolution - the runner warns and treats it as ``False``, then
+    still asks the next plugin."""
+
+    class Crashes(BasePlugin):
+        name = "boom"
+
+        def affects(self, ctx, component, paths):
+            raise RuntimeError("kaboom")
+
+    class Yes(BasePlugin):
+        name = "yes"
+
+        def affects(self, ctx, component, paths):
+            return True
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = run_affects(
+            _config_with("boom", "yes"),
+            _FAKE_REPO,
+            "api",
+            ["x"],
+            registry=PluginRegistry([Crashes(), Yes()]),
+        )
+    assert out is True
+    assert any("raised in affects" in str(w.message) for w in caught)
