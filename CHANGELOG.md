@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.6.1] - 2026-10-02
+
+### Fixes
+
+- **cli**: honor overlap_policy = "all" in `changed` (`cfa9287`)
+
 ## [1.6.0] - 2026-07-04
 
 ### Features
