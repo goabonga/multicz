@@ -129,6 +129,10 @@ Distinct from `plan`: `plan` says "would bump", `changed` says
 "any activity, regardless of whether it's release-worthy". Release
 commits matching `[project].release_commit_pattern` are filtered out.
 
+Honors [`overlap_policy`](configuration.md#overlap_policy) the same
+way `plan`/`bump` do: under `"all"`, a file several components claim
+reports every one of them, not just the first-declared.
+
 ## `bump`
 
 Compute and apply the bump plan.
