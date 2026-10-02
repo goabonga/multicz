@@ -14,6 +14,13 @@ can:
 - **surface advice** in `multicz status` / `multicz plan` so the user
   knows about a pending gate before it fires.
 
+A plugin can also:
+
+- **claim ownership** of a component for a changed file that none of
+  its `paths` globs matched (`affects`) - useful when a more
+  authoritative, queryable dependency graph exists than a
+  hand-maintained glob (e.g. a Go import graph).
+
 A plugin is a Python package that registers a class under the
 `multicz.plugins` [entry-point group](https://packaging.python.org/en/latest/specifications/entry-points/).
 There is **no privileged loader path**: built-in plugins use the exact
@@ -130,6 +137,39 @@ printed verbatim under the bump table, prefixed with a magenta arrow.
 Rich markup (`[bold]`, `[red]`, …) is supported - escape literal
 brackets with `\[` if you mean them literally.
 
+### `affects` { #affects }
+
+```python
+def affects(
+    self, ctx: OwnershipContext, component: str, paths: list[str],
+) -> bool: ...
+```
+
+Unlike the three hooks above, `affects` doesn't run against a computed
+`Plan` - it runs *while* multicz is still deciding which component(s)
+a change belongs to, so it receives the lighter
+[`OwnershipContext`](#ownership-context) instead of `PluginContext`
+(no `plan` field - there isn't one yet):
+
+| field | content |
+|---|---|
+| `ctx.config`        | the parsed multicz config |
+| `ctx.repo`          | absolute `Path` to the repository root |
+| `ctx.plugin_config` | the `[plugins.<name>]` slice, same as elsewhere |
+
+Both `multicz changed` and the planner's direct pass call `affects`
+**only as a fallback**, once plain `paths` matching has already failed
+to attribute a changed file to `component`. Return `True` to claim it
+anyway. Call frequency differs by caller: `changed` calls it once per
+component with every unmatched path batched together; the planner
+calls it once per `(component, commit)` pair. A plugin whose answer
+requires an expensive external call (shelling out to a compiler's
+dependency query, for instance) should cache on `self` across calls
+within a single run.
+
+A plugin that raises is caught by the runner, logged as a
+`RuntimeWarning`, and treated as if it returned `False`.
+
 ## Data types { #data-types }
 
 ### `Violation` { #violation }
@@ -144,6 +184,19 @@ class Violation:
     line: int | None = None
     component: str | None = None
 ```
+
+### `OwnershipContext` { #ownership-context }
+
+```python
+@dataclass
+class OwnershipContext:
+    config: Any      # multicz.config.Config
+    repo: Path
+    plugin_config: dict[str, Any]
+```
+
+Passed to [`affects`](#affects) only - lighter than `PluginContext`,
+with no `plan` field.
 
 ### `ChangelogEntry` { #changelog-entry }
 
@@ -303,6 +356,10 @@ slicing, hook ordering, and exception isolation; the plugin only has
 to implement the hooks it cares about.
 
 Runnable example, full code + README: [`examples/custom-plugin/`](https://github.com/goabonga/multicz/tree/main/examples/custom-plugin).
+
+A second worked example implements only `affects`: [`examples/go-deps-plugin/`](https://github.com/goabonga/multicz/tree/main/examples/go-deps-plugin)
+claims a Go component via `go list -deps` when its `paths` glob misses
+an `internal/` import.
 
 ## Reference { #reference }
 
