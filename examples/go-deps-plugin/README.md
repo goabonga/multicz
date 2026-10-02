@@ -103,6 +103,12 @@ $ multicz changed --since HEAD~1 --output json
 - **Unconfigured components are untouched.** A component absent from
   `[plugins.go-deps.packages]` gets `False` immediately - this plugin
   never guesses at an import path on your behalf.
+- **A shared dependency fans out to every importer.** `affects` is
+  evaluated independently per component - `changed`/the planner loop
+  over every configured component and ask each one in turn. A change
+  to a package both `cmd/api` and `cmd/worker` import gets `True` from
+  both calls, so both components bump. This runs regardless of
+  `overlap_policy`, which only governs plain `paths` matching.
 - **Same idea generalizes past Go.** Any ecosystem with an
   authoritative, queryable dependency graph (`cargo tree`, `go list`,
   a language server's reverse-dependency index) can back an `affects`
