@@ -19,13 +19,17 @@ from ..results import ChangedReport
 @app.command()
 def changed(
     since: str = typer.Option(
-        None, "--since",
+        None,
+        "--since",
         help="Reference to compare against (e.g. origin/main, HEAD~5). "
-             "When omitted, each component is compared against its own "
-             "last tag - same window as the planner uses for bumps.",
+        "When omitted, each component is compared against its own "
+        "last tag - same window as the planner uses for bumps.",
     ),
     output: str = typer.Option(
-        "text", "--output", "-o", help="text | json",
+        "text",
+        "--output",
+        "-o",
+        help="text | json",
     ),
 ) -> None:
     """List components whose files changed since the given reference.
@@ -60,6 +64,7 @@ def changed(
     repo, config = _load()
     matcher = ComponentMatcher(config.components)
     release_re = re.compile(config.project.release_commit_pattern)
+    overlap_all = config.project.overlap_policy == "all"
 
     direct_changed: set[str] = set()
     for name in config.components:
@@ -72,7 +77,11 @@ def changed(
         for c in commits:
             if release_re.match(_commit_header(c)):
                 continue
-            if any(matcher.match(f) == name for f in c.files):
+            if overlap_all:
+                matched = any(name in matcher.match_all(f) for f in c.files)
+            else:
+                matched = any(matcher.match(f) == name for f in c.files)
+            if matched:
                 direct_changed.add(name)
                 break
 
