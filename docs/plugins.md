@@ -167,6 +167,12 @@ requires an expensive external call (shelling out to a compiler's
 dependency query, for instance) should cache on `self` across calls
 within a single run.
 
+Both callers evaluate every component independently - nothing stops
+two different components from each getting `True` for the same path.
+A change to a dependency shared by two binaries can legitimately bump
+both; this is unaffected by `overlap_policy`, which only governs plain
+`paths` matching.
+
 A plugin that raises is caught by the runner, logged as a
 `RuntimeWarning`, and treated as if it returned `False`.
 
