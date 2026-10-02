@@ -9,6 +9,7 @@ Each subdirectory shows a different way to set up `multicz`.
 | [`inline-package-json/`](inline-package-json/) | npm-workspace monorepo (`web`, `mobile`, `shared`) | `package.json` `"multicz"` key |
 | [`deprecation-plugin/`](deprecation-plugin/) | Opting into the built-in deprecation-policy plugin (gate + changelog sections) | `multicz.toml` (`[plugins.deprecation]`) |
 | [`custom-plugin/`](custom-plugin/) | Writing your own plugin (`newsy`, towncrier-style fragments) - entry-point registration and all three hooks | `multicz.toml` (`[plugins.newsy]`) |
+| [`go-deps-plugin/`](go-deps-plugin/) | Claiming a Go component by `go list -deps` instead of a hand-maintained `paths` glob - the `affects` hook | `multicz.toml` (`[plugins.go-deps]`) |
 | [`ci/`](ci/) | Drop-in pipelines for GitHub Actions, GitLab CI, Azure Pipelines | n/a (CI files) |
 
 Search order at every directory level (walked up from `cwd`):

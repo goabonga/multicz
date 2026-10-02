@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# multicz config for a project that uses the go-deps plugin.
+#
+# Layout:
+#   cmd/api/      -> the "api" component's main package
+#   cmd/worker/   -> the "worker" component's main package
+#   internal/     -> shared packages, imported by one or both binaries
+#
+# `paths` below only lists each component's own cmd/ directory - this
+# is the realistic, slightly-incomplete state most hand-maintained
+# configs end up in: nobody remembers to add every internal/ package a
+# binary imports. The go-deps plugin closes that gap: once installed
+# and opted in, a change under internal/auth/ is attributed to `api`
+# (it's in `go list -deps ./cmd/api`) even though no `paths` glob
+# mentions internal/ at all.
+
+[project]
+commit_convention = "conventional"
+tag_format = "v{version}"
+initial_version = "0.1.0"
+
+[components.api]
+paths = ["cmd/api/**"]
+bump_files = [{ file = "cmd/api/version.txt" }]
+
+[components.worker]
+paths = ["cmd/worker/**"]
+bump_files = [{ file = "cmd/worker/version.txt" }]
+
+# --- Plugin activation ----------------------------------------------------
+#
+# Verify with::
+#
+#   $ multicz plugins
+#   ┃ Plugin  │ Status │ Module         │ Config section
+#   │ go-deps │ active │ go_deps_plugin │ [plugins.go-deps] packages={…}
+#
+# If you see ``go-deps: inactive`` instead, you forgot to declare the
+# section. If you don't see ``go-deps`` at all, the plugin isn't
+# installed in the same env - ``pip install -e .`` from this directory.
+
+[plugins.go-deps]
+# Maps each component to the Go import path `go list -deps` is run
+# against. A component missing from this table gets no second look
+# from this plugin - plain `paths` matching is all it has.
+[plugins.go-deps.packages]
+api = "./cmd/api"
+worker = "./cmd/worker"
