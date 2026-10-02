@@ -11,6 +11,7 @@ import typer
 
 from ...commits import commits_since, latest_tag, tag_prefix
 from ...config import ComponentMatcher
+from ...plugins import run_affects
 from .. import app, presenters
 from .._shared import _commit_header, _load
 from ..results import ChangedReport
@@ -73,17 +74,20 @@ def changed(
             ref: str | None = latest_tag(repo, prefix)
         else:
             ref = since
-        commits = commits_since(repo, ref)
-        for c in commits:
-            if release_re.match(_commit_header(c)):
-                continue
-            if overlap_all:
-                matched = any(name in matcher.match_all(f) for f in c.files)
-            else:
-                matched = any(matcher.match(f) == name for f in c.files)
-            if matched:
-                direct_changed.add(name)
-                break
+        files = [
+            f
+            for c in commits_since(repo, ref)
+            if not release_re.match(_commit_header(c))
+            for f in c.files
+        ]
+        if overlap_all:
+            owns_path = any(name in matcher.match_all(f) for f in files)
+        else:
+            owns_path = any(matcher.match(f) == name for f in files)
+        # A plugin gets a say only once path matching alone has already
+        # failed to claim this component - see Plugin.affects.
+        if owns_path or (files and run_affects(config, repo, name, files)):
+            direct_changed.add(name)
 
     # Cascade closure — propagate ``mirrors`` and ``depends_on`` edges
     # so the output matches what ``multicz plan`` would actually bump.
