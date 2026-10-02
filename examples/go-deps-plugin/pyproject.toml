@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# This pyproject.toml does two things:
+#   1. Packages the ``go_deps_plugin`` plugin so it can be installed into
+#      the same Python environment as multicz.
+#   2. Registers ``go-deps`` under the ``multicz.plugins`` entry-point
+#      group - that registration is the *only* mechanism multicz uses
+#      to discover third-party plugins.
+
+[project]
+name = "go-deps-plugin"
+version = "0.1.0"
+description = "Claim Go components by compiler-verified import graph, not hand-maintained globs."
+requires-python = ">=3.12"
+# Depend on multicz so installing the plugin gives you the host CLI too.
+# A real plugin distributed independently would pin a range that matches
+# the stable plugin Protocol (e.g. ``multicz>=1.2,<2``).
+dependencies = [
+    "multicz",
+]
+
+# This is what makes the plugin discoverable. When multicz starts up, it
+# iterates ``importlib.metadata.entry_points(group="multicz.plugins")``
+# and instantiates each value. The key (``go-deps``) doubles as the
+# expected ``plugin.name`` and as the TOML section name the user must
+# declare to opt in: ``[plugins.go-deps]``.
+[project.entry-points."multicz.plugins"]
+go-deps = "go_deps_plugin:GoDepsPlugin"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/go_deps_plugin"]
+
+# Workspace-only convenience: this example lives *inside* the multicz
+# repo, so ``multicz`` is resolved from the local source tree (two
+# levels up) instead of PyPI. When copying this example outside the
+# repo, delete this section - ``uv sync`` (and ``pip``) will then pick
+# multicz up from PyPI like any other dependency.
+[tool.uv.sources]
+multicz = { path = "../../" }
