@@ -2,6 +2,14 @@
 
 All notable changes to this component are documented here.
 
+## [1.7.0] - 2026-10-02
+
+### Features
+
+- **plugins**: add affects ownership hook to the plugin protocol (`d1db364`)
+- **cli**: consult plugin affects when changed can't match a path (`5195202`)
+- **planner**: consult plugin affects in the direct bump pass (`730dbf0`)
+
 ## [1.6.1] - 2026-10-02
 
 ### Fixes
