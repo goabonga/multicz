@@ -34,6 +34,7 @@ from ..commits import (
 )
 from ..config import ComponentMatcher, Config
 from ..formats import FormatError, read_value
+from ..plugins import run_affects
 from .plan import Plan, PlannedBump, _stronger
 from .reasons import (
     CommitReason,
@@ -144,6 +145,10 @@ def _direct_pass(
                     owned = tuple(
                         p for p in commit.files if matcher.match(p) == name
                     )
+                # Path matching found nothing - give an active plugin a
+                # say before giving up on this commit (see Plugin.affects).
+                if not owned and run_affects(config, repo, name, list(commit.files)):
+                    owned = tuple(commit.files)
                 if not owned:
                     continue
                 if unknown_policy == "error":
@@ -178,6 +183,10 @@ def _direct_pass(
                 owned = tuple(
                     p for p in commit.files if matcher.match(p) == name
                 )
+            # Path matching found nothing - give an active plugin a say
+            # before giving up on this commit (see Plugin.affects).
+            if not owned and run_affects(config, repo, name, list(commit.files)):
+                owned = tuple(commit.files)
             if not owned:
                 continue
 
