@@ -9,6 +9,7 @@ import typer
 
 from ...commits import commits_since, latest_tag, tag_prefix
 from ...config import ComponentMatcher
+from ...planner import owned_files
 from .. import app, err, presenters
 from .._shared import _build_plan_or_exit, _load
 from ..results import ChangelogEntry
@@ -35,7 +36,7 @@ def changelog(
         relevant = [
             c
             for c in commits_since(repo, since)
-            if c.is_conventional and any(matcher.match(f) == name for f in c.files)
+            if c.is_conventional and owned_files(config, repo, matcher, name, c.files)
         ]
         entries.append(ChangelogEntry(
             component=name,

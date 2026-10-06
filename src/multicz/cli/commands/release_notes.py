@@ -20,6 +20,7 @@ from ...commits import (
     tags_pointing_at,
 )
 from ...config import ComponentMatcher
+from ...planner import owned_files
 from ...plugins import run_enrich_changelog
 from .. import app, err, presenters
 from .._shared import (
@@ -57,7 +58,7 @@ def _filtered_commits_in_range(
         if c.is_conventional
         and not release_re.match(_commit_header(c))
         and c.type.lower() not in ignored
-        and any(matcher.match(f) == name for f in c.files)
+        and owned_files(config, repo, matcher, name, c.files)
     ]
 
 

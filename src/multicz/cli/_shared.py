@@ -23,6 +23,7 @@ from ..planner import (
     NonConventionalCommitsError,
     TriggerReason,
     build_plan,
+    owned_files,
 )
 from . import err
 
@@ -153,7 +154,7 @@ def _component_relevant_commits(
         if c.is_conventional
         and not release_re.match(_commit_header(c))
         and c.type.lower() not in ignored
-        and any(matcher.match(f) == name for f in c.files)
+        and owned_files(config, repo, matcher, name, c.files)
     ]
 
 
