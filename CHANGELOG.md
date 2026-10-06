@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.7.1] - 2026-10-06
+
+### Fixes
+
+- **cli**: list plugin and shared-file commits in changelogs (`86227e9`)
+
 ## [1.7.0] - 2026-10-02
 
 ### Features
