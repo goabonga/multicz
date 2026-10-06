@@ -167,6 +167,13 @@ requires an expensive external call (shelling out to a compiler's
 dependency query, for instance) should cache on `self` across calls
 within a single run.
 
+The changelog that `bump` writes, `multicz changelog` and
+`multicz release-notes` attribute commits the same way, so a commit
+that bumps a component only because of `affects` is listed in that
+component's changelog and release notes instead of leaving the release
+with "No notable changes". Every match under `overlap_policy = "all"`
+counts there too, as it does for the planner.
+
 Both callers evaluate every component independently - nothing stops
 two different components from each getting `True` for the same path.
 A change to a dependency shared by two binaries can legitimately bump
