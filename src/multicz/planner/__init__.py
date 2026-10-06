@@ -9,6 +9,7 @@ with callers that import ``multicz.planner.<symbol>`` directly.
 
 from .build import _current_version as _current_version
 from .build import build_plan
+from .ownership import owned_files
 from .plan import (
     Plan,
     PlannedBump,
@@ -38,4 +39,5 @@ __all__ = [
     "build_plan",
     "bump_version",
     "compute_next",
+    "owned_files",
 ]

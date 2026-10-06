@@ -34,7 +34,7 @@ from ..commits import (
 )
 from ..config import ComponentMatcher, Config
 from ..formats import FormatError, read_value
-from ..plugins import run_affects
+from .ownership import owned_files
 from .plan import Plan, PlannedBump, _stronger
 from .reasons import (
     CommitReason,
@@ -119,7 +119,6 @@ def _direct_pass(
     import re
 
     release_re = re.compile(config.project.release_commit_pattern)
-    overlap_all = config.project.overlap_policy == "all"
     unknown_policy = config.project.unknown_commit_policy
     offenders: list[tuple[str, str]] = []  # for unknown_commit_policy = error
 
@@ -137,18 +136,7 @@ def _direct_pass(
                     continue
                 # Both 'patch' and 'error' need to know which files in this
                 # commit map to this component.
-                if overlap_all:
-                    owned = tuple(
-                        p for p in commit.files if name in matcher.match_all(p)
-                    )
-                else:
-                    owned = tuple(
-                        p for p in commit.files if matcher.match(p) == name
-                    )
-                # Path matching found nothing - give an active plugin a
-                # say before giving up on this commit (see Plugin.affects).
-                if not owned and run_affects(config, repo, name, list(commit.files)):
-                    owned = tuple(commit.files)
+                owned = owned_files(config, repo, matcher, name, commit.files)
                 if not owned:
                     continue
                 if unknown_policy == "error":
@@ -175,18 +163,8 @@ def _direct_pass(
             commit_kind = bump_kind_for(commit, rules)
             if commit_kind is None:
                 continue
-            if overlap_all:
-                owned = tuple(
-                    p for p in commit.files if name in matcher.match_all(p)
-                )
-            else:
-                owned = tuple(
-                    p for p in commit.files if matcher.match(p) == name
-                )
-            # Path matching found nothing - give an active plugin a say
-            # before giving up on this commit (see Plugin.affects).
-            if not owned and run_affects(config, repo, name, list(commit.files)):
-                owned = tuple(commit.files)
+            # Paths first, then an active plugin (see Plugin.affects).
+            owned = owned_files(config, repo, matcher, name, commit.files)
             if not owned:
                 continue
 
