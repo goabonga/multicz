@@ -434,6 +434,8 @@ Checks:
 - `changelog_not_a_file`
 - `debian_changelog_missing`, `debian_changelog_unreadable`, `debian_changelog_unparseable`
 - `state_drift`, `state_unknown_component` (when `state_file` is set)
+- `plugin:<name>`, at the level the plugin reports (active plugins implementing
+  [`validate`](plugins.md#validate))
 
 Each finding prints a check identifier in parentheses, e.g.
 `(bump_files_exist)`, so CI logs and PR comments can grep on it.
