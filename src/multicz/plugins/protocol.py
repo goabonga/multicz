@@ -28,6 +28,13 @@ Hooks are wired into specific stages of the bump pipeline:
   match; a plugin with no opinion returns ``False`` and changes
   nothing. Call frequency varies by caller - see below.
 
+* :meth:`Plugin.validate` runs during ``multicz validate``, with no plan
+  either. Return :class:`Violation` objects for whatever would make the
+  plugin's other hooks answer wrongly (a dependency query that fails,
+  a config section it cannot use); they are reported as validation
+  findings, so ``Severity.error`` fails the command and
+  ``Severity.warning`` fails it under ``--strict``.
+
 Plugins are read-only with respect to the plan and config; they MUST
 NOT mutate either. Side effects (logging, network) are allowed but
 discouraged — keep hooks fast (<500ms). Call frequency for ``affects``
@@ -108,10 +115,12 @@ class PluginContext:
 
 @dataclass
 class OwnershipContext:
-    """Read-only context handed to :meth:`Plugin.affects`.
+    """Read-only context handed to :meth:`Plugin.affects` and
+    :meth:`Plugin.validate`.
 
     Lighter than :class:`PluginContext`: ``affects`` runs while multicz
-    is still deciding which components a change touches, before any
+    is still deciding which components a change touches, and
+    ``validate`` checks the configuration, both before any
     :class:`Plan` exists to put in one.
     """
 
@@ -146,6 +155,8 @@ class Plugin(Protocol):
         self, ctx: OwnershipContext, component: str, paths: list[str]
     ) -> bool: ...
 
+    def validate(self, ctx: OwnershipContext) -> list[Violation]: ...
+
 
 class BasePlugin:
     """Convenience base — every hook is a no-op by default.
@@ -176,3 +187,6 @@ class BasePlugin:
         self, ctx: OwnershipContext, component: str, paths: list[str]
     ) -> bool:
         return False
+
+    def validate(self, ctx: OwnershipContext) -> list[Violation]:
+        return []

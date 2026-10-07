@@ -17,6 +17,7 @@ exceptions or plugin misbehaviour.
 from __future__ import annotations
 
 import warnings
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -181,6 +182,29 @@ def run_affects(
         if _safe_call(plugin, "affects", ctx, component, paths, default=False):
             return True
     return False
+
+
+def run_validate(
+    config: Any,
+    repo: Path,
+    *,
+    registry: PluginRegistry | None = None,
+) -> list[Violation]:
+    """Invoke :meth:`Plugin.validate` on every active plugin.
+
+    Each violation carries the name of the plugin that reported it, so
+    ``multicz validate`` can say where a finding comes from."""
+    reg = registry or DEFAULT_REGISTRY
+    violations: list[Violation] = []
+    for plugin in reg:
+        if not is_active(config, plugin.name):
+            continue
+        ctx = _make_ownership_context(config, repo, plugin.name)
+        for violation in _safe_call(plugin, "validate", ctx):
+            violations.append(
+                violation if violation.plugin else replace(violation, plugin=plugin.name)
+            )
+    return violations
 
 
 def has_errors(violations: list[Violation]) -> bool:

@@ -22,6 +22,7 @@ from multicz.plugins import (
     run_enrich_changelog,
     run_post_plan,
     run_status_lines,
+    run_validate,
 )
 
 # Light-weight stand-in for the real multicz.config.Config —
@@ -429,3 +430,66 @@ def test_affects_crashing_plugin_treated_as_false():
         )
     assert out is True
     assert any("raised in affects" in str(w.message) for w in caught)
+
+
+# ---------------------------------------------------------------------------
+# run_validate
+# ---------------------------------------------------------------------------
+
+
+def test_validate_receives_an_ownership_context_with_its_config_slice():
+    captured: list[OwnershipContext] = []
+
+    class Checker(BasePlugin):
+        name = "checker"
+
+        def validate(self, ctx):
+            captured.append(ctx)
+            return []
+
+    config = _config_with("checker", checker={"strict": True})
+    run_validate(config, _FAKE_REPO, registry=PluginRegistry([Checker()]))
+    assert isinstance(captured[0], OwnershipContext)
+    assert captured[0].plugin_config == {"strict": True}
+    assert captured[0].repo == _FAKE_REPO
+
+
+def test_validate_violations_are_tagged_with_their_plugin():
+    class Checker(BasePlugin):
+        name = "checker"
+
+        def validate(self, ctx):
+            return [
+                Violation(Severity.error, "go list failed", component="api"),
+                Violation(Severity.warning, "named", plugin="other"),
+            ]
+
+    out = run_validate(_config_with("checker"), _FAKE_REPO, registry=PluginRegistry([Checker()]))
+    assert [(v.severity, v.plugin, v.component) for v in out] == [
+        (Severity.error, "checker", "api"),
+        (Severity.warning, "other", None),
+    ]
+
+
+def test_validate_default_inactive_and_crashing_plugins_report_nothing():
+    class Quiet(BasePlugin):
+        name = "quiet"
+
+    class Loud(BasePlugin):
+        name = "loud"
+
+        def validate(self, ctx):
+            return [Violation(Severity.error, "never seen")]
+
+    class Crash(BasePlugin):
+        name = "crash"
+
+        def validate(self, ctx):
+            raise RuntimeError("boom")
+
+    registry = PluginRegistry([Quiet(), Loud(), Crash()])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = run_validate(_config_with("quiet", "crash"), _FAKE_REPO, registry=registry)
+    assert out == []
+    assert any("raised in validate()" in str(w.message) for w in caught)
