@@ -38,6 +38,7 @@ def validate_cmd(
     - declared changelog paths are reachable
     - the planner can resolve the current version of every component
     - declared writers (e.g. debian-changelog) validate against the repo
+    - active plugins report no problem through their validate hook
 
     Exit code:
 

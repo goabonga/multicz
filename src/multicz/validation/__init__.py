@@ -26,6 +26,7 @@ from .changelog import ChangelogPathCheck, WritersCheck
 from .cycles import MirrorCycleCheck, TriggerCycleCheck
 from .mirrors import MirrorTargetsCheck
 from .overlap import PathOverlapCheck
+from .plugins import PluginValidationCheck
 from .state import StateDriftCheck
 from .versions import CurrentVersionCheck
 
@@ -39,6 +40,7 @@ CHECKS: list[Check] = [
     CurrentVersionCheck(),
     WritersCheck(),
     StateDriftCheck(),
+    PluginValidationCheck(),
 ]
 # Order matches the original validate() ordering — preserve it.
 
@@ -64,6 +66,7 @@ __all__ = [
     "MirrorCycleCheck",
     "MirrorTargetsCheck",
     "PathOverlapCheck",
+    "PluginValidationCheck",
     "StateDriftCheck",
     "TriggerCycleCheck",
     "ValidationContext",
