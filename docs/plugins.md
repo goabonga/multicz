@@ -20,6 +20,8 @@ A plugin can also:
   its `paths` globs matched (`affects`) - useful when a more
   authoritative, queryable dependency graph exists than a
   hand-maintained glob (e.g. a Go import graph).
+- **report problems** in `multicz validate` (`validate`) - e.g. a
+  dependency query its other hooks rely on that fails.
 
 A plugin is a Python package that registers a class under the
 `multicz.plugins` [entry-point group](https://packaging.python.org/en/latest/specifications/entry-points/).
@@ -183,6 +185,31 @@ both; this is unaffected by `overlap_policy`, which only governs plain
 A plugin that raises is caught by the runner, logged as a
 `RuntimeWarning`, and treated as if it returned `False`.
 
+### `validate` { #validate }
+
+```python
+def validate(self, ctx: OwnershipContext) -> list[Violation]: ...
+```
+
+Called once by `multicz validate`, with the same
+[`OwnershipContext`](#ownership-context) as `affects` - there is no
+plan to validate against. Return [`Violation`](#violation) objects for
+anything that would make the plugin's other hooks answer wrongly: a
+failing dependency query, a config section it cannot use. Each one is
+reported as a finding with the check identifier `plugin:<name>`:
+
+- `Severity.error` fails the command (exit code 1).
+- `Severity.warning` fails it under `--strict` (exit code 2), the
+  usual CI gate.
+- `Severity.info` is purely informational.
+
+This is how a plugin whose `affects` degrades to "no opinion" on
+failure can still stop CI: `affects` stays safe, `validate` says why
+it would have answered `False`.
+
+A plugin that raises is caught by the runner, logged as a
+`RuntimeWarning`, and treated as if it returned `[]`.
+
 ## Data types { #data-types }
 
 ### `Violation` { #violation }
@@ -208,8 +235,8 @@ class OwnershipContext:
     plugin_config: dict[str, Any]
 ```
 
-Passed to [`affects`](#affects) only - lighter than `PluginContext`,
-with no `plan` field.
+Passed to [`affects`](#affects) and [`validate`](#validate) - lighter
+than `PluginContext`, with no `plan` field.
 
 ### `ChangelogEntry` { #changelog-entry }
 
