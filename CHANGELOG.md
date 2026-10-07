@@ -2,6 +2,13 @@
 
 All notable changes to this component are documented here.
 
+## [1.8.0] - 2026-10-07
+
+### Features
+
+- **plugins**: add a validate hook to the plugin protocol (`321a4ec`)
+- **validation**: report plugin validate findings (`3507369`)
+
 ## [1.7.1] - 2026-10-06
 
 ### Fixes
