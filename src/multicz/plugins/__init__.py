@@ -30,6 +30,7 @@ from .runner import (
     run_enrich_changelog,
     run_post_plan,
     run_status_lines,
+    run_validate,
 )
 
 __all__ = [
@@ -48,4 +49,5 @@ __all__ = [
     "run_enrich_changelog",
     "run_post_plan",
     "run_status_lines",
+    "run_validate",
 ]
