@@ -149,6 +149,28 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/format_summary.py bandit bandit.json
 
+  # Audit the locked dependency graph against the PyPI advisory database.
+  pip-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Export locked requirements
+        # `pip-audit --path .venv` finds no package in a uv venv and
+        # audits nothing, so audit the pinned lock export instead.
+        run: uv export --frozen --all-groups --no-emit-project --no-hashes --output-file requirements.txt
+
+      - name: Run pip-audit
+        run: uvx pip-audit -r requirements.txt --no-deps --disable-pip --format json --output audit.json
+
+      - name: Summarize pip-audit
+        if: ${{ !cancelled() }}
+        run: python3 scripts/format_summary.py pip-audit audit.json
+
   test:
     needs: [license-headers, lint, type-check, pyright, validate]
     runs-on: ubuntu-24.04
