@@ -22,8 +22,17 @@ uv run multicz --help
 ```
 
 `uv sync` installs the runtime plus the `dev` group (pytest, pytest-cov,
-ruff) into `.venv/`. Add `--group docs` to also install Zensical for the
-documentation site.
+ruff, mypy, pyright, pre-commit) into `.venv/`. Add `--group docs` to also
+install Zensical for the documentation site.
+
+Install the pre-commit and commit-msg hooks once per clone. They run ruff
+check and format, mypy, pyright, the SPDX header checks and the
+Conventional Commits validation before each commit lands:
+
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files   # run every hook on the whole tree
+```
 
 ## Development workflow
 
@@ -52,6 +61,35 @@ uv run ruff format --check       # CI-style check (no writes)
 ```
 
 Selected rule set: `E F I B UP SIM N RUF`. Line length is 100.
+
+### Type checks
+
+Two checkers run on `src/`, because mypy and pyright disagree on inference
+and narrowing and each catches what the other lets through:
+
+```bash
+uv run mypy src                  # config: [tool.mypy]
+uv run pyright                   # config: [tool.pyright]
+```
+
+CI runs both next to the tests, the SPDX header check and the security
+scans (bandit, pip-audit, osv-scanner), and all of them gate the release.
+Each job writes a summary of its result on the run page.
+
+### License headers
+
+Every Python and workflow file starts with the two-line SPDX header (after
+the shebang, if any):
+
+```
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+```
+
+```bash
+python3 scripts/add_license_header.py --path src --types py          # add
+python3 scripts/add_license_header.py --path .github --types yml --check
+```
 
 ### Documentation site (optional)
 
