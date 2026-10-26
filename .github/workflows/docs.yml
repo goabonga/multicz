@@ -5,9 +5,9 @@ name: docs
 
 # Build the Zensical site and deploy it to GitHub Pages.
 #
-# There is no push trigger any more. The deploy is driven by the release
-# pipeline, which calls this workflow once multicz has bumped and tagged
-# whatever moved on `main`. The `docs` component (paths `docs/**` +
+# There is no push trigger. The deploy is driven by the `docs` job of the
+# ci workflow, which calls this workflow once multicz has bumped and
+# tagged whatever moved on `main`. The `docs` component (paths `docs/**` +
 # `zensical.toml`) turns "did the docs change?" into a tag-aware question
 # answered by the same planner that decides the package release, instead
 # of a paths filter that would fire once before the release commit exists

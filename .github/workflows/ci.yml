@@ -242,3 +242,212 @@ jobs:
       - name: Summarize tests and coverage
         if: ${{ !cancelled() }}
         run: python3 scripts/format_summary.py pytest --junit junit.xml --coverage coverage.xml
+
+  # Release on main only: bump the version, write the changelog, create
+  # the release commit + tag and push them back. Gated on every quality
+  # job; `needs` blocks on any upstream failure and skips the release
+  # with the quality jobs on a `chore(release)` commit.
+  release:
+    needs:
+      - lint
+      - type-check
+      - pyright
+      - license-headers
+      - validate
+      - test
+      - bandit
+      - pip-audit
+      - osv-scanner
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      bumped: ${{ steps.plan.outputs.bumped }}
+      version: ${{ steps.version.outputs.version }}
+      # True only when the *package* moved. A `docs:` commit bumps the
+      # `docs` component alone, which has no wheel and no PyPI project,
+      # so a non-empty plan is not enough to gate `pypi-publish`.
+      package_bumped: ${{ steps.plan.outputs.package_bumped }}
+      # True when the `docs` component moved, either directly by a `docs:`
+      # commit or by the cascade of a package bump. Gates the site deploy.
+      docs_bumped: ${{ steps.plan.outputs.docs_bumped }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          # The main-protection ruleset only lets the maintainer push the
+          # release commit and its tag; the workflow token cannot bypass it.
+          token: ${{ secrets.AUTO_MERGE_PAT || github.token }}
+          persist-credentials: true
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Configure git author
+        # Attribute the release commit to whoever pushed the head commit
+        # that triggered CI, falling back to the github-actions[bot]
+        # noreply identity when the payload carries no author. The values
+        # are commit-author controlled, so they reach the shell through
+        # env, never through interpolation into the script.
+        env:
+          NAME: ${{ github.event.head_commit.author.name }}
+          EMAIL: ${{ github.event.head_commit.author.email }}
+        run: |
+          git config user.name  "${NAME:-github-actions[bot]}"
+          git config user.email "${EMAIL:-41898282+github-actions[bot]@users.noreply.github.com}"
+
+      - name: Detect GPG availability
+        # Secrets can't be referenced from `if:` directly, so promote
+        # their presence to a step output.
+        id: gpg
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          if [ -n "$GPG_PRIVATE_KEY" ] && [ -n "$GPG_PASSPHRASE" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import and unlock GPG key
+        if: steps.gpg.outputs.available == 'true'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          # Pre-cache the passphrase in gpg-agent via a dummy sign so
+          # subsequent `git commit -S` / `git tag -s` don't prompt.
+          echo test | gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
+            --pinentry-mode loopback --sign > /dev/null
+          # Derive the signing key id from the imported key; no extra
+          # secret needed.
+          KEY_ID=$(gpg --list-secret-keys --with-colons \
+            | awk -F: '/^sec/{print $5; exit}')
+          git config user.signingkey "$KEY_ID"
+
+      - name: Plan
+        id: plan
+        run: |
+          uv run multicz plan --summary "$GITHUB_STEP_SUMMARY" \
+            --output json | tee /tmp/plan.json
+          BUMPED=$(jq -r '.bumps | keys | join(" ")' /tmp/plan.json)
+          echo "bumped=$BUMPED" >> "$GITHUB_OUTPUT"
+          echo "package_bumped=$(jq -r '.bumps | has("multicz")' /tmp/plan.json)" >> "$GITHUB_OUTPUT"
+          echo "docs_bumped=$(jq -r '.bumps | has("docs")' /tmp/plan.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Bump, commit, tag, push (signed)
+        if: steps.plan.outputs.bumped != '' && steps.gpg.outputs.available == 'true'
+        run: |
+          uv run multicz bump --commit --tag --push --sign \
+            --summary "$GITHUB_STEP_SUMMARY" --output json \
+            | tee /tmp/release.json
+
+      - name: Bump, commit, tag, push
+        if: steps.plan.outputs.bumped != '' && steps.gpg.outputs.available != 'true'
+        run: |
+          uv run multicz bump --commit --tag --push \
+            --summary "$GITHUB_STEP_SUMMARY" --output json \
+            | tee /tmp/release.json
+
+      - name: Resolve the released version
+        id: version
+        if: steps.plan.outputs.package_bumped == 'true'
+        run: echo "version=$(uv run multicz get multicz)" >> "$GITHUB_OUTPUT"
+
+  # Build and publish to PyPI, then create the GitHub Release. Trusted
+  # Publishing (OIDC) through the `pypi` environment registered with the
+  # PyPI Trusted Publisher. Skipped on a docs-only release: the `docs`
+  # component has no wheel and PyPI would reject the duplicate upload.
+  pypi-publish:
+    needs: [release]
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.release.result == 'success'
+      && needs.release.outputs.package_bumped == 'true'
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/multicz
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # The release commit and tags multicz just pushed.
+          ref: main
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Build wheel and sdist
+        run: |
+          uv build --out-dir dist
+          ls -l dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist
+          skip-existing: true
+
+      - name: Create GitHub Release
+        # Package tags only: `docs` declares no `github-release` artifact,
+        # so a `docs-v*` tag at the same commit opens no entry on a
+        # Releases page people read for package changes.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for tag in $(git tag --points-at HEAD --list 'multicz-v*'); do
+            uv run multicz release-notes --tag "$tag" \
+              | gh release create "$tag" --title "$tag" --notes-file -
+          done
+
+      - name: Summarize publish
+        if: ${{ !cancelled() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: >-
+          python3 scripts/format_summary.py publish dist
+          --package multicz
+          --version "${{ needs.release.outputs.version }}"
+
+  # Deploy the documentation site, only when the `docs` component moved:
+  # by a `docs:` commit, or by the cascade of a package bump (the site
+  # documents the CLI and the config schema). Any other push to main
+  # leaves the site as it is. Gated on `docs_bumped`, set from the bump
+  # plan like `package_bumped`, and not on a job result alone, which
+  # redeployed the unchanged site on every push.
+  docs:
+    needs: [release]
+    if: >-
+      !cancelled()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.release.result == 'success'
+      && needs.release.outputs.docs_bumped == 'true'
+    uses: ./.github/workflows/docs.yml
+    with:
+      # `main`, not the triggering SHA: multicz has just pushed the
+      # release commit and tags on top of it, and the published site
+      # should be the released tree.
+      ref: main
+      bumped: ${{ needs.release.outputs.bumped }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: write
