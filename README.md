@@ -7,6 +7,10 @@
   <em>Multi-component versioning for monorepos.</em>
 </p>
 
+<p align="center">
+  <a href="https://codecov.io/gh/goabonga/multicz"><img src="https://img.shields.io/codecov/c/github/goabonga/multicz?logo=codecov" alt="Codecov"/></a>
+</p>
+
 Bump a Python app, its Docker image, and the Helm chart that deploys it from a
 single conventional-commit history - each with its own version line and its own
 git tag.
