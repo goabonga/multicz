@@ -8,6 +8,19 @@ on:
   push:
     branches: [main]
 
+# `concurrency` cancels superseded PR runs but never main-branch releases.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # An explicit shell enables pipefail, so `| tee` keeps the tool's status.
+    shell: bash
+
 jobs:
   license-headers:
     runs-on: ubuntu-24.04
