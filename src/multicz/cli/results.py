@@ -16,10 +16,14 @@ and are deliberately decoupled from ``planner`` / ``changelog`` /
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..changelog import CascadeEntry
 from ..commits import Commit
 from ..validation import Finding
+
+if TYPE_CHECKING:
+    from ..planner import PlannedBump
 
 # ============ bump ============
 
@@ -115,13 +119,14 @@ class ChangelogEntry:
     """One per-component entry in a ``multicz changelog`` run.
 
     ``planned`` is the planner's ``PlannedBump`` (or ``None`` when no
-    bump is pending). Typed as ``object`` to avoid a planner import here.
+    bump is pending). Imported for type checking only, to avoid a
+    planner import at runtime.
     """
 
     component: str
     since: str | None
     relevant: tuple[Commit, ...]
-    planned: object | None = None
+    planned: PlannedBump | None = None
 
 
 # ============ changed ============
