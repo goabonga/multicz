@@ -88,6 +88,27 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: python3 scripts/format_summary.py text mypy mypy.txt
 
+  # Second type checker on src. mypy and pyright disagree on inference and
+  # narrowing, so each catches what the other lets through.
+  pyright:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Type-check
+        run: uv run --no-sync pyright --outputjson > pyright.json
+
+      - name: Summarize pyright
+        if: ${{ !cancelled() }}
+        run: python3 scripts/format_summary.py pyright pyright.json
+
   validate:
     runs-on: ubuntu-24.04
     steps:
@@ -107,7 +128,7 @@ jobs:
         run: uv run multicz validate --strict
 
   test:
-    needs: [license-headers, lint, type-check, validate]
+    needs: [license-headers, lint, type-check, pyright, validate]
     runs-on: ubuntu-24.04
     strategy:
       matrix:
