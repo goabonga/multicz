@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 _WHITE, _GRAY, _BLACK = 0, 1, 2
 
@@ -15,7 +15,7 @@ def _find_cycle(graph: dict[str, list[str]]) -> list[str] | None:
     color = dict.fromkeys(graph, _WHITE)
 
     def dfs(start: str) -> list[str] | None:
-        stack: list[tuple[str, Iterable[str], list[str]]] = [
+        stack: list[tuple[str, Iterator[str], list[str]]] = [
             (start, iter(graph.get(start, [])), [start])
         ]
         color[start] = _GRAY
