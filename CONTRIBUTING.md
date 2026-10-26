@@ -102,22 +102,54 @@ uv run zensical build --strict   # validate links + render
 The doc site is the user-facing source of truth - when you change
 behavior, update the relevant page under `docs/`.
 
-## Branch naming
+## Branches and merging
 
-Use `<type>/<kebab-description>`, where `<type>` matches the conventional
-commit type the work will produce:
+### Branch names
 
-| type        | example                                |
-|-------------|----------------------------------------|
-| `feat/`     | `feat/cli-changed-json-output`         |
-| `fix/`      | `fix/bump-empty-release-exit-code`     |
-| `docs/`     | `docs/concepts-mirrors-clarify`        |
-| `refactor/` | `refactor/writers-regex-prefix`        |
-| `chore/`    | `chore/uv-lock-bump`                   |
-| `ci/`       | `ci/cache-uv-deps`                     |
-| `test/`     | `test/cover-trigger-cycles`            |
+A branch is named after the GitHub issue it addresses:
 
-Avoid `wip`, `tmp`, or personal-name-only branches.
+```
+issue-<number>-<slug>
+```
+
+`<number>` is the issue number and `<slug>` a few lowercase words separated
+by hyphens, for example `issue-12-writers-regex-prefix`. Keep it free of
+`/`: Git cannot hold `issue-12` and `issue-12/...` at the same time, and
+the automation only recognises `issue-*` as a base branch.
+
+| Work | Branch | Created from | Pull request into |
+| --- | --- | --- | --- |
+| An issue | `issue-<number>-<slug>` | `main` | `main` |
+| A sub-issue of an issue | `issue-<number>-<slug>` (its own issue number) | the branch of the parent issue | the branch of the parent issue |
+
+An issue split into sub-issues therefore gets one branch of its own, which
+collects the pull requests of its sub-issues. Once they are all merged, the
+issue branch is proposed to `main` in a single pull request. Dependabot
+branches (`dependabot/...`) are created by Dependabot and need no naming.
+
+The conventional commit type is carried by the commits and the pull request
+title, not by the branch name.
+
+### Signed commits and merging
+
+`main` and the `issue-*` branches require signed commits, a linear history,
+a pull request and the CI checks. A pull request is merged by adding the
+`auto-merge` label, which needs write access: the workflow replays its
+commits GPG-signed onto the base branch once the required checks passed,
+then fast-forwards that branch, `main` or the issue branch of a sub-issue.
+The commits of a branch pushed unsigned, such as by GitHub's "Update
+branch", are re-signed in place.
+
+Dependabot pull requests are rewritten as Conventional Commits and signed.
+Minor and patch updates are queued for the same merge once CI passed; a
+major update only gets a notice and waits for a maintainer to add the
+label.
+
+The automation needs the `AUTO_MERGE_PAT`, `GPG_PRIVATE_KEY` and
+`GPG_PASSPHRASE` secrets and the `GIT_USER_NAME`, `GIT_USER_EMAIL` and
+`GIT_SIGNING_KEY` variables of the repository. The release job pushes its
+commit and tags with the same token, because the `main` ruleset does not
+let the workflow token do it.
 
 ## Commit messages
 
@@ -165,16 +197,16 @@ Guidelines:
 
 ## Pull requests
 
-Before pushing:
+Before pushing, run the hooks (they mirror the CI checks) and the tests:
 
 ```bash
-uv run ruff check --fix
-uv run ruff format
+uv run pre-commit run --all-files
 uv run pytest
 ```
 
 In your PR:
 
+- Open it against `main`, or against the issue branch for a sub-issue.
 - Title follows Conventional Commits.
 - One PR per logical change - bundling a refactor with a feature gets
   split on review.
