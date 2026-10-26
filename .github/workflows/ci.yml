@@ -8,6 +8,8 @@ on:
   push:
     branches: [main]
 
+# The quality jobs skip the `chore(release)` commit multicz pushes to main:
+# the run that cut the release already validated the code it carries.
 # `concurrency` cancels superseded PR runs but never main-branch releases.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,6 +27,7 @@ jobs:
   # Verify the two-line SPDX header on the Python sources and the
   # workflows. The script needs no dependency, so nothing is synced.
   license-headers:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -45,6 +48,7 @@ jobs:
   # `ruff check` plus a separate `ruff format --check`, so formatting
   # drift is caught for contributors who skipped the pre-commit hooks.
   lint:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -72,6 +76,7 @@ jobs:
 
   # Static type checking of src with mypy.
   type-check:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -95,6 +100,7 @@ jobs:
   # Second type checker on src. mypy and pyright disagree on inference and
   # narrowing, so each catches what the other lets through.
   pyright:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -114,6 +120,7 @@ jobs:
         run: python3 scripts/format_summary.py pyright pyright.json
 
   validate:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -134,6 +141,7 @@ jobs:
   # Static security analysis of the source (Bandit); the skipped tests
   # are explained in `[tool.bandit]` of pyproject.toml.
   bandit:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -151,6 +159,7 @@ jobs:
 
   # Audit the locked dependency graph against the PyPI advisory database.
   pip-audit:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -175,6 +184,7 @@ jobs:
   # The binary is pinned to a release and verified against its published
   # checksum instead of downloading whatever `latest` points to.
   osv-scanner:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     env:
       OSV_SCANNER_VERSION: v2.7.0
@@ -203,6 +213,7 @@ jobs:
 
   test:
     needs: [license-headers, lint, type-check, pyright, validate]
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)')
     runs-on: ubuntu-24.04
     strategy:
       matrix:
