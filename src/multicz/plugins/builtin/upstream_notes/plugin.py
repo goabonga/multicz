@@ -137,9 +137,9 @@ class UpstreamNotesPlugin(BasePlugin):
 
         # Baseline = the component's currently released tag (pre-bump).
         comp_prefix = tag_prefix(ctx.config.tag_format_for(component), component)
-        baseline: str | None = f"{comp_prefix}{bump.current}"
-        if not _tag_exists(ctx.repo, baseline):
-            baseline = None  # first release: diff upstream against nothing
+        released_tag = f"{comp_prefix}{bump.current}"
+        # First release: no tag yet, so diff upstream against nothing.
+        baseline = released_tag if _tag_exists(ctx.repo, released_tag) else None
 
         entries: list[ChangelogEntry] = []
         for upstream in upstreams:
