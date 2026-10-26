@@ -182,7 +182,7 @@ def _direct_pass(
                 kind = "patch"
                 demoted = True
 
-            reason = CommitReason(
+            commit_reason = CommitReason(
                 sha=commit.sha,
                 type=commit.type,
                 scope=commit.scope,
@@ -192,7 +192,7 @@ def _direct_pass(
                 bump_kind=kind,
                 original_kind=commit_kind if demoted else None,
             )
-            _promote(plan, name, kind, versions[name], reason)
+            _promote(plan, name, kind, versions[name], commit_reason)
 
     if offenders:
         raise NonConventionalCommitsError(offenders)
