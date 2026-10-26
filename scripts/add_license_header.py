@@ -108,9 +108,7 @@ def process_directory(root: str, extensions: list[str], check_only: bool) -> int
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Add or check SPDX license headers.")
-    parser.add_argument(
-        "--path", type=str, default=".", help="Root directory to process"
-    )
+    parser.add_argument("--path", type=str, default=".", help="Root directory to process")
     parser.add_argument(
         "--types",
         type=str,
