@@ -131,10 +131,10 @@ def render_body(
     # any matching commit/cascade bucket.
     plugin_groups: dict[str, list[str]] = {}
     if plugin_sections:
-        for entry in plugin_sections:
-            if not entry.section or not entry.lines:
+        for plugin_entry in plugin_sections:
+            if not plugin_entry.section or not plugin_entry.lines:
                 continue
-            plugin_groups.setdefault(entry.section, []).extend(entry.lines)
+            plugin_groups.setdefault(plugin_entry.section, []).extend(plugin_entry.lines)
 
     if bucketed.is_empty and not cascade_groups and not plugin_groups:
         return "_No notable changes._\n"
@@ -192,9 +192,9 @@ def render_body(
     existing_titles = {title for title, _ in ordered}
     for title, lines in plugin_groups.items():
         if title in existing_titles:
-            for entry in ordered:
-                if entry[0] == title:
-                    entry[1].extend(lines)
+            for block in ordered:
+                if block[0] == title:
+                    block[1].extend(lines)
                     break
         else:
             ordered.append((title, list(lines)))
