@@ -15,7 +15,7 @@ initial_version = "0.0.0"
 post_bump_policy = "allow"
 
 [components.multicz]
-paths = ["src/**", "pyproject.toml", "tests/**"]
+paths = ["src/**", "pyproject.toml", "uv.lock", "tests/**"]
 bump_files = [
     {file = "pyproject.toml", key = "project.version"},
 ]
