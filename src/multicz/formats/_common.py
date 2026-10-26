@@ -10,6 +10,8 @@ respective module.
 
 from __future__ import annotations
 
+from typing import Any
+
 from ._base import FormatError
 
 
@@ -21,7 +23,7 @@ def split_key(key: str) -> list[str]:
     return parts
 
 
-def navigate(root, parts: list[str], create: bool):
+def navigate(root: Any, parts: list[str], create: bool) -> tuple[Any, str]:
     """Walk ``root`` along ``parts``, returning ``(parent, last_part)``.
 
     With ``create=True``, missing intermediate dicts are inserted along
