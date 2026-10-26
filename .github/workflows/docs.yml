@@ -59,6 +59,7 @@ jobs:
           # The release commit and tags multicz just pushed, so the site
           # is built from the tree that was actually released.
           ref: ${{ inputs.ref }}
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
