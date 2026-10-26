@@ -58,8 +58,7 @@ def _select(file: Path, key: str | None) -> FileFormat:
         if fmt.matches(file, key):
             return fmt
     raise FormatError(
-        f"no format handler claimed {file} (key={key!r}); "
-        f"plain-file values cannot have a key"
+        f"no format handler claimed {file} (key={key!r}); plain-file values cannot have a key"
     )
 
 

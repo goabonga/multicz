@@ -95,7 +95,7 @@ def _cascade_entries_from_sibling_tags(
         if sib_owner is None or sib_owner == owner:
             continue
         sib_prefix = tag_prefix(config.tag_format_for(sib_owner), sib_owner)
-        sibling_versions[sib_owner] = sib[len(sib_prefix):]
+        sibling_versions[sib_owner] = sib[len(sib_prefix) :]
 
     entries: list[CascadeEntry] = []
     seen: set[str] = set()
@@ -103,10 +103,12 @@ def _cascade_entries_from_sibling_tags(
 
     for upstream in owner_comp.depends_on:
         if upstream in sibling_versions and upstream not in seen:
-            entries.append(CascadeEntry(
-                upstream=upstream,
-                upstream_version=sibling_versions[upstream],
-            ))
+            entries.append(
+                CascadeEntry(
+                    upstream=upstream,
+                    upstream_version=sibling_versions[upstream],
+                )
+            )
             seen.add(upstream)
 
     for sib_name, sib_version in sibling_versions.items():
@@ -115,12 +117,14 @@ def _cascade_entries_from_sibling_tags(
         sib_comp = config.components[sib_name]
         for mirror in sib_comp.mirrors:
             if matcher.match(str(mirror.file)) == owner:
-                entries.append(CascadeEntry(
-                    upstream=sib_name,
-                    upstream_version=sib_version,
-                    section=mirror.changelog_section,
-                    format=mirror.changelog_format,
-                ))
+                entries.append(
+                    CascadeEntry(
+                        upstream=sib_name,
+                        upstream_version=sib_version,
+                        section=mirror.changelog_section,
+                        format=mirror.changelog_format,
+                    )
+                )
                 seen.add(sib_name)
                 break
     return entries
@@ -133,15 +137,20 @@ def release_notes_cmd(
         help="Component to render notes for. Required unless --all or --tag is set.",
     ),
     all_: bool = typer.Option(
-        False, "--all",
+        False,
+        "--all",
         help="Render notes for every component with a planned bump.",
     ),
     tag: str = typer.Option(
-        None, "--tag",
+        None,
+        "--tag",
         help="Render notes for a past release tag (e.g. api-v1.3.0).",
     ),
     output: str = typer.Option(
-        "md", "--output", "-o", help="md | text | json",
+        "md",
+        "--output",
+        "-o",
+        help="md | text | json",
     ),
 ) -> None:
     """Generate release notes for an upcoming bump or a past tag.
@@ -164,14 +173,10 @@ def release_notes_cmd(
     so each rc shows only the delta.
     """
     if tag is None and not all_ and component is None:
-        err.print(
-            "[red]specify a component, --all, or --tag <tag>[/]"
-        )
+        err.print("[red]specify a component, --all, or --tag <tag>[/]")
         raise typer.Exit(code=1)
     if tag is not None and (all_ or component is not None):
-        err.print(
-            "[red]--tag is exclusive with a component name and --all[/]"
-        )
+        err.print("[red]--tag is exclusive with a component name and --all[/]")
         raise typer.Exit(code=1)
 
     repo, config = _load()
@@ -182,28 +187,32 @@ def release_notes_cmd(
     if tag is not None:
         owner = _component_for_tag(config, tag)
         if owner is None:
-            err.print(
-                f"[red]tag {tag!r} doesn't match any component's tag_format[/]"
-            )
+            err.print(f"[red]tag {tag!r} doesn't match any component's tag_format[/]")
             raise typer.Exit(code=1)
         prefix = tag_prefix(config.tag_format_for(owner), owner)
-        target_version = Version(tag[len(prefix):])
+        target_version = Version(tag[len(prefix) :])
         if target_version.is_prerelease:
             prev = previous_tag(repo, prefix, tag)
         else:
             prev = previous_stable_tag(repo, prefix, tag)
-        commits = _filtered_commits_in_range(
-            owner, config, repo, matcher, since=prev, end=tag
+        commits = _filtered_commits_in_range(owner, config, repo, matcher, since=prev, end=tag)
+        sections.append(
+            ReleaseNotesSection(
+                component=owner,
+                from_version=prev[len(prefix) :] if prev else None,
+                to_version=str(target_version),
+                commits=tuple(commits),
+                cascades=tuple(
+                    _cascade_entries_from_sibling_tags(
+                        config,
+                        repo,
+                        matcher,
+                        tag,
+                        owner,
+                    )
+                ),
+            )
         )
-        sections.append(ReleaseNotesSection(
-            component=owner,
-            from_version=prev[len(prefix):] if prev else None,
-            to_version=str(target_version),
-            commits=tuple(commits),
-            cascades=tuple(_cascade_entries_from_sibling_tags(
-                config, repo, matcher, tag, owner,
-            )),
-        ))
     else:
         plan_obj = _build_plan_or_exit(repo, config)
         if all_:
@@ -222,21 +231,21 @@ def release_notes_cmd(
                     return
                 continue
             commits = _component_relevant_commits(name, config, repo, matcher)
-            sections.append(ReleaseNotesSection(
-                component=name,
-                from_version=str(bump.current),
-                to_version=bump.next,
-                commits=tuple(commits),
-                # Cascades only attach to upcoming bumps - past tag mode
-                # has no plan reasons to draw from.
-                cascades=tuple(_cascade_entries_for(bump, plan_obj, config)),
-                # Plugin contributions for this component (Deprecated /
-                # Removed sections from the built-in deprecation plugin,
-                # plus anything third-party plugins add).
-                plugin_sections=tuple(
-                    run_enrich_changelog(config, repo, plan_obj, name)
-                ),
-            ))
+            sections.append(
+                ReleaseNotesSection(
+                    component=name,
+                    from_version=str(bump.current),
+                    to_version=bump.next,
+                    commits=tuple(commits),
+                    # Cascades only attach to upcoming bumps - past tag mode
+                    # has no plan reasons to draw from.
+                    cascades=tuple(_cascade_entries_for(bump, plan_obj, config)),
+                    # Plugin contributions for this component (Deprecated /
+                    # Removed sections from the built-in deprecation plugin,
+                    # plus anything third-party plugins add).
+                    plugin_sections=tuple(run_enrich_changelog(config, repo, plan_obj, name)),
+                )
+            )
 
     if not sections:
         presenters.render_release_notes_empty(output=output)

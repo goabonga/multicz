@@ -15,19 +15,23 @@ def test_metadata():
 
 def test_extract_reads_top_level_multicz_key(tmp_path: Path):
     f = tmp_path / "package.json"
-    f.write_text(json.dumps({
-        "name": "monorepo",
-        "version": "1.0.0",
-        "multicz": {
-            "project": {"commit_convention": "conventional"},
-            "components": {
-                "web": {
-                    "paths": ["src/**"],
-                    "bump_files": [{"file": "package.json", "key": "version"}],
+    f.write_text(
+        json.dumps(
+            {
+                "name": "monorepo",
+                "version": "1.0.0",
+                "multicz": {
+                    "project": {"commit_convention": "conventional"},
+                    "components": {
+                        "web": {
+                            "paths": ["src/**"],
+                            "bump_files": [{"file": "package.json", "key": "version"}],
+                        },
+                    },
                 },
-            },
-        },
-    }))
+            }
+        )
+    )
     raw = PackageJsonSource().extract(f)
     assert raw is not None
     assert raw["project"]["commit_convention"] == "conventional"

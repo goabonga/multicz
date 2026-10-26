@@ -26,9 +26,7 @@ class ComponentMatcher:
         self._exclude: dict[str, pathspec.PathSpec] = {}
         for name, comp in components.items():
             self._include[name] = pathspec.PathSpec.from_lines("gitignore", comp.paths)
-            self._exclude[name] = pathspec.PathSpec.from_lines(
-                "gitignore", comp.exclude_paths
-            )
+            self._exclude[name] = pathspec.PathSpec.from_lines("gitignore", comp.exclude_paths)
 
     def match(self, path: str) -> str | None:
         """Return the component owning ``path``, or ``None`` if unowned.
@@ -51,8 +49,7 @@ class ComponentMatcher:
         return [
             name
             for name in self._order
-            if self._include[name].match_file(path)
-            and not self._exclude[name].match_file(path)
+            if self._include[name].match_file(path) and not self._exclude[name].match_file(path)
         ]
 
     def group(self, paths: Iterable[str]) -> dict[str, set[str]]:

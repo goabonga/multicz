@@ -30,6 +30,7 @@ from . import err
 
 def _load() -> tuple[Path, object]:
     from pydantic import ValidationError
+
     try:
         config_path = find_config()
     except FileNotFoundError as exc:
@@ -58,20 +59,14 @@ def _parse_force_specs(specs: list[str], config) -> dict[str, str]:
     parsed: dict[str, str] = {}
     for spec in specs or []:
         if ":" not in spec:
-            err.print(
-                f"[red]invalid --force spec[/] {spec!r}: "
-                "expected NAME:KIND (e.g. api:patch)"
-            )
+            err.print(f"[red]invalid --force spec[/] {spec!r}: expected NAME:KIND (e.g. api:patch)")
             raise typer.Exit(code=1)
         name, _, kind = spec.partition(":")
         if name not in config.components:
             err.print(f"[red]unknown component:[/] {name}")
             raise typer.Exit(code=1)
         if kind not in valid_kinds:
-            err.print(
-                f"[red]invalid kind[/] {kind!r}: "
-                "must be major, minor, or patch"
-            )
+            err.print(f"[red]invalid kind[/] {kind!r}: must be major, minor, or patch")
             raise typer.Exit(code=1)
         parsed[name] = kind
     return parsed
@@ -106,8 +101,8 @@ def _build_plan_or_exit(repo, config, **kwargs):
         err.print(
             "\n[dim]Either rewrite their headers as conventional commits "
             "(`git rebase -i`), or set "
-            "[bold]unknown_commit_policy = \"ignore\"[/] (or "
-            "[bold]\"patch\"[/]) in [project].[/]"
+            '[bold]unknown_commit_policy = "ignore"[/] (or '
+            '[bold]"patch"[/]) in [project].[/]'
         )
         raise typer.Exit(code=1) from exc
 
@@ -141,11 +136,7 @@ def _component_relevant_commits(
     finalize strategies.
     """
     prefix = tag_prefix(config.tag_format_for(name), name)
-    since = (
-        latest_stable_tag(repo, prefix)
-        if since_stable
-        else latest_tag(repo, prefix)
-    )
+    since = latest_stable_tag(repo, prefix) if since_stable else latest_tag(repo, prefix)
     release_re = re.compile(config.project.release_commit_pattern)
     ignored = config.ignored_types_for(name)
     return [
@@ -188,10 +179,7 @@ def _cascade_entries_for(planned, plan, config) -> list[CascadeEntry]:
             upstream_component = config.components.get(reason.upstream)
             if upstream_component is not None:
                 for mirror in upstream_component.mirrors:
-                    if (
-                        str(mirror.file) == reason.file
-                        and mirror.key == reason.key
-                    ):
+                    if str(mirror.file) == reason.file and mirror.key == reason.key:
                         section_override = mirror.changelog_section
                         format_override = mirror.changelog_format
                         break

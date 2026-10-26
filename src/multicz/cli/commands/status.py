@@ -15,10 +15,11 @@ from .._shared import _build_plan_or_exit, _load
 @app.command()
 def status(
     since: str = typer.Option(
-        None, "--since",
+        None,
+        "--since",
         help="Override the commit window: use this ref instead of each "
-             "component's last tag. Useful for PR previews "
-             "(--since origin/main).",
+        "component's last tag. Useful for PR previews "
+        "(--since origin/main).",
     ),
 ) -> None:
     """Brief summary of pending bumps (alias of ``plan`` without reasons)."""

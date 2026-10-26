@@ -28,17 +28,13 @@ INITIAL_FILES = {
     "multicz.toml": CONFIG,
     "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
     "src/main.py": "x = 1\n",
-    "charts/myapp/Chart.yaml": (
-        "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
-    ),
+    "charts/myapp/Chart.yaml": ("apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"),
     "charts/myapp/templates/deployment.yaml": "kind: Deployment\n",
 }
 
 
 def _git(repo: Path, *args: str) -> None:
-    result = subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True
-    )
+    result = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True)
     if result.returncode != 0:
         raise AssertionError(
             f"git {' '.join(args)} failed ({result.returncode}):\n"
@@ -265,8 +261,8 @@ bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
         "feat: shared change",
     )
     plan = build_plan(repo, load_config(cfg))
-    assert plan.bumps["api"].kind == "patch"     # component override
-    assert plan.bumps["chart"].kind == "minor"   # project default
+    assert plan.bumps["api"].kind == "patch"  # component override
+    assert plan.bumps["chart"].kind == "minor"  # project default
 
 
 def test_bump_rules_custom_type_bumps_per_rule(repo: Path):
@@ -331,8 +327,7 @@ bump_policy = "scoped"
 
     # Demotion is recorded on the CommitReason
     chart_commit_reasons = [
-        r for r in plan.bumps["chart"].reasons
-        if r.__class__.__name__ == "CommitReason"
+        r for r in plan.bumps["chart"].reasons if r.__class__.__name__ == "CommitReason"
     ]
     assert chart_commit_reasons[0].original_kind == "minor"
     assert chart_commit_reasons[0].bump_kind == "patch"

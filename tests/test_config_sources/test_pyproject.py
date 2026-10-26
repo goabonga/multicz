@@ -15,14 +15,14 @@ def test_metadata():
 def test_extract_reads_tool_multicz_table(tmp_path: Path):
     f = tmp_path / "pyproject.toml"
     f.write_text(
-        '[project]\n'
+        "[project]\n"
         'name = "myapp"\n'
         'version = "1.0.0"\n'
-        '\n'
-        '[tool.multicz.project]\n'
+        "\n"
+        "[tool.multicz.project]\n"
         'commit_convention = "conventional"\n'
-        '\n'
-        '[tool.multicz.components.api]\n'
+        "\n"
+        "[tool.multicz.components.api]\n"
         'paths = ["src/**"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )
@@ -34,12 +34,7 @@ def test_extract_reads_tool_multicz_table(tmp_path: Path):
 
 def test_extract_returns_none_when_no_tool_multicz_section(tmp_path: Path):
     f = tmp_path / "pyproject.toml"
-    f.write_text(
-        '[project]\n'
-        'name = "myapp"\n'
-        '[tool.ruff]\n'
-        'line-length = 100\n'
-    )
+    f.write_text('[project]\nname = "myapp"\n[tool.ruff]\nline-length = 100\n')
     assert PyprojectSource().extract(f) is None
 
 
@@ -73,11 +68,7 @@ def test_extract_isolates_tool_multicz_from_other_tool_subtables(tmp_path: Path)
     extracted multicz section."""
     f = tmp_path / "pyproject.toml"
     f.write_text(
-        '[tool.ruff]\n'
-        'line-length = 100\n'
-        '\n'
-        '[tool.multicz.project]\n'
-        'tag_format = "v{version}"\n'
+        '[tool.ruff]\nline-length = 100\n\n[tool.multicz.project]\ntag_format = "v{version}"\n'
     )
     raw = PyprojectSource().extract(f)
     assert raw is not None

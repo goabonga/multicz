@@ -35,9 +35,7 @@ def _strip_none(value: Any) -> Any:
     ``maintainer = null`` isn't).
     """
     if isinstance(value, dict):
-        return {
-            k: _strip_none(v) for k, v in value.items() if v is not None
-        }
+        return {k: _strip_none(v) for k, v in value.items() if v is not None}
     if isinstance(value, list):
         return [_strip_none(v) for v in value if v is not None]
     return value
@@ -46,15 +44,20 @@ def _strip_none(value: Any) -> Any:
 @app.command(name="config")
 def config_cmd(
     output: str = typer.Option(
-        "toml", "--output", "-o",
+        "toml",
+        "--output",
+        "-o",
         help="toml | json [default: toml]",
     ),
     component: str = typer.Option(
-        None, "--component", "-c",
+        None,
+        "--component",
+        "-c",
         help="Restrict output to a single component (plus the [project] table).",
     ),
     source: bool = typer.Option(
-        False, "--source",
+        False,
+        "--source",
         help="Also print which file the config was loaded from (stderr).",
     ),
 ) -> None:

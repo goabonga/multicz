@@ -20,10 +20,7 @@ from multicz.plugins.builtin.deprecation.scanner import scan_paths
 
 def test_scanner_finds_decorator_marker(tmp_path: Path):
     src = tmp_path / "old.py"
-    src.write_text(
-        '@deprecated(since="1.2.0", remove_in="3.0.0")\n'
-        'def legacy(): pass\n'
-    )
+    src.write_text('@deprecated(since="1.2.0", remove_in="3.0.0")\ndef legacy(): pass\n')
     found = scan_paths(tmp_path, ["*.py"])
     assert len(found) == 1
     assert found[0].since.public == "1.2.0"
@@ -43,9 +40,7 @@ def test_scanner_finds_decorator_reversed_kwargs(tmp_path: Path):
 
 def test_scanner_finds_python_comment(tmp_path: Path):
     src = tmp_path / "x.py"
-    src.write_text(
-        "x = 1  # DEPRECATED since=1.0.0 remove_in=2.0.0 — use y instead\n"
-    )
+    src.write_text("x = 1  # DEPRECATED since=1.0.0 remove_in=2.0.0 — use y instead\n")
     found = scan_paths(tmp_path, ["*.py"])
     assert len(found) == 1
     assert found[0].message == "use y instead"
@@ -53,9 +48,7 @@ def test_scanner_finds_python_comment(tmp_path: Path):
 
 def test_scanner_finds_c_style_and_html_comments(tmp_path: Path):
     (tmp_path / "a.js").write_text("// DEPRECATED since=1.0 remove_in=2.0\n")
-    (tmp_path / "b.html").write_text(
-        "<!-- DEPRECATED since=1.0 remove_in=2.0 -->\n"
-    )
+    (tmp_path / "b.html").write_text("<!-- DEPRECATED since=1.0 remove_in=2.0 -->\n")
     found = scan_paths(tmp_path, ["*.js", "*.html"])
     assert {str(d.file).split("/")[-1] for d in found} == {"a.js", "b.html"}
 
@@ -72,9 +65,7 @@ def test_scanner_skips_invalid_versions(tmp_path: Path):
 def test_scanner_silently_skips_binary_files(tmp_path: Path):
     """A non-UTF-8 file in a scanned path should not crash the scan."""
     (tmp_path / "icon.png").write_bytes(b"\x89PNG\x00\x00\x00\xff invalid utf8")
-    (tmp_path / "real.py").write_text(
-        '@deprecated(since="1.0", remove_in="2.0")\n'
-    )
+    (tmp_path / "real.py").write_text('@deprecated(since="1.0", remove_in="2.0")\n')
     found = scan_paths(tmp_path, ["*.png", "*.py"])
     assert len(found) == 1
     assert found[0].file.name == "real.py"
@@ -91,9 +82,7 @@ def test_scanner_dedups_same_file_line(tmp_path: Path):
 def test_scanner_recursive_globs(tmp_path: Path):
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "deep").mkdir()
-    (tmp_path / "pkg" / "deep" / "old.py").write_text(
-        '@deprecated(since="1.0", remove_in="2.0")\n'
-    )
+    (tmp_path / "pkg" / "deep" / "old.py").write_text('@deprecated(since="1.0", remove_in="2.0")\n')
     found = scan_paths(tmp_path, ["**/*.py"])
     assert len(found) == 1
 
@@ -121,10 +110,14 @@ def _make_ctx(
         __iter__=lambda self: iter(self.bumps.values()),
     )
     # Bind __iter__ properly on the instance.
-    plan = type("FakePlan", (), {
-        "bumps": plan_bumps,
-        "__iter__": lambda self: iter(self.bumps.values()),
-    })()
+    plan = type(
+        "FakePlan",
+        (),
+        {
+            "bumps": plan_bumps,
+            "__iter__": lambda self: iter(self.bumps.values()),
+        },
+    )()
     return PluginContext(
         config=config,
         repo=repo,
@@ -140,9 +133,7 @@ def _planned(component: str, current: str, next_version: str):
 
 
 def test_post_plan_flags_marker_due_for_removal(tmp_path: Path):
-    (tmp_path / "api.py").write_text(
-        '@deprecated(since="1.0.0", remove_in="3.0.0")\n'
-    )
+    (tmp_path / "api.py").write_text('@deprecated(since="1.0.0", remove_in="3.0.0")\n')
     ctx = _make_ctx(
         repo=tmp_path,
         plan_bumps={"api": _planned("api", "2.0.0", "3.0.0")},
@@ -156,9 +147,7 @@ def test_post_plan_flags_marker_due_for_removal(tmp_path: Path):
 
 
 def test_post_plan_no_violation_when_remove_in_far_future(tmp_path: Path):
-    (tmp_path / "api.py").write_text(
-        '@deprecated(since="1.0.0", remove_in="5.0.0")\n'
-    )
+    (tmp_path / "api.py").write_text('@deprecated(since="1.0.0", remove_in="5.0.0")\n')
     ctx = _make_ctx(
         repo=tmp_path,
         plan_bumps={"api": _planned("api", "2.0.0", "2.1.0")},
@@ -168,9 +157,7 @@ def test_post_plan_no_violation_when_remove_in_far_future(tmp_path: Path):
 
 
 def test_post_plan_warning_mode(tmp_path: Path):
-    (tmp_path / "api.py").write_text(
-        '@deprecated(since="1.0.0", remove_in="2.0.0")\n'
-    )
+    (tmp_path / "api.py").write_text('@deprecated(since="1.0.0", remove_in="2.0.0")\n')
     ctx = _make_ctx(
         repo=tmp_path,
         plan_bumps={"api": _planned("api", "1.5.0", "2.0.0")},
@@ -182,9 +169,7 @@ def test_post_plan_warning_mode(tmp_path: Path):
 
 
 def test_post_plan_disabled_returns_nothing(tmp_path: Path):
-    (tmp_path / "api.py").write_text(
-        '@deprecated(since="1.0.0", remove_in="2.0.0")\n'
-    )
+    (tmp_path / "api.py").write_text('@deprecated(since="1.0.0", remove_in="2.0.0")\n')
     ctx = _make_ctx(
         repo=tmp_path,
         plan_bumps={"api": _planned("api", "1.5.0", "2.0.0")},
@@ -197,9 +182,7 @@ def test_post_plan_falls_back_to_component_paths(tmp_path: Path):
     """No ``scan`` config → plugin falls back to the component's own
     ``paths`` — zero-config deployment."""
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "x.py").write_text(
-        '@deprecated(since="1.0.0", remove_in="2.0.0")\n'
-    )
+    (tmp_path / "src" / "x.py").write_text('@deprecated(since="1.0.0", remove_in="2.0.0")\n')
     fake_component = SimpleNamespace(paths=["src/**/*.py"])
     ctx = _make_ctx(
         repo=tmp_path,
@@ -219,9 +202,7 @@ def test_post_plan_falls_back_to_component_paths(tmp_path: Path):
 def test_enrich_changelog_emits_deprecated_section_for_new_markers(tmp_path: Path):
     """A marker whose ``since`` falls in the (current, next] window is
     a NEW deprecation for this release — surface it under ``Deprecated``."""
-    (tmp_path / "api.py").write_text(
-        '@deprecated(since="2.0.0", remove_in="4.0.0")\n'
-    )
+    (tmp_path / "api.py").write_text('@deprecated(since="2.0.0", remove_in="4.0.0")\n')
     ctx = _make_ctx(
         repo=tmp_path,
         plan_bumps={"api": _planned("api", "1.5.0", "2.0.0")},
@@ -234,9 +215,7 @@ def test_enrich_changelog_emits_deprecated_section_for_new_markers(tmp_path: Pat
 
 
 def test_enrich_changelog_emits_removed_section_for_due_markers(tmp_path: Path):
-    (tmp_path / "api.py").write_text(
-        '@deprecated(since="1.0.0", remove_in="3.0.0")\n'
-    )
+    (tmp_path / "api.py").write_text('@deprecated(since="1.0.0", remove_in="3.0.0")\n')
     ctx = _make_ctx(
         repo=tmp_path,
         plan_bumps={"api": _planned("api", "2.0.0", "3.0.0")},

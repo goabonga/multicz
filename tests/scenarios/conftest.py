@@ -21,9 +21,7 @@ from typer.testing import CliRunner
 
 
 def _git(repo: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True)
     return result.stdout
 
 
@@ -33,9 +31,7 @@ def runner() -> CliRunner:
 
 
 @pytest.fixture
-def make_repo(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Callable[[dict[str, str]], Path]:
+def make_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[[dict[str, str]], Path]:
     """Build a git repo from a dict of relative paths -> file content.
 
     Initialises git, sets a stable author, stages every file, makes a

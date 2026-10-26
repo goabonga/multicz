@@ -33,16 +33,12 @@ INITIAL = {
     "multicz.toml": CONFIG,
     "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
     "src/main.py": "x = 1\n",
-    "charts/myapp/Chart.yaml": (
-        "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
-    ),
+    "charts/myapp/Chart.yaml": ("apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"),
 }
 
 
 def _git(repo: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True)
     return result.stdout
 
 
@@ -166,7 +162,9 @@ def test_changelog_markdown_uses_project_sections(repo: Path, runner: CliRunner)
     # AND silence `perf` at the bump_rules level so the type doesn't
     # auto-bucket: this test asserts that custom sections drive the
     # render and types neither claimed nor bumped get dropped entirely.
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project.bump_rules]
 perf = "none"
 
@@ -177,7 +175,8 @@ types = ["feat"]
 [[project.changelog_sections]]
 title = "Fixed"
 types = ["fix"]
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
     _commit(repo, {"src/main.py": "x = 3\n"}, "fix: null token")
     _commit(repo, {"src/main.py": "x = 4\n"}, "perf: tighter loop")
@@ -194,11 +193,14 @@ types = ["fix"]
 
 
 def test_bump_writes_changelog_with_custom_sections(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [[project.changelog_sections]]
 title = "Added"
 types = ["feat"]
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): login")
     _commit(repo, {"src/main.py": "x = 3\n"}, "fix: y")  # not in any section -> dropped
 
@@ -330,14 +332,18 @@ def test_validate_missing_bump_file_exits_one(repo: Path, runner: CliRunner):
 
 def test_validate_strict_exits_two_on_warnings(repo: Path, runner: CliRunner):
     # Overlap between api and lib on src/** with policy = first-match -> warning
-    (repo / "multicz.toml").write_text("""
+    (repo / "multicz.toml").write_text(
+        """
 [project]
 overlap_policy = "first-match"
-""" + CONFIG + """
+"""
+        + CONFIG
+        + """
 [components.lib]
 paths = ["src/**"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-""")
+"""
+    )
     result = runner.invoke(app, ["validate", "--strict"])
     assert result.exit_code == 2
     assert "path_overlap" in result.output
@@ -345,11 +351,14 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 
 def test_validate_default_overlap_policy_errors(repo: Path, runner: CliRunner):
     # No explicit policy -> default "error" -> overlap is an error -> exit 1
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [components.lib]
 paths = ["src/**"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-""")
+"""
+    )
     result = runner.invoke(app, ["validate"])
     assert result.exit_code == 1
     assert "path_overlap" in result.output
@@ -449,9 +458,7 @@ def test_bump_summary_appends_release_block(repo: Path, runner: CliRunner, tmp_p
     summary = tmp_path / "summary.md"
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
 
-    result = runner.invoke(
-        app, ["bump", "--commit", "--tag", "--summary", str(summary)]
-    )
+    result = runner.invoke(app, ["bump", "--commit", "--tag", "--summary", str(summary)])
     assert result.exit_code == 0, result.stdout
     text = summary.read_text()
     assert "## Released" in text
@@ -459,9 +466,7 @@ def test_bump_summary_appends_release_block(repo: Path, runner: CliRunner, tmp_p
     assert "Release commit:" in text
 
 
-def test_summary_appends_when_plan_then_bump(
-    repo: Path, runner: CliRunner, tmp_path: Path
-):
+def test_summary_appends_when_plan_then_bump(repo: Path, runner: CliRunner, tmp_path: Path):
     """Plan and bump can write to the same summary file in sequence."""
     summary = tmp_path / "summary.md"
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
@@ -476,9 +481,7 @@ def test_summary_appends_when_plan_then_bump(
     assert text.index("## Release plan") < text.index("## Released")
 
 
-def test_bump_summary_works_with_json_output(
-    repo: Path, runner: CliRunner, tmp_path: Path
-):
+def test_bump_summary_works_with_json_output(repo: Path, runner: CliRunner, tmp_path: Path):
     """--summary and --output json compose: JSON to stdout, markdown to file."""
     summary = tmp_path / "summary.md"
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: add login")
@@ -486,9 +489,13 @@ def test_bump_summary_works_with_json_output(
     result = runner.invoke(
         app,
         [
-            "bump", "--commit", "--tag",
-            "--summary", str(summary),
-            "--output", "json",
+            "bump",
+            "--commit",
+            "--tag",
+            "--summary",
+            str(summary),
+            "--output",
+            "json",
         ],
     )
     assert result.exit_code == 0, result.stdout
@@ -552,10 +559,13 @@ def test_state_command_without_config(repo: Path, runner: CliRunner):
 
 
 def test_state_written_on_bump_and_readable(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 state_file = ".multicz/state.json"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     result = runner.invoke(app, ["bump", "--commit", "--tag"])
     assert result.exit_code == 0, result.stdout
@@ -577,10 +587,13 @@ state_file = ".multicz/state.json"
 
 
 def test_state_drift_detected_by_validate(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 state_file = ".multicz/state.json"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
@@ -596,10 +609,13 @@ state_file = ".multicz/state.json"
 
 
 def test_state_no_drift_when_consistent(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 state_file = ".multicz/state.json"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
@@ -608,10 +624,13 @@ state_file = ".multicz/state.json"
 
 
 def test_unknown_commit_error_policy_clean_cli_message(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 unknown_commit_policy = "error"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")
     _commit(repo, {"src/main.py": "x = 3\n"}, "wip")
 
@@ -623,10 +642,13 @@ unknown_commit_policy = "error"
 
 
 def test_unknown_commit_error_policy_blocks_bump(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 unknown_commit_policy = "error"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "update stuff")
     result = runner.invoke(app, ["bump"])
     assert result.exit_code == 1
@@ -658,9 +680,7 @@ def test_plan_since_overrides_commit_window(repo: Path, runner: CliRunner):
     sha = _git(repo, "rev-parse", "HEAD").strip()
     _commit(repo, {"src/main.py": "x = 3\n"}, "fix: post")
 
-    result = runner.invoke(
-        app, ["plan", "--since", sha, "--output", "json"]
-    )
+    result = runner.invoke(app, ["plan", "--since", sha, "--output", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     api = payload["bumps"]["api"]
@@ -714,9 +734,7 @@ def test_changed_against_explicit_since(repo: Path, runner: CliRunner):
     # baseline: HEAD before the two new commits = the init commit
     sha = _git(repo, "rev-list", "--max-parents=0", "HEAD").strip()
 
-    result = runner.invoke(
-        app, ["changed", "--since", sha, "--output", "json"]
-    )
+    result = runner.invoke(app, ["changed", "--since", sha, "--output", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert set(payload["changed"]) == {"api", "chart"}
@@ -729,9 +747,7 @@ def test_changed_excludes_release_commits(repo: Path, runner: CliRunner):
     # No new content commits since the tag - only the release commit.
     # Use --since on the init commit to span the entire history.
     sha = _git(repo, "rev-list", "--max-parents=0", "HEAD").strip()
-    result = runner.invoke(
-        app, ["changed", "--since", sha, "--output", "json"]
-    )
+    result = runner.invoke(app, ["changed", "--since", sha, "--output", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     # api genuinely changed (the feat commit). The chore(release) commit
@@ -924,9 +940,7 @@ def test_release_notes_for_rc_tag_uses_previous_tag(repo: Path, runner: CliRunne
     _commit(repo, {"src/main.py": "x = 3\n"}, "fix: bug")
     runner.invoke(app, ["bump", "--pre", "rc", "--commit", "--tag"])
 
-    result = runner.invoke(
-        app, ["release-notes", "--tag", "api-v1.3.0-rc.2"]
-    )
+    result = runner.invoke(app, ["release-notes", "--tag", "api-v1.3.0-rc.2"])
     assert result.exit_code == 0
     # rc.2's notes only show delta since rc.1
     assert "bug" in result.stdout
@@ -939,9 +953,7 @@ def test_release_notes_unknown_tag_errors(repo: Path, runner: CliRunner):
     assert "doesn't match any component" in result.output
 
 
-def test_release_notes_past_tag_surfaces_cascade_from_sibling_tags(
-    repo: Path, runner: CliRunner
-):
+def test_release_notes_past_tag_surfaces_cascade_from_sibling_tags(repo: Path, runner: CliRunner):
     """``release-notes --tag <chart-tag>`` should surface the cascade
     source from sibling tags pointing at the same chore(release) commit.
 
@@ -976,10 +988,14 @@ def test_release_notes_tag_exclusive_with_component(repo: Path, runner: CliRunne
 
 
 def test_explain_lists_files_per_commit(repo: Path, runner: CliRunner):
-    _commit(repo, {
-        "src/main.py": "x = 2\n",
-        "src/auth.py": "x = 1\n",
-    }, "feat(api): add login flow")
+    _commit(
+        repo,
+        {
+            "src/main.py": "x = 2\n",
+            "src/auth.py": "x = 1\n",
+        },
+        "feat(api): add login flow",
+    )
 
     result = runner.invoke(app, ["explain", "api"])
     assert result.exit_code == 0, result.stdout
@@ -1068,15 +1084,14 @@ def _capture_git_args(monkeypatch):
     args. We only care about the arguments here, not the side effects.
     """
     import subprocess as real_subprocess
+
     captured: list[list[str]] = []
     real_run = real_subprocess.run
 
     def spy(args, *posargs, **kwargs):
         if args and args[0] == "git":
             captured.append(list(args[1:]))
-            if len(args) > 1 and args[1] in ("commit", "tag") and (
-                "-S" in args or "-s" in args
-            ):
+            if len(args) > 1 and args[1] in ("commit", "tag") and ("-S" in args or "-s" in args):
                 return real_subprocess.CompletedProcess(args, 0, "", "")
         return real_run(args, *posargs, **kwargs)
 
@@ -1097,12 +1112,10 @@ def test_bump_sign_passes_signing_flags_to_git(
     # The fixture setup uses `git commit -q` and `git tag -m` directly, so
     # filter to the release commit/tag (those don't include -q from us, and
     # the tag args carry -s/-m without --list).
-    release_commit = [
-        args for args in captured
-        if args[:1] == ["commit"] and "-q" not in args
-    ]
+    release_commit = [args for args in captured if args[:1] == ["commit"] and "-q" not in args]
     release_tag = [
-        args for args in captured
+        args
+        for args in captured
         if args[:1] == ["tag"] and "--list" not in args and "-d" not in args
     ]
     assert release_commit and "-S" in release_commit[0]
@@ -1116,12 +1129,10 @@ def test_bump_default_does_not_pass_signing_flags(
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
-    release_commit = [
-        args for args in captured
-        if args[:1] == ["commit"] and "-q" not in args
-    ]
+    release_commit = [args for args in captured if args[:1] == ["commit"] and "-q" not in args]
     release_tag = [
-        args for args in captured
+        args
+        for args in captured
         if args[:1] == ["tag"] and "--list" not in args and "-d" not in args
     ]
     assert release_commit and "-S" not in release_commit[0]
@@ -1131,38 +1142,39 @@ def test_bump_default_does_not_pass_signing_flags(
 def test_config_sign_commits_enables_signing(
     repo: Path, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
 ):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 sign_commits = true
-""")
+"""
+    )
     captured = _capture_git_args(monkeypatch)
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
     runner.invoke(app, ["bump", "--commit"])
 
-    release_commit = [
-        args for args in captured
-        if args[:1] == ["commit"] and "-q" not in args
-    ]
+    release_commit = [args for args in captured if args[:1] == ["commit"] and "-q" not in args]
     assert release_commit and "-S" in release_commit[0]
 
 
 def test_config_sign_tags_only_signs_tags(
     repo: Path, runner: CliRunner, monkeypatch: pytest.MonkeyPatch
 ):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 sign_tags = true
-""")
+"""
+    )
     captured = _capture_git_args(monkeypatch)
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
-    release_commit = [
-        args for args in captured
-        if args[:1] == ["commit"] and "-q" not in args
-    ]
+    release_commit = [args for args in captured if args[:1] == ["commit"] and "-q" not in args]
     release_tag = [
-        args for args in captured
+        args
+        for args in captured
         if args[:1] == ["tag"] and "--list" not in args and "-d" not in args
     ]
     # commit not signed, tag signed
@@ -1178,9 +1190,7 @@ def test_bump_force_creates_bump_without_commits(repo: Path, runner: CliRunner):
 
 
 def test_bump_force_repeatable(repo: Path, runner: CliRunner):
-    result = runner.invoke(
-        app, ["bump", "--force", "api:minor", "--force", "chart:major"]
-    )
+    result = runner.invoke(app, ["bump", "--force", "api:minor", "--force", "chart:major"])
     assert result.exit_code == 0, result.stdout
     assert 'version = "1.3.0"' in (repo / "pyproject.toml").read_text()
     chart = (repo / "charts/myapp/Chart.yaml").read_text()
@@ -1223,17 +1233,13 @@ def test_bump_force_invalid_spec(repo: Path, runner: CliRunner):
 
 
 def test_bump_force_composes_with_pre(repo: Path, runner: CliRunner):
-    result = runner.invoke(
-        app, ["bump", "--force", "api:minor", "--pre", "rc"]
-    )
+    result = runner.invoke(app, ["bump", "--force", "api:minor", "--pre", "rc"])
     assert result.exit_code == 0, result.stdout
     assert 'version = "1.3.0-rc.1"' in (repo / "pyproject.toml").read_text()
 
 
 def test_plan_force_shows_manual_reason(repo: Path, runner: CliRunner):
-    result = runner.invoke(
-        app, ["plan", "--force", "api:patch", "--output", "json"]
-    )
+    result = runner.invoke(app, ["plan", "--force", "api:patch", "--output", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     api = payload["bumps"]["api"]
@@ -1250,10 +1256,13 @@ def test_empty_plan_message_mentions_force(repo: Path, runner: CliRunner):
 
 
 def test_release_commit_message_template_components(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 release_commit_message = "chore(release): {components}"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
@@ -1262,10 +1271,13 @@ release_commit_message = "chore(release): {components}"
 
 
 def test_release_commit_message_template_count(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 release_commit_message = "release: {count} components ({summary})"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
@@ -1280,9 +1292,7 @@ def test_release_commit_message_default_unchanged(repo: Path, runner: CliRunner)
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
     head_msg = _git(repo, "log", "-1", "--format=%B").strip()
-    assert head_msg.startswith(
-        "chore(release): bump api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.4.1"
-    )
+    assert head_msg.startswith("chore(release): bump api 1.2.0 -> 1.3.0, chart 0.4.0 -> 0.4.1")
     # default body is the bullet list
     assert "- api: 1.2.0 -> 1.3.0 (minor)" in head_msg
     assert "- chart: 0.4.0 -> 0.4.1 (patch)" in head_msg
@@ -1301,18 +1311,19 @@ def test_bump_commit_message_cli_override(repo: Path, runner: CliRunner):
 
 
 def test_bump_commit_message_requires_commit(repo: Path, runner: CliRunner):
-    result = runner.invoke(
-        app, ["bump", "--commit-message", "ignored without --commit"]
-    )
+    result = runner.invoke(app, ["bump", "--commit-message", "ignored without --commit"])
     assert result.exit_code == 1
     assert "--commit" in result.output
 
 
 def test_release_commit_message_template_with_literal_braces(repo: Path, runner: CliRunner):
-    (repo / "multicz.toml").write_text(CONFIG + """
+    (repo / "multicz.toml").write_text(
+        CONFIG
+        + """
 [project]
 release_commit_message = "release {{json}} for {components}"
-""")
+"""
+    )
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat(api): add login")
     runner.invoke(app, ["bump", "--commit", "--tag"])
 
@@ -1538,9 +1549,7 @@ debian_revision = 3
 def test_init_print_emits_to_stdout_without_writing(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
-    (target / "pyproject.toml").write_text(
-        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
-    )
+    (target / "pyproject.toml").write_text('[project]\nname = "auto-app"\nversion = "0.1.0"\n')
     (target / "src").mkdir()
     os.chdir(target)
     result = runner.invoke(app, ["init", "--print"])
@@ -1561,9 +1570,7 @@ def test_init_print_bare(tmp_path: Path, runner: CliRunner):
 def test_init_detect_text_summary(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
-    (target / "pyproject.toml").write_text(
-        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
-    )
+    (target / "pyproject.toml").write_text('[project]\nname = "auto-app"\nversion = "0.1.0"\n')
     os.chdir(target)
     result = runner.invoke(app, ["init", "--detect"])
     assert result.exit_code == 0
@@ -1575,9 +1582,7 @@ def test_init_detect_text_summary(tmp_path: Path, runner: CliRunner):
 def test_init_detect_json_output(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
-    (target / "pyproject.toml").write_text(
-        '[project]\nname = "myapp"\nversion = "1.0.0"\n'
-    )
+    (target / "pyproject.toml").write_text('[project]\nname = "myapp"\nversion = "1.0.0"\n')
     os.chdir(target)
     result = runner.invoke(app, ["init", "--detect", "--output", "json"])
     assert result.exit_code == 0
@@ -1596,9 +1601,7 @@ def test_init_detect_rejects_bare(tmp_path: Path, runner: CliRunner):
 def test_init_detect_rejects_print(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
-    (target / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (target / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     os.chdir(target)
     result = runner.invoke(app, ["init", "--detect", "--print"])
     assert result.exit_code == 1
@@ -1607,9 +1610,7 @@ def test_init_detect_rejects_print(tmp_path: Path, runner: CliRunner):
 def test_init_auto_detects_pyproject(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
-    (target / "pyproject.toml").write_text(
-        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
-    )
+    (target / "pyproject.toml").write_text('[project]\nname = "auto-app"\nversion = "0.1.0"\n')
     (target / "src").mkdir()
     os.chdir(target)
     result = runner.invoke(app, ["init"])
@@ -1642,9 +1643,7 @@ def test_init_fails_when_no_manifests(tmp_path: Path, runner: CliRunner):
 def test_init_force_overwrites(tmp_path: Path, runner: CliRunner):
     target = tmp_path / "fresh"
     target.mkdir()
-    (target / "pyproject.toml").write_text(
-        '[project]\nname = "auto-app"\nversion = "0.1.0"\n'
-    )
+    (target / "pyproject.toml").write_text('[project]\nname = "auto-app"\nversion = "0.1.0"\n')
     (target / "multicz.toml").write_text("# old\n")
     os.chdir(target)
     result = runner.invoke(app, ["init"])
@@ -1655,9 +1654,7 @@ def test_init_force_overwrites(tmp_path: Path, runner: CliRunner):
     assert "[components.auto-app]" in (target / "multicz.toml").read_text()
 
 
-def test_post_bump_runs_command_and_includes_modified_file(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_runs_command_and_includes_modified_file(repo: Path, runner: CliRunner):
     """post_bump runs after writes and pulls modified files into the
     release commit (simulates `uv lock` regenerating uv.lock)."""
     (repo / "multicz.toml").write_text("""
@@ -1680,9 +1677,7 @@ post_bump = ["sh -c 'echo regenerated > generated.lock'"]
     assert (repo / "generated.lock").read_text().strip() == "regenerated"
 
 
-def test_post_bump_failure_aborts_bump(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_failure_aborts_bump(repo: Path, runner: CliRunner):
     """A non-zero post_bump exit aborts the bump pipeline before
     committing or tagging - the working tree may have been written to,
     but no release commit is created."""
@@ -1705,9 +1700,7 @@ post_bump = ["false"]
     assert "chore(release)" not in _git(repo, "log", "-1", "--format=%s")
 
 
-def test_post_bump_skipped_in_dry_run(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_skipped_in_dry_run(repo: Path, runner: CliRunner):
     (repo / "multicz.toml").write_text("""
 [project]
 post_bump_policy = "allow"
@@ -1722,9 +1715,7 @@ post_bump = ["sh -c 'echo nope > should_not_exist.lock'"]
     assert not (repo / "should_not_exist.lock").exists()
 
 
-def test_post_bump_includes_file_already_dirty_before_hook(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_includes_file_already_dirty_before_hook(repo: Path, runner: CliRunner):
     """Reproduces the `uv run` race: uv (or some pre-bump tool)
     rewrites a lockfile before multicz starts, so the file is already
     in the dirty set when multicz takes its `before` snapshot. The
@@ -1778,18 +1769,17 @@ post_bump = ["sh -c 'echo lock > out.lock'"]
     # Bypass CliRunner so stdout/stderr stay separate (CliRunner in
     # current click no longer supports mix_stderr=False).
     proc = subprocess.run(
-        [sys.executable, "-m", "multicz", "bump", "--commit",
-         "--output", "json"],
-        cwd=repo, capture_output=True, text=True,
+        [sys.executable, "-m", "multicz", "bump", "--commit", "--output", "json"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, proc.stderr
     json.loads(proc.stdout)  # raises if stdout isn't pure JSON
     assert "post_bump" in proc.stderr
 
 
-def test_post_bump_runs_only_for_bumped_components(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_runs_only_for_bumped_components(repo: Path, runner: CliRunner):
     """Hooks fire only for components that actually got bumped - a
     component with `post_bump` that didn't change must stay quiet."""
     (repo / "multicz.toml").write_text("""
@@ -1813,9 +1803,7 @@ post_bump = ["sh -c 'echo ran > untouched.lock'"]
     assert not (repo / "untouched.lock").exists()
 
 
-def test_post_bump_default_policy_skips_hooks_and_warns(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_default_policy_skips_hooks_and_warns(repo: Path, runner: CliRunner):
     """Without ``post_bump_policy = "allow"``, configured hooks are
     skipped and a loud warning is emitted (the security default: shell
     execution from config is opt-in)."""
@@ -1829,7 +1817,9 @@ post_bump = ["sh -c 'echo ran > should_not_exist.lock'"]
     # CliRunner merges stderr into output; subprocess keeps them separate.
     proc = subprocess.run(
         [sys.executable, "-m", "multicz", "bump"],
-        cwd=repo, capture_output=True, text=True,
+        cwd=repo,
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, proc.stderr
     assert not (repo / "should_not_exist.lock").exists()
@@ -1837,9 +1827,7 @@ post_bump = ["sh -c 'echo ran > should_not_exist.lock'"]
     assert "post_bump_policy" in proc.stderr
 
 
-def test_post_bump_no_post_bump_flag_silences_warning(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_no_post_bump_flag_silences_warning(repo: Path, runner: CliRunner):
     """``--no-post-bump`` skips hooks AND silences the deny-policy
     warning. Useful in CI when the policy is intentionally deny."""
     (repo / "multicz.toml").write_text("""
@@ -1851,16 +1839,16 @@ post_bump = ["sh -c 'echo ran > should_not_exist.lock'"]
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
     proc = subprocess.run(
         [sys.executable, "-m", "multicz", "bump", "--no-post-bump"],
-        cwd=repo, capture_output=True, text=True,
+        cwd=repo,
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, proc.stderr
     assert not (repo / "should_not_exist.lock").exists()
     assert "post_bump hooks skipped" not in proc.stderr
 
 
-def test_post_bump_no_post_bump_overrides_allow_policy(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_no_post_bump_overrides_allow_policy(repo: Path, runner: CliRunner):
     """``--no-post-bump`` overrides ``post_bump_policy = "allow"`` for
     the current run — emergency disable without editing config."""
     (repo / "multicz.toml").write_text("""
@@ -1878,9 +1866,7 @@ post_bump = ["sh -c 'echo ran > should_not_exist.lock'"]
     assert not (repo / "should_not_exist.lock").exists()
 
 
-def test_post_bump_policy_no_warning_when_no_hooks_configured(
-    repo: Path, runner: CliRunner
-):
+def test_post_bump_policy_no_warning_when_no_hooks_configured(repo: Path, runner: CliRunner):
     """The deny warning fires only when hooks are configured. Repos
     without any post_bump must stay quiet on the default policy."""
     (repo / "multicz.toml").write_text("""
@@ -1891,7 +1877,9 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
     _commit(repo, {"src/main.py": "x = 2\n"}, "feat: x")
     proc = subprocess.run(
         [sys.executable, "-m", "multicz", "bump"],
-        cwd=repo, capture_output=True, text=True,
+        cwd=repo,
+        capture_output=True,
+        text=True,
     )
     assert proc.returncode == 0, proc.stderr
     assert "post_bump" not in proc.stderr
@@ -1939,7 +1927,8 @@ def test_config_json_output_is_machine_readable(repo: Path, runner: CliRunner):
 
 
 def test_config_component_filter_keeps_project_and_named_component(
-    repo: Path, runner: CliRunner,
+    repo: Path,
+    runner: CliRunner,
 ):
     """``-c <name>`` keeps the [project] table (defaults are useful for
     debugging) and exactly one component."""
@@ -1953,7 +1942,8 @@ def test_config_component_filter_keeps_project_and_named_component(
 
 
 def test_config_component_filter_unknown_name_fails(
-    repo: Path, runner: CliRunner,
+    repo: Path,
+    runner: CliRunner,
 ):
     result = runner.invoke(app, ["config", "-c", "wibble"])
     assert result.exit_code == 1
@@ -1999,7 +1989,8 @@ def test_graph_dot_emits_digraph(repo: Path, runner: CliRunner):
 
 
 def test_graph_component_filter_keeps_subtree_only(
-    repo: Path, runner: CliRunner,
+    repo: Path,
+    runner: CliRunner,
 ):
     """``-c chart`` shows only chart's downstream cascade. Since chart
     has no downstreams in the default fixture, the output is just the
@@ -2015,7 +2006,8 @@ def test_graph_component_filter_keeps_subtree_only(
 
 
 def test_graph_component_filter_unknown_name_fails(
-    repo: Path, runner: CliRunner,
+    repo: Path,
+    runner: CliRunner,
 ):
     result = runner.invoke(app, ["graph", "-c", "wibble"])
     assert result.exit_code == 1
@@ -2027,7 +2019,8 @@ def test_graph_invalid_output_format_fails(repo: Path, runner: CliRunner):
 
 
 def test_graph_depends_on_edge_appears_in_dot(
-    tmp_path: Path, runner: CliRunner,
+    tmp_path: Path,
+    runner: CliRunner,
 ):
     """``depends_on`` is a name-based cascade edge; it must appear in
     the graph output even when no mirror is declared."""
@@ -2052,6 +2045,7 @@ depends_on = ["upstream"]
     (tmp_path / "downstream/VERSION").write_text("0.1.0\n")
 
     import os
+
     cwd = os.getcwd()
     try:
         os.chdir(tmp_path)

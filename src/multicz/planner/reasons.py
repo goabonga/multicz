@@ -134,9 +134,7 @@ class NonConventionalReason:
         }
 
 
-Reason = (
-    CommitReason | TriggerReason | MirrorReason | ManualReason | NonConventionalReason
-)
+Reason = CommitReason | TriggerReason | MirrorReason | ManualReason | NonConventionalReason
 
 
 class NonConventionalCommitsError(RuntimeError):
@@ -147,6 +145,4 @@ class NonConventionalCommitsError(RuntimeError):
     def __init__(self, offenders: list[tuple[str, str]]) -> None:
         # offenders: list of (sha, first_line)
         self.offenders = offenders
-        super().__init__(
-            f"{len(offenders)} non-conventional commit(s) blocking the plan"
-        )
+        super().__init__(f"{len(offenders)} non-conventional commit(s) blocking the plan")

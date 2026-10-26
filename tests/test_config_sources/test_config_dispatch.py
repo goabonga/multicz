@@ -53,9 +53,9 @@ def test_registry_order_is_canonical_first():
 def test_load_config_via_multicz_toml(tmp_path: Path):
     f = tmp_path / "multicz.toml"
     f.write_text(
-        '[project]\n'
+        "[project]\n"
         'commit_convention = "conventional"\n'
-        '[components.app]\n'
+        "[components.app]\n"
         'paths = ["src/**"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )
@@ -68,7 +68,7 @@ def test_load_config_via_pyproject(tmp_path: Path):
     f.write_text(
         '[project]\nname = "x"\nversion = "1.0.0"\n'
         '[tool.multicz.project]\ncommit_convention = "conventional"\n'
-        '[tool.multicz.components.app]\n'
+        "[tool.multicz.components.app]\n"
         'paths = ["src/**"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )
@@ -85,7 +85,7 @@ def test_load_config_via_package_json(tmp_path: Path):
 
 def test_load_config_raises_on_unknown_filename(tmp_path: Path):
     f = tmp_path / "Cargo.toml"
-    f.write_text("[package]\nname = \"x\"\n")
+    f.write_text('[package]\nname = "x"\n')
     with pytest.raises(FileNotFoundError, match="no multicz config"):
         load_config(f)
 
@@ -94,13 +94,13 @@ def test_find_config_prefers_multicz_toml_over_pyproject(tmp_path: Path):
     """When both files coexist in the same directory, multicz.toml wins."""
     canonical = tmp_path / "multicz.toml"
     canonical.write_text(
-        '[components.from_canonical]\n'
+        "[components.from_canonical]\n"
         'paths = ["src/**"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )
     pyproj = tmp_path / "pyproject.toml"
     pyproj.write_text(
-        '[tool.multicz.components.from_pyproject]\n'
+        "[tool.multicz.components.from_pyproject]\n"
         'paths = ["src/**"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )
@@ -111,7 +111,7 @@ def test_find_config_prefers_multicz_toml_over_pyproject(tmp_path: Path):
 def test_find_config_falls_back_to_pyproject_when_no_canonical(tmp_path: Path):
     pyproj = tmp_path / "pyproject.toml"
     pyproj.write_text(
-        '[tool.multicz.components.app]\n'
+        "[tool.multicz.components.app]\n"
         'paths = ["src/**"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )
@@ -132,7 +132,7 @@ def test_find_config_walks_up_to_parent_directory(tmp_path: Path):
     sub = tmp_path / "subdir"
     sub.mkdir()
     (tmp_path / "multicz.toml").write_text(
-        '[components.app]\n'
+        "[components.app]\n"
         'paths = ["src/**"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )

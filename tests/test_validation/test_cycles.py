@@ -14,15 +14,11 @@ from multicz.validation.cycles import MirrorCycleCheck, TriggerCycleCheck
 
 def _ctx(repo: Path) -> ValidationContext:
     config = load_config(repo / "multicz.toml")
-    return ValidationContext(
-        repo=repo, config=config, matcher=ComponentMatcher(config.components)
-    )
+    return ValidationContext(repo=repo, config=config, matcher=ComponentMatcher(config.components))
 
 
 def test_trigger_cycle_detected(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (tmp_path / "multicz.toml").write_text("""
 [components.a]
 paths = ["a/**"]

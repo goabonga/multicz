@@ -66,9 +66,7 @@ VersionScheme = Literal["semver", "pep440"]
 _PEP440_COMPACT = {"alpha": "a", "beta": "b", "c": "rc", "pre": "rc", "preview": "rc"}
 
 
-def _render_pre(
-    base: str, label: str, num: int, scheme: VersionScheme
-) -> str:
+def _render_pre(base: str, label: str, num: int, scheme: VersionScheme) -> str:
     """Render ``base + pre-release suffix`` in the requested scheme."""
     if scheme == "pep440":
         compact = _PEP440_COMPACT.get(label.lower(), label.lower())

@@ -17,15 +17,11 @@ from multicz.validation.changelog import (
 
 def _ctx(repo: Path) -> ValidationContext:
     config = load_config(repo / "multicz.toml")
-    return ValidationContext(
-        repo=repo, config=config, matcher=ComponentMatcher(config.components)
-    )
+    return ValidationContext(repo=repo, config=config, matcher=ComponentMatcher(config.components))
 
 
 def test_changelog_directory_is_error(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (tmp_path / "CHANGELOG.md").mkdir()  # dir, not a file
     (tmp_path / "multicz.toml").write_text("""
 [components.api]

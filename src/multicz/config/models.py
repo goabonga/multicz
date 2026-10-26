@@ -182,8 +182,7 @@ class Component(BaseModel):
                 shlex.split(entry)
             except ValueError as exc:
                 raise ValueError(
-                    f"post_bump entry {entry!r} is not a valid shell "
-                    f"command: {exc}"
+                    f"post_bump entry {entry!r} is not a valid shell command: {exc}"
                 ) from exc
         return value
 
@@ -210,10 +209,7 @@ class Component(BaseModel):
                     "component; each writer must point to a distinct path."
                 )
             seen_files.add(writer.file)
-            if (
-                isinstance(writer, DebianChangelogWriter)
-                and self.version_scheme != "semver"
-            ):
+            if isinstance(writer, DebianChangelogWriter) and self.version_scheme != "semver":
                 raise ValueError(
                     "writer type='debian-changelog' requires "
                     "version_scheme='semver' (the internal canonical form); "
@@ -256,9 +252,7 @@ class ProjectSettings(BaseModel):
     initial_version: str = "0.1.0"
     release_commit_pattern: str = r"^chore\(release\)"
     release_commit_message: str = "chore(release): bump {summary}\n\n{body}"
-    changelog_sections: list[ChangelogSection] = Field(
-        default_factory=_default_changelog_sections
-    )
+    changelog_sections: list[ChangelogSection] = Field(default_factory=_default_changelog_sections)
     breaking_section_title: str = "Breaking changes"
     other_section_title: str = ""
     # Section + line format for cascade-only bumps (mirror or trigger).
@@ -281,9 +275,7 @@ class ProjectSettings(BaseModel):
     # so adding a single rule like ``refactor = "patch"`` doesn't silently
     # lose the conventional bump for ``feat`` / ``fix`` / ``perf`` /
     # ``revert``. To silence a default, set it to ``"none"`` explicitly.
-    bump_rules: dict[str, BumpRule] = Field(
-        default_factory=lambda: dict(DEFAULT_BUMP_RULES)
-    )
+    bump_rules: dict[str, BumpRule] = Field(default_factory=lambda: dict(DEFAULT_BUMP_RULES))
     state_file: Path | None = None  # opt-in JSON snapshot, written on bump
     # Path (repo-relative) of an aggregated cross-component
     # CHANGELOG.md. When set, every ``multicz bump`` appends a single
@@ -295,7 +287,7 @@ class ProjectSettings(BaseModel):
     root_changelog: Path | None = None
     unknown_commit_policy: Literal["ignore", "patch", "error"] = "ignore"
     sign_commits: bool = False  # gpg-sign release commits (git commit -S)
-    sign_tags: bool = False     # gpg-sign tags (git tag -s)
+    sign_tags: bool = False  # gpg-sign tags (git tag -s)
     # Whether ``[components.<name>] post_bump`` shell hooks are allowed
     # to run. Defaults to ``"deny"`` because post_bump is the *only*
     # multicz feature that executes arbitrary commands sourced from the
@@ -357,15 +349,10 @@ class Config(BaseModel):
         converted: dict[str, dict[str, Any]] = {}
         for index, item in enumerate(raw):
             if not isinstance(item, dict):
-                raise ValueError(
-                    f"components[{index}] must be a table, got "
-                    f"{type(item).__name__}"
-                )
+                raise ValueError(f"components[{index}] must be a table, got {type(item).__name__}")
             name = item.get("name")
             if not isinstance(name, str) or not name:
-                raise ValueError(
-                    f"components[{index}] is missing a string 'name' field"
-                )
+                raise ValueError(f"components[{index}] is missing a string 'name' field")
             if name in converted:
                 raise ValueError(f"duplicate component name: {name!r}")
             converted[name] = {k: v for k, v in item.items() if k != "name"}
@@ -446,9 +433,7 @@ class Config(BaseModel):
         rule is ``"none"`` is considered ignored. Kept for callers that
         still consume ignored-types semantics directly.
         """
-        return {
-            t for t, kind in self.bump_rules_for(component).items() if kind == "none"
-        }
+        return {t for t, kind in self.bump_rules_for(component).items() if kind == "none"}
 
     def tag_format_for(self, component: str) -> str:
         """Return the effective tag_format for ``component``.

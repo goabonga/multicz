@@ -69,8 +69,7 @@ class PluginRegistry:
                 continue
             if not isinstance(instance, Plugin):
                 warnings.warn(
-                    f"multicz: plugin {ep.name!r} does not satisfy the Plugin "
-                    "protocol — skipping",
+                    f"multicz: plugin {ep.name!r} does not satisfy the Plugin protocol — skipping",
                     RuntimeWarning,
                     stacklevel=2,
                 )

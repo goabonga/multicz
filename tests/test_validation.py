@@ -15,9 +15,7 @@ from multicz.validation import Finding, validate
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
-        ["git", *args], cwd=repo, check=True, capture_output=True
-    )
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
 
 
 @pytest.fixture
@@ -47,24 +45,28 @@ def _checks(findings: list[Finding]) -> set[str]:
 
 
 def test_bump_file_existing_passes(repo: Path):
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
-    _write_config(repo, """
+    (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
+    _write_config(
+        repo,
+        """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     assert "bump_files_exist" not in _checks(findings)
 
 
 def test_missing_bump_file_is_error(repo: Path):
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.api]
 paths = ["src/**"]
 bump_files = [{ file = "missing.toml", key = "version" }]
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     errors = [f for f in findings if f.check == "bump_files_exist"]
     assert errors
@@ -79,15 +81,14 @@ bump_files = [{ file = "missing.toml", key = "version" }]
 
 def _overlap_repo(repo: Path, policy: str | None = None) -> None:
     """Common fixture: api and lib both claim src/**."""
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (repo / "src").mkdir()
     (repo / "src" / "main.py").write_text("x = 1\n")
-    project_block = (
-        f'\n[project]\noverlap_policy = "{policy}"\n' if policy else ""
-    )
-    _write_config(repo, project_block + """
+    project_block = f'\n[project]\noverlap_policy = "{policy}"\n' if policy else ""
+    _write_config(
+        repo,
+        project_block
+        + """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -95,7 +96,8 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 [components.lib]
 paths = ["src/**"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-""")
+""",
+    )
     _commit_all(repo)
 
 
@@ -138,30 +140,32 @@ def test_path_overlap_all_is_info(repo: Path):
 
 
 def test_mirror_to_unowned_file_is_info(repo: Path):
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (repo / "values.yaml").write_text("foo: bar\n")
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 mirrors = [{ file = "values.yaml", key = "version" }]
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     assert "mirror_target_unowned" in _checks(findings)
 
 
 def test_mirror_to_self_owned_file_is_warning(repo: Path):
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
-    _write_config(repo, """
+    (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
+    _write_config(
+        repo,
+        """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 mirrors = [{ file = "pyproject.toml", key = "project.version" }]
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     selfish = [f for f in findings if f.check == "mirror_self_target"]
     assert selfish
@@ -174,10 +178,10 @@ mirrors = [{ file = "pyproject.toml", key = "project.version" }]
 
 
 def test_trigger_cycle_detected(repo: Path):
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
-    _write_config(repo, """
+    (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
+    _write_config(
+        repo,
+        """
 [components.a]
 paths = ["a/**"]
 depends_on = ["b"]
@@ -185,7 +189,8 @@ depends_on = ["b"]
 [components.b]
 paths = ["b/**"]
 depends_on = ["a"]
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     cycles = [f for f in findings if f.check == "trigger_cycle"]
     assert cycles
@@ -196,7 +201,9 @@ depends_on = ["a"]
 def test_mirror_cycle_detected(repo: Path):
     (repo / "a.yaml").write_text("v: 1\n")
     (repo / "b.yaml").write_text("v: 1\n")
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.a]
 paths = ["a.yaml"]
 bump_files = [{ file = "a.yaml", key = "v" }]
@@ -206,7 +213,8 @@ mirrors = [{ file = "b.yaml", key = "v" }]
 paths = ["b.yaml"]
 bump_files = [{ file = "b.yaml", key = "v" }]
 mirrors = [{ file = "a.yaml", key = "v" }]
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     cycles = [f for f in findings if f.check == "mirror_cycle"]
     assert cycles
@@ -219,16 +227,17 @@ mirrors = [{ file = "a.yaml", key = "v" }]
 
 
 def test_changelog_path_is_a_directory_is_error(repo: Path):
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (repo / "CHANGELOG.md").mkdir()  # dir, not a file
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 changelog = "CHANGELOG.md"
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     bad = [f for f in findings if f.check == "changelog_not_a_file"]
     assert bad
@@ -241,13 +250,16 @@ changelog = "CHANGELOG.md"
 
 
 def test_debian_changelog_missing_is_info(repo: Path):
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.mypkg]
 paths = ["debian/**"]
 
 [[components.mypkg.writers]]
 type = "debian-changelog"
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     assert "debian_changelog_missing" in _checks(findings)
 
@@ -256,13 +268,16 @@ def test_debian_changelog_unparseable_is_error(repo: Path):
     debian = repo / "debian"
     debian.mkdir()
     (debian / "changelog").write_text("not a debian changelog\n")
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.mypkg]
 paths = ["debian/**"]
 
 [[components.mypkg.writers]]
 type = "debian-changelog"
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     bad = [f for f in findings if f.check == "debian_changelog_unparseable"]
     assert bad
@@ -277,13 +292,16 @@ def test_debian_changelog_parseable_passes(repo: Path):
         "  * Initial.\n\n"
         " -- x <x@y>  Sun, 01 Jan 2023 00:00:00 +0000\n"
     )
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.mypkg]
 paths = ["debian/**"]
 
 [[components.mypkg.writers]]
 type = "debian-changelog"
-""")
+""",
+    )
     findings = validate(repo, load_config(repo / "multicz.toml"))
     debian_findings = [f for f in findings if "debian" in f.check]
     assert all(f.level != "error" for f in debian_findings)
@@ -295,17 +313,18 @@ type = "debian-changelog"
 
 
 def test_clean_repo_no_findings(repo: Path):
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "myapp"\nversion = "1.0.0"\n'
-    )
+    (repo / "pyproject.toml").write_text('[project]\nname = "myapp"\nversion = "1.0.0"\n')
     (repo / "src").mkdir()
     (repo / "src" / "main.py").write_text("x = 1\n")
-    _write_config(repo, """
+    _write_config(
+        repo,
+        """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 changelog = "CHANGELOG.md"
-""")
+""",
+    )
     _commit_all(repo)
     findings = validate(repo, load_config(repo / "multicz.toml"))
     assert findings == []

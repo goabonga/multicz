@@ -16,11 +16,15 @@ from ..results import ValidationReport
 @app.command(name="validate")
 def validate_cmd(
     strict: bool = typer.Option(
-        False, "--strict",
+        False,
+        "--strict",
         help="Exit non-zero on warnings too (CI gate).",
     ),
     output: str = typer.Option(
-        "text", "--output", "-o", help="text | json",
+        "text",
+        "--output",
+        "-o",
+        help="text | json",
     ),
 ) -> None:
     """Run every config + repo sanity check and report the findings.

@@ -32,17 +32,17 @@ changelog = "charts/myapp/CHANGELOG.md"
 """
 
 
-def test_feat_on_api_bumps_minor_and_cascades_patch_on_chart(
-    make_repo, commit, runner
-):
-    make_repo({
-        "multicz.toml": CONFIG,
-        "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
-        "src/main.py": "x = 1\n",
-        "charts/myapp/Chart.yaml": (
-            "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
-        ),
-    })
+def test_feat_on_api_bumps_minor_and_cascades_patch_on_chart(make_repo, commit, runner):
+    make_repo(
+        {
+            "multicz.toml": CONFIG,
+            "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
+            "src/main.py": "x = 1\n",
+            "charts/myapp/Chart.yaml": (
+                "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
+            ),
+        }
+    )
     commit({"src/main.py": "x = 2\n"}, "feat(api): add login")
 
     result = runner.invoke(app, ["plan", "--output", "json"])
@@ -59,19 +59,19 @@ def test_feat_on_api_bumps_minor_and_cascades_patch_on_chart(
     assert any(r["kind"] == "mirror" for r in chart["reasons"])
 
 
-def test_chart_template_only_change_does_not_bump_api(
-    make_repo, commit, runner
-):
+def test_chart_template_only_change_does_not_bump_api(make_repo, commit, runner):
     """A change confined to charts/myapp/templates/ must NOT touch api."""
-    make_repo({
-        "multicz.toml": CONFIG,
-        "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
-        "src/main.py": "x = 1\n",
-        "charts/myapp/Chart.yaml": (
-            "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
-        ),
-        "charts/myapp/templates/deployment.yaml": "kind: Deployment\n",
-    })
+    make_repo(
+        {
+            "multicz.toml": CONFIG,
+            "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
+            "src/main.py": "x = 1\n",
+            "charts/myapp/Chart.yaml": (
+                "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
+            ),
+            "charts/myapp/templates/deployment.yaml": "kind: Deployment\n",
+        }
+    )
     commit(
         {"charts/myapp/templates/deployment.yaml": "kind: Deployment\nx: 1\n"},
         "fix(chart): tweak deployment",

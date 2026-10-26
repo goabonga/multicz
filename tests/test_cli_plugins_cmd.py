@@ -30,9 +30,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "multicz.toml").write_text(MINIMAL_CONFIG)
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "main.py").write_text("x = 1\n")
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "0.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.0.0"\n')
     for args in (
         ("init", "-q"),
         ("config", "user.email", "test@example.com"),
@@ -77,14 +75,10 @@ def test_plugins_command_json_shape(repo: Path, runner: CliRunner):
     assert dep["config"] == {}
 
 
-def test_plugins_command_active_when_section_declared_empty(
-    repo: Path, runner: CliRunner
-):
+def test_plugins_command_active_when_section_declared_empty(repo: Path, runner: CliRunner):
     """An empty ``[plugins.deprecation]`` is the minimal opt-in — the
     plugin must flip to ``active`` even without any keys under it."""
-    (repo / "multicz.toml").write_text(
-        MINIMAL_CONFIG + "\n[plugins.deprecation]\n"
-    )
+    (repo / "multicz.toml").write_text(MINIMAL_CONFIG + "\n[plugins.deprecation]\n")
     result = runner.invoke(app, ["plugins", "--output", "json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
@@ -97,9 +91,7 @@ def test_plugins_command_active_when_section_declared_empty(
 
 def test_plugins_command_reflects_disabled_state(repo: Path, runner: CliRunner):
     (repo / "multicz.toml").write_text(
-        MINIMAL_CONFIG
-        + "\n[plugins.deprecation]\nenabled = false\n"
-        "scan = [\"src/**/*.py\"]\n"
+        MINIMAL_CONFIG + '\n[plugins.deprecation]\nenabled = false\nscan = ["src/**/*.py"]\n'
     )
     result = runner.invoke(app, ["plugins", "--output", "json"])
     assert result.exit_code == 0

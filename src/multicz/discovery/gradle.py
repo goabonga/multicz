@@ -12,9 +12,7 @@ from pathlib import Path
 from ..config import Component, FileKey
 from .context import DiscoveryContext, DiscoveryResult
 
-_GRADLE_NAME_RE = re.compile(
-    r"rootProject\.name\s*=\s*['\"]([^'\"]+)['\"]"
-)
+_GRADLE_NAME_RE = re.compile(r"rootProject\.name\s*=\s*['\"]([^'\"]+)['\"]")
 
 
 def _read_gradle_property(path: Path, key: str) -> str | None:
@@ -54,9 +52,7 @@ class GradleDiscovery:
 
     name = "gradle"
 
-    def discover(
-        self, repo: Path, context: DiscoveryContext
-    ) -> Iterable[DiscoveryResult]:
+    def discover(self, repo: Path, context: DiscoveryContext) -> Iterable[DiscoveryResult]:
         properties_path = repo / "gradle.properties"
         if not properties_path.is_file():
             return

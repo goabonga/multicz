@@ -35,33 +35,44 @@ changelog = "CHANGELOG.md"
 @app.command()
 def init(
     path: Path = typer.Option(
-        None, "--path", "-p", help="Directory to write multicz.toml into.",
-        file_okay=False, dir_okay=True, resolve_path=True,
+        None,
+        "--path",
+        "-p",
+        help="Directory to write multicz.toml into.",
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing config."),
     bare: bool = typer.Option(
-        False, "--bare",
+        False,
+        "--bare",
         help="Skip auto-discovery and write a generic single-component stub.",
     ),
     print_only: bool = typer.Option(
-        False, "--print",
+        False,
+        "--print",
         help="Print the rendered config to stdout instead of writing a file. "
-             "Composes with --bare. Useful for `multicz init --print > file`.",
+        "Composes with --bare. Useful for `multicz init --print > file`.",
     ),
     detect: bool = typer.Option(
-        False, "--detect",
+        False,
+        "--detect",
         help="Scan and summarise detected components without rendering the "
-             "full TOML. Use --output json for machine-readable output.",
+        "full TOML. Use --output json for machine-readable output.",
     ),
     output: str = typer.Option(
-        "text", "--output", "-o",
+        "text",
+        "--output",
+        "-o",
         help="text | json (only meaningful with --detect)",
     ),
     skip: str = typer.Option(
-        "", "--skip",
+        "",
+        "--skip",
         help="Comma-separated list of discovery strategies to disable "
-             "(e.g. 'helm,gradle'). Recognised names: python, cargo, "
-             "gradle, go, helm.",
+        "(e.g. 'helm,gradle'). Recognised names: python, cargo, "
+        "gradle, go, helm.",
     ),
 ) -> None:
     """Generate a multicz.toml tailored to the working tree.

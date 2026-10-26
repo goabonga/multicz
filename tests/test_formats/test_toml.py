@@ -18,22 +18,13 @@ def test_matches_for_toml_extension_only(tmp_path: Path):
 
 def test_read_navigates_dotted_path(tmp_path: Path):
     f = tmp_path / "pyproject.toml"
-    f.write_text(
-        '[project]\n'
-        'name = "myapp"\n'
-        'version = "1.2.3"\n'
-    )
+    f.write_text('[project]\nname = "myapp"\nversion = "1.2.3"\n')
     assert TomlFormat().read(f, "project.version") == "1.2.3"
 
 
 def test_write_preserves_comments_and_neighbour_keys(tmp_path: Path):
     f = tmp_path / "pyproject.toml"
-    f.write_text(
-        '# leading comment\n'
-        '[project]\n'
-        'name = "myapp"  # inline\n'
-        'version = "1.0.0"\n'
-    )
+    f.write_text('# leading comment\n[project]\nname = "myapp"  # inline\nversion = "1.0.0"\n')
     TomlFormat().write(f, "project.version", "2.0.0")
     text = f.read_text()
     assert "# leading comment" in text
@@ -43,7 +34,7 @@ def test_write_preserves_comments_and_neighbour_keys(tmp_path: Path):
 
 def test_write_creates_intermediate_tables(tmp_path: Path):
     f = tmp_path / "x.toml"
-    f.write_text('# empty\n')
+    f.write_text("# empty\n")
     TomlFormat().write(f, "deeply.nested.version", "1.0.0")
     text = f.read_text()
     assert "1.0.0" in text

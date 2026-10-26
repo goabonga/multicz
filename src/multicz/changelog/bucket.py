@@ -81,10 +81,7 @@ def bucket_commits(
     by_section: dict[str, list[Commit]] = {}
     for section in sections:
         type_set = {t.lower() for t in section.types}
-        items = [
-            c for c in relevant
-            if id(c) not in breaking_set and c.type.lower() in type_set
-        ]
+        items = [c for c in relevant if id(c) not in breaking_set and c.type.lower() in type_set]
         if items:
             by_section[section.title] = items
 
@@ -94,15 +91,10 @@ def bucket_commits(
     # any explicit section. Sorted for stable output.
     rule_claimed: set[str] = set()
     if bump_rules:
-        rule_claimed = {
-            t.lower()
-            for t, kind in bump_rules.items()
-            if kind != "none"
-        }
+        rule_claimed = {t.lower() for t, kind in bump_rules.items() if kind != "none"}
         for type_name in sorted(rule_claimed - section_claimed):
             items = [
-                c for c in relevant
-                if id(c) not in breaking_set and c.type.lower() == type_name
+                c for c in relevant if id(c) not in breaking_set and c.type.lower() == type_name
             ]
             if items:
                 by_section[type_name.title()] = items
@@ -111,8 +103,7 @@ def bucket_commits(
     if other_title:
         all_claimed = section_claimed | rule_claimed
         leftovers = [
-            c for c in relevant
-            if id(c) not in breaking_set and c.type.lower() not in all_claimed
+            c for c in relevant if id(c) not in breaking_set and c.type.lower() not in all_claimed
         ]
 
     return BucketedCommits(
@@ -143,18 +134,13 @@ def filter_commits(
     """
     sections = list(sections) if sections is not None else _default_changelog_sections()
     section_types = {t.lower() for s in sections for t in s.types}
-    rule_types = {
-        t.lower() for t, kind in (bump_rules or {}).items() if kind != "none"
-    }
+    rule_types = {t.lower() for t, kind in (bump_rules or {}).items() if kind != "none"}
     keep = section_types | rule_types
     keep_breaking = bool(breaking_title)
     keep_leftovers = bool(other_title)
     return [
-        c for c in commits
+        c
+        for c in commits
         if c.is_conventional
-        and (
-            (keep_breaking and c.breaking)
-            or c.type.lower() in keep
-            or keep_leftovers
-        )
+        and ((keep_breaking and c.breaking) or c.type.lower() in keep or keep_leftovers)
     ]

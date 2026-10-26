@@ -198,9 +198,7 @@ def _direct_pass(
         raise NonConventionalCommitsError(offenders)
 
 
-def _triggers_pass(
-    config: Config, plan: Plan, versions: dict[str, Version]
-) -> None:
+def _triggers_pass(config: Config, plan: Plan, versions: dict[str, Version]) -> None:
     """Cascade bumps along ``depends_on`` edges.
 
     The cascade kind is governed by ``project.trigger_policy``:
@@ -222,9 +220,7 @@ def _triggers_pass(
                 upstream_bump = plan.bumps.get(upstream)
                 if upstream_bump is None:
                     continue
-                cascade_kind: BumpKind = (
-                    "patch" if policy == "patch" else upstream_bump.kind
-                )
+                cascade_kind: BumpKind = "patch" if policy == "patch" else upstream_bump.kind
                 reason = TriggerReason(
                     upstream=upstream,
                     upstream_kind=upstream_bump.kind,

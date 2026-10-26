@@ -159,11 +159,15 @@ def _reachable(root: str, edges: list[tuple[str, str, str]]) -> set[str]:
 @app.command(name="graph")
 def graph_cmd(
     output: str = typer.Option(
-        "tree", "--output", "-o",
+        "tree",
+        "--output",
+        "-o",
         help="tree | mermaid | dot [default: tree]",
     ),
     component: str = typer.Option(
-        None, "--component", "-c",
+        None,
+        "--component",
+        "-c",
         help="Show only the cascade rooted at this component (downstream).",
     ),
 ) -> None:
@@ -182,10 +186,7 @@ def graph_cmd(
     multicz graph --output dot | dot -Tsvg # render via Graphviz
     """
     if output not in {"tree", "mermaid", "dot"}:
-        err.print(
-            f"[red]unknown --output:[/] {output} "
-            "(use 'tree', 'mermaid', or 'dot')"
-        )
+        err.print(f"[red]unknown --output:[/] {output} (use 'tree', 'mermaid', or 'dot')")
         raise typer.Exit(code=1)
 
     _, config = _load()

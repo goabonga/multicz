@@ -50,7 +50,7 @@ def latest_tag(cwd: Path, prefix: str) -> str | None:
         if not name.startswith(prefix):
             continue
         try:
-            versioned.append((Version(name[len(prefix):]), name))
+            versioned.append((Version(name[len(prefix) :]), name))
         except InvalidVersion:
             continue
     if not versioned:
@@ -86,7 +86,7 @@ def latest_version(cwd: Path, prefix: str) -> Version | None:
     tag = latest_tag(cwd, prefix)
     if tag is None:
         return None
-    return Version(tag[len(prefix):])
+    return Version(tag[len(prefix) :])
 
 
 def latest_stable_tag(cwd: Path, prefix: str) -> str | None:
@@ -103,7 +103,7 @@ def latest_stable_tag(cwd: Path, prefix: str) -> str | None:
         if not name.startswith(prefix):
             continue
         try:
-            v = Version(name[len(prefix):])
+            v = Version(name[len(prefix) :])
         except InvalidVersion:
             continue
         if v.is_prerelease:
@@ -120,9 +120,7 @@ def commits_since(cwd: Path, since: str | None) -> list[Commit]:
     return commits_in_range(cwd, since, "HEAD")
 
 
-def commits_in_range(
-    cwd: Path, since: str | None, end: str = "HEAD"
-) -> list[Commit]:
+def commits_in_range(cwd: Path, since: str | None, end: str = "HEAD") -> list[Commit]:
     """List commits between ``since`` (exclusive) and ``end`` (inclusive)."""
     range_arg = f"{since}..{end}" if since else end
     try:
@@ -134,9 +132,7 @@ def commits_in_range(
     commits: list[Commit] = []
     for sha in shas:
         message = _run_git(["log", "-1", "--format=%B", sha], cwd).rstrip("\n")
-        files_out = _run_git(
-            ["diff-tree", "--no-commit-id", "--name-only", "-r", sha], cwd
-        )
+        files_out = _run_git(["diff-tree", "--no-commit-id", "--name-only", "-r", sha], cwd)
         files = tuple(line.strip() for line in files_out.splitlines() if line.strip())
         commits.append(parse_commit(sha, message, files))
     return commits
@@ -152,9 +148,7 @@ def previous_stable_tag(cwd: Path, prefix: str, current: str) -> str | None:
     return _adjacent_tag(cwd, prefix, current, stable_only=True)
 
 
-def _adjacent_tag(
-    cwd: Path, prefix: str, current: str, *, stable_only: bool
-) -> str | None:
+def _adjacent_tag(cwd: Path, prefix: str, current: str, *, stable_only: bool) -> str | None:
     out = _run_git(["tag", "--list", f"{prefix}*"], cwd)
     pairs: list[tuple[Version, str]] = []
     for line in out.splitlines():
@@ -162,7 +156,7 @@ def _adjacent_tag(
         if not name.startswith(prefix):
             continue
         try:
-            v = Version(name[len(prefix):])
+            v = Version(name[len(prefix) :])
         except InvalidVersion:
             continue
         if stable_only and v.is_prerelease:
@@ -170,7 +164,7 @@ def _adjacent_tag(
         pairs.append((v, name))
     pairs.sort(key=lambda p: p[0])
     try:
-        cur_v = Version(current[len(prefix):])
+        cur_v = Version(current[len(prefix) :])
     except (InvalidVersion, ValueError):
         return None
     prev: str | None = None

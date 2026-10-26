@@ -38,7 +38,7 @@ def _read_cargo_excludes(repo: Path) -> set[Path]:
     for entry in excludes:
         if not isinstance(entry, str):
             continue
-        candidate = (repo / entry / "Cargo.toml")
+        candidate = repo / entry / "Cargo.toml"
         if candidate.is_file():
             out.add(candidate.resolve())
     return out
@@ -84,9 +84,7 @@ class CargoDiscovery:
 
     name = "cargo"
 
-    def discover(
-        self, repo: Path, context: DiscoveryContext
-    ) -> Iterable[DiscoveryResult]:
+    def discover(self, repo: Path, context: DiscoveryContext) -> Iterable[DiscoveryResult]:
         cargo_excluded = _read_cargo_excludes(repo)
         for cargo_path in _find_manifests(repo, "Cargo.toml"):
             if cargo_path.resolve() in cargo_excluded:
@@ -106,7 +104,8 @@ class CargoDiscovery:
             if (repo / "Dockerfile").is_file():
                 root_paths.append("Dockerfile")
             paths, changelog = default_component_paths(
-                rel_dir, paths_when_root=root_paths,
+                rel_dir,
+                paths_when_root=root_paths,
             )
             component = Component(
                 paths=paths,

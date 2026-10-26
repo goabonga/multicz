@@ -67,12 +67,8 @@ class CascadeEntry:
     section: str | None = None
     format: str | None = None
 
-_PREAMBLE = (
-    "# Changelog\n"
-    "\n"
-    "All notable changes to this component are documented here.\n"
-    "\n"
-)
+
+_PREAMBLE = "# Changelog\n\nAll notable changes to this component are documented here.\n\n"
 
 
 def render_body(
@@ -269,9 +265,7 @@ def drop_prerelease_sections(text: str, base_version: str) -> str:
     written, the now-superseded ``[1.3.0-rc.1]``, ``[1.3.0-rc.2]``, …
     sections are removed from the file.
     """
-    pre_re = re.compile(
-        rf"^## \[{re.escape(base_version)}-[A-Za-z]+\.\d+\]"
-    )
+    pre_re = re.compile(rf"^## \[{re.escape(base_version)}-[A-Za-z]+\.\d+\]")
     out: list[str] = []
     skip = False
     for line in text.splitlines(keepends=True):

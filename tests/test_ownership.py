@@ -78,9 +78,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(tmp_path, "config", "user.name", "Test")
     _commit(tmp_path, INITIAL, "chore: init")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(
-        "multicz.plugins.runner.DEFAULT_REGISTRY", PluginRegistry([_ClaimsApi()])
-    )
+    monkeypatch.setattr("multicz.plugins.runner.DEFAULT_REGISTRY", PluginRegistry([_ClaimsApi()]))
     return tmp_path
 
 

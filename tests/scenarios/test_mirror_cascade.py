@@ -34,17 +34,17 @@ bump_files = [{ file = "charts/myapp/Chart.yaml", key = "version" }]
 """
 
 
-def test_single_api_commit_cascades_chart_patch(
-    make_repo, commit, runner, git
-):
-    repo = make_repo({
-        "multicz.toml": CONFIG,
-        "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
-        "src/main.py": "x = 1\n",
-        "charts/myapp/Chart.yaml": (
-            "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
-        ),
-    })
+def test_single_api_commit_cascades_chart_patch(make_repo, commit, runner, git):
+    repo = make_repo(
+        {
+            "multicz.toml": CONFIG,
+            "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
+            "src/main.py": "x = 1\n",
+            "charts/myapp/Chart.yaml": (
+                "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
+            ),
+        }
+    )
     commit({"src/main.py": "x = 2\n"}, "feat: change")
 
     runner.invoke(app, ["bump", "--commit", "--tag"])
@@ -58,23 +58,20 @@ def test_single_api_commit_cascades_chart_patch(
     assert "chart-v0.4.1" in tags
 
 
-def test_chart_reasons_attribute_the_cascade_to_api(
-    make_repo, commit, runner
-):
-    make_repo({
-        "multicz.toml": CONFIG,
-        "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
-        "src/main.py": "x = 1\n",
-        "charts/myapp/Chart.yaml": (
-            "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
-        ),
-    })
+def test_chart_reasons_attribute_the_cascade_to_api(make_repo, commit, runner):
+    make_repo(
+        {
+            "multicz.toml": CONFIG,
+            "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
+            "src/main.py": "x = 1\n",
+            "charts/myapp/Chart.yaml": (
+                "apiVersion: v2\nname: x\nversion: 0.4.0\nappVersion: 1.2.0\n"
+            ),
+        }
+    )
     commit({"src/main.py": "x = 2\n"}, "feat: change")
 
     result = runner.invoke(app, ["plan", "--output", "json"])
     payload = json.loads(result.stdout)
     chart_reasons = payload["bumps"]["chart"]["reasons"]
-    assert any(
-        r["kind"] == "mirror" and r["upstream"] == "api"
-        for r in chart_reasons
-    )
+    assert any(r["kind"] == "mirror" and r["upstream"] == "api" for r in chart_reasons)

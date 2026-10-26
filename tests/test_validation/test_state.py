@@ -14,9 +14,7 @@ from multicz.validation.state import StateDriftCheck
 
 def _ctx(repo: Path) -> ValidationContext:
     config = load_config(repo / "multicz.toml")
-    return ValidationContext(
-        repo=repo, config=config, matcher=ComponentMatcher(config.components)
-    )
+    return ValidationContext(repo=repo, config=config, matcher=ComponentMatcher(config.components))
 
 
 def _write_state(path: Path, body: str) -> None:
@@ -26,9 +24,7 @@ def _write_state(path: Path, body: str) -> None:
 
 def test_state_drift_yields_warning(tmp_path: Path):
     # pyproject says 2.0.0 but state still records 1.0.0
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "2.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "2.0.0"\n')
     _write_state(
         tmp_path / ".multicz" / "state.json",
         '{"version": 1, "components": {"api": {"version": "1.0.0"}}}\n',
@@ -51,9 +47,7 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 
 
 def test_state_unknown_component_yields_warning(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     # state references "ghost" but the config no longer declares it
     _write_state(
         tmp_path / ".multicz" / "state.json",

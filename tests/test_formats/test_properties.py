@@ -30,12 +30,7 @@ def test_read_value_with_colon_separator(tmp_path: Path):
 
 def test_read_skips_comments_and_blanks(tmp_path: Path):
     f = tmp_path / "gradle.properties"
-    f.write_text(
-        "# header comment\n"
-        "! pling-style comment\n"
-        "\n"
-        "version=1.2.3\n"
-    )
+    f.write_text("# header comment\n! pling-style comment\n\nversion=1.2.3\n")
     assert PropertiesFormat().read(f, "version") == "1.2.3"
 
 
@@ -56,12 +51,7 @@ def test_read_missing_key_raises(tmp_path: Path):
 
 def test_write_preserves_comments_and_other_keys(tmp_path: Path):
     f = tmp_path / "gradle.properties"
-    f.write_text(
-        "# top comment\n"
-        "kotlin.version=1.9.0\n"
-        "version=1.0.0\n"
-        "# trailer\n"
-    )
+    f.write_text("# top comment\nkotlin.version=1.9.0\nversion=1.0.0\n# trailer\n")
     PropertiesFormat().write(f, "version", "2.0.0")
     text = f.read_text()
     assert "# top comment\n" in text

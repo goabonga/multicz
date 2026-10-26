@@ -29,21 +29,17 @@ def repo(tmp_path: Path) -> Path:
 
 def _ctx(repo: Path) -> ValidationContext:
     config = load_config(repo / "multicz.toml")
-    return ValidationContext(
-        repo=repo, config=config, matcher=ComponentMatcher(config.components)
-    )
+    return ValidationContext(repo=repo, config=config, matcher=ComponentMatcher(config.components))
 
 
 def _setup_overlap(repo: Path, policy: str | None) -> None:
-    (repo / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (repo / "src").mkdir()
     (repo / "src" / "main.py").write_text("x = 1\n")
-    project_block = (
-        f'\n[project]\noverlap_policy = "{policy}"\n' if policy else ""
-    )
-    (repo / "multicz.toml").write_text(project_block + """
+    project_block = f'\n[project]\noverlap_policy = "{policy}"\n' if policy else ""
+    (repo / "multicz.toml").write_text(
+        project_block
+        + """
 [components.api]
 paths = ["src/**", "pyproject.toml"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
@@ -51,7 +47,8 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 [components.lib]
 paths = ["src/**"]
 bump_files = [{ file = "pyproject.toml", key = "project.version" }]
-""")
+"""
+    )
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "init")
 

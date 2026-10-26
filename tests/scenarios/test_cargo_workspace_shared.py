@@ -34,22 +34,18 @@ bump_files = [{ file = "Cargo.toml", key = "workspace.package.version" }]
 """
 
 
-def test_feat_on_inheriting_member_bumps_the_shared_version(
-    make_repo, commit, runner
-):
-    make_repo({
-        "multicz.toml": CONFIG,
-        "Cargo.toml": ROOT_CARGO,
-        "src/lib.rs": "// root crate\n",
-        "crates/foo/Cargo.toml": (
-            '[package]\nname = "foo"\nversion.workspace = true\n'
-        ),
-        "crates/foo/src/lib.rs": "// foo\n",
-        "crates/bar/Cargo.toml": (
-            '[package]\nname = "bar"\nversion.workspace = true\n'
-        ),
-        "crates/bar/src/lib.rs": "// bar\n",
-    })
+def test_feat_on_inheriting_member_bumps_the_shared_version(make_repo, commit, runner):
+    make_repo(
+        {
+            "multicz.toml": CONFIG,
+            "Cargo.toml": ROOT_CARGO,
+            "src/lib.rs": "// root crate\n",
+            "crates/foo/Cargo.toml": ('[package]\nname = "foo"\nversion.workspace = true\n'),
+            "crates/foo/src/lib.rs": "// foo\n",
+            "crates/bar/Cargo.toml": ('[package]\nname = "bar"\nversion.workspace = true\n'),
+            "crates/bar/src/lib.rs": "// bar\n",
+        }
+    )
     commit({"crates/foo/src/lib.rs": "// foo!\n"}, "feat: foo gains a feature")
 
     result = runner.invoke(app, ["plan", "--output", "json"])

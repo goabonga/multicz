@@ -77,9 +77,7 @@ class DeprecationPlugin(BasePlugin):
         except ValueError:
             return Severity.error
 
-    def _scan_globs_for(
-        self, ctx: PluginContext, component_name: str
-    ) -> list[str]:
+    def _scan_globs_for(self, ctx: PluginContext, component_name: str) -> list[str]:
         """Resolve the scan globs for one component.
 
         Priority:
@@ -135,9 +133,7 @@ class DeprecationPlugin(BasePlugin):
                     )
         return violations
 
-    def enrich_changelog(
-        self, ctx: PluginContext, component: str
-    ) -> list[ChangelogEntry]:
+    def enrich_changelog(self, ctx: PluginContext, component: str) -> list[ChangelogEntry]:
         """Contribute up to two sections per component:
 
         * ``Deprecated`` — markers newly added in this release window
@@ -156,10 +152,7 @@ class DeprecationPlugin(BasePlugin):
         deprecated_lines: list[str] = []
         removed_lines: list[str] = []
         for dep in deps:
-            label = (
-                f"`{dep.file}:{dep.line}` (since {dep.since}, "
-                f"remove in {dep.remove_in})"
-            )
+            label = f"`{dep.file}:{dep.line}` (since {dep.since}, remove in {dep.remove_in})"
             if dep.message:
                 label += f" — {dep.message}"
             if current < dep.since <= next_v:

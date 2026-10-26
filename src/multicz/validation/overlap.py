@@ -77,10 +77,7 @@ class PathOverlapCheck:
             )
         elif policy == "first-match":
             level = "warning"
-            suffix = (
-                "first-match-wins means the earlier-declared component owns "
-                "the shared files."
-            )
+            suffix = "first-match-wins means the earlier-declared component owns the shared files."
         else:  # all
             level = "info"
             suffix = (
@@ -93,7 +90,5 @@ class PathOverlapCheck:
                 level=level,
                 check="path_overlap",
                 component=loser,
-                message=(
-                    f"shares files with {winner!r} (e.g. {sample!r}). {suffix}"
-                ),
+                message=(f"shares files with {winner!r} (e.g. {sample!r}). {suffix}"),
             )

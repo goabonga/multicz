@@ -14,15 +14,11 @@ from multicz.validation.mirrors import MirrorTargetsCheck
 
 def _ctx(repo: Path) -> ValidationContext:
     config = load_config(repo / "multicz.toml")
-    return ValidationContext(
-        repo=repo, config=config, matcher=ComponentMatcher(config.components)
-    )
+    return ValidationContext(repo=repo, config=config, matcher=ComponentMatcher(config.components))
 
 
 def test_mirror_to_unowned_file_is_info(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (tmp_path / "values.yaml").write_text("foo: bar\n")
     (tmp_path / "multicz.toml").write_text("""
 [components.api]
@@ -31,16 +27,11 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 mirrors = [{ file = "values.yaml", key = "version" }]
 """)
     findings = list(MirrorTargetsCheck().run(_ctx(tmp_path)))
-    assert any(
-        f.check == "mirror_target_unowned" and f.level == "info"
-        for f in findings
-    )
+    assert any(f.check == "mirror_target_unowned" and f.level == "info" for f in findings)
 
 
 def test_mirror_self_target_is_warning(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     (tmp_path / "multicz.toml").write_text("""
 [components.api]
 paths = ["src/**", "pyproject.toml"]

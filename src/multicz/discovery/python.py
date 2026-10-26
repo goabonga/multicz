@@ -80,9 +80,7 @@ class PythonDiscovery:
 
     name = "python"
 
-    def discover(
-        self, repo: Path, context: DiscoveryContext
-    ) -> Iterable[DiscoveryResult]:
+    def discover(self, repo: Path, context: DiscoveryContext) -> Iterable[DiscoveryResult]:
         pyprojects = _find_manifests(repo, "pyproject.toml")
         excluded: set[Path] = set()
         root_pyproject = repo / "pyproject.toml"
@@ -108,7 +106,8 @@ class PythonDiscovery:
             if (repo / "Dockerfile").is_file():
                 root_paths.append("Dockerfile")
             paths, changelog = default_component_paths(
-                rel_dir, paths_when_root=root_paths,
+                rel_dir,
+                paths_when_root=root_paths,
             )
             component = Component(
                 paths=paths,

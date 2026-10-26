@@ -97,8 +97,7 @@ class DebianChangelogImpl:
                 check="debian_changelog_missing",
                 component=None,
                 message=(
-                    f"{str(writer.file)!r} does not exist; it will be "
-                    "created on the first bump"
+                    f"{str(writer.file)!r} does not exist; it will be created on the first bump"
                 ),
             )
             return
@@ -117,10 +116,7 @@ class DebianChangelogImpl:
                 level="error",
                 check="debian_changelog_unparseable",
                 component=None,
-                message=(
-                    f"{str(writer.file)!r} top stanza is not a valid "
-                    "Debian changelog header"
-                ),
+                message=(f"{str(writer.file)!r} top stanza is not a valid Debian changelog header"),
             )
 
 
@@ -136,14 +132,18 @@ def _resolve_maintainer(repo: Path, configured: str | None) -> str:
     if control.is_file():
         for line in control.read_text(encoding="utf-8").splitlines():
             if line.startswith("Maintainer:"):
-                return line[len("Maintainer:"):].strip()
+                return line[len("Maintainer:") :].strip()
     name_proc = subprocess.run(
         ["git", "config", "user.name"],
-        cwd=repo, capture_output=True, text=True,
+        cwd=repo,
+        capture_output=True,
+        text=True,
     )
     email_proc = subprocess.run(
         ["git", "config", "user.email"],
-        cwd=repo, capture_output=True, text=True,
+        cwd=repo,
+        capture_output=True,
+        text=True,
     )
     name = name_proc.stdout.strip()
     email = email_proc.stdout.strip()

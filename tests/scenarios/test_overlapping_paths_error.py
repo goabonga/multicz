@@ -27,25 +27,27 @@ bump_files = [{ file = "pyproject.toml", key = "project.version" }]
 
 
 def test_default_overlap_policy_is_error(make_repo, runner):
-    make_repo({
-        "multicz.toml": OVERLAP_CONFIG,
-        "pyproject.toml": '[project]\nname = "x"\nversion = "1.0.0"\n',
-        "src/main.py": "x = 1\n",
-    })
+    make_repo(
+        {
+            "multicz.toml": OVERLAP_CONFIG,
+            "pyproject.toml": '[project]\nname = "x"\nversion = "1.0.0"\n',
+            "src/main.py": "x = 1\n",
+        }
+    )
 
     result = runner.invoke(app, ["validate"])
     assert result.exit_code == 1
     assert "path_overlap" in result.output
 
 
-def test_overlap_policy_all_bumps_both_components(
-    make_repo, commit, runner
-):
-    make_repo({
-        "multicz.toml": '[project]\noverlap_policy = "all"\n' + OVERLAP_CONFIG,
-        "pyproject.toml": '[project]\nname = "x"\nversion = "1.0.0"\n',
-        "src/main.py": "x = 1\n",
-    })
+def test_overlap_policy_all_bumps_both_components(make_repo, commit, runner):
+    make_repo(
+        {
+            "multicz.toml": '[project]\noverlap_policy = "all"\n' + OVERLAP_CONFIG,
+            "pyproject.toml": '[project]\nname = "x"\nversion = "1.0.0"\n',
+            "src/main.py": "x = 1\n",
+        }
+    )
     commit({"src/main.py": "x = 2\n"}, "feat: shared change")
 
     result = runner.invoke(app, ["plan", "--output", "json"])

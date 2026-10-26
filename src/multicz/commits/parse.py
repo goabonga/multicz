@@ -28,8 +28,17 @@ _HEADER_RE = re.compile(
 _BREAKING_FOOTER_RE = re.compile(r"^BREAKING(?:[ -]CHANGE)?:", re.MULTILINE)
 
 DEFAULT_TYPES: tuple[str, ...] = (
-    "feat", "fix", "perf", "refactor", "docs", "test",
-    "build", "ci", "chore", "style", "revert",
+    "feat",
+    "fix",
+    "perf",
+    "refactor",
+    "docs",
+    "test",
+    "build",
+    "ci",
+    "chore",
+    "style",
+    "revert",
 )
 DEFAULT_BUMP_RULES: dict[str, BumpRule] = {
     "feat": "minor",
@@ -38,7 +47,11 @@ DEFAULT_BUMP_RULES: dict[str, BumpRule] = {
     "revert": "patch",
 }
 _AUTO_PREFIXES: tuple[str, ...] = (
-    "Merge ", "Revert ", "fixup!", "squash!", "amend!",
+    "Merge ",
+    "Revert ",
+    "fixup!",
+    "squash!",
+    "amend!",
 )
 
 
@@ -63,10 +76,7 @@ def validate_message(message: str, allowed_types: tuple[str, ...] = DEFAULT_TYPE
             f"Allowed types: {', '.join(allowed_types)}."
         )
     if match.group("type").lower() not in allowed_types:
-        return (
-            f"unknown type {match.group('type')!r}. "
-            f"Allowed types: {', '.join(allowed_types)}."
-        )
+        return f"unknown type {match.group('type')!r}. Allowed types: {', '.join(allowed_types)}."
     return None
 
 
@@ -126,8 +136,9 @@ def parse_commit(sha: str, message: str, files: tuple[str, ...]) -> Commit:
 
     match = _HEADER_RE.match(header)
     if match is None:
-        return Commit(sha=sha, type="", scope=None, breaking=False,
-                      subject=header, body=body, files=files)
+        return Commit(
+            sha=sha, type="", scope=None, breaking=False, subject=header, body=body, files=files
+        )
 
     breaking = bool(match.group("breaking")) or bool(_BREAKING_FOOTER_RE.search(body))
     return Commit(

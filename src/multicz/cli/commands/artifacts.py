@@ -18,15 +18,20 @@ def artifacts(
         help="Component to render artifacts for. Required unless --all is set.",
     ),
     all_: bool = typer.Option(
-        False, "--all",
+        False,
+        "--all",
         help="Render artifacts for every component.",
     ),
     version_override: str = typer.Option(
-        None, "--version",
+        None,
+        "--version",
         help="Render with this explicit version instead of the current one.",
     ),
     output: str = typer.Option(
-        "text", "--output", "-o", help="text | json",
+        "text",
+        "--output",
+        "-o",
+        help="text | json",
     ),
 ) -> None:
     """List the artifacts a component (or all components) would publish.
@@ -59,10 +64,9 @@ def artifacts(
             version = version_override
         else:
             from ...planner import _current_version
+
             version = str(_current_version(repo, config, name))
-        rendered = [
-            a.render(component=name, version=version) for a in comp.artifacts
-        ]
+        rendered = [a.render(component=name, version=version) for a in comp.artifacts]
         payload[name] = {"version": version, "artifacts": rendered}
 
     presenters.render_artifacts(payload, output=output)

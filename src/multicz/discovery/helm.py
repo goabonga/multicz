@@ -33,9 +33,7 @@ class HelmDiscovery:
 
     name = "helm"
 
-    def discover(
-        self, repo: Path, context: DiscoveryContext
-    ) -> Iterable[DiscoveryResult]:
+    def discover(self, repo: Path, context: DiscoveryContext) -> Iterable[DiscoveryResult]:
         for chart_yaml in _find_chart_yamls(repo):
             chart_dir = chart_yaml.parent
             rel_dir = chart_dir.relative_to(repo).as_posix()

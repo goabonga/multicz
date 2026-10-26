@@ -83,20 +83,16 @@ def _seed():
         "pyproject.toml": '[project]\nname = "x"\nversion = "1.2.0"\n',
         "src/api/main.py": "x = 1\n",
         "charts/myapp-api/Chart.yaml": (
-            "apiVersion: v2\nname: myapp-api\nversion: 0.4.0\n"
-            "appVersion: 1.2.0\n"
+            "apiVersion: v2\nname: myapp-api\nversion: 0.4.0\nappVersion: 1.2.0\n"
         ),
         "charts/myapp-web/Chart.yaml": (
-            "apiVersion: v2\nname: myapp-web\nversion: 0.4.0\n"
-            "appVersion: 1.0.0\n"
+            "apiVersion: v2\nname: myapp-web\nversion: 0.4.0\nappVersion: 1.0.0\n"
         ),
         "charts/myapp/Chart.yaml": CHART_YAML,
     }
 
 
-def test_api_to_chart_api_uses_custom_format_in_features_section(
-    make_repo, commit, runner
-):
+def test_api_to_chart_api_uses_custom_format_in_features_section(make_repo, commit, runner):
     """The api -> chart-api mirror routes its cascade line into the
     chart-api CHANGELOG's ``Features`` section (matching an existing
     commit-driven section title) with the custom format."""
@@ -113,17 +109,14 @@ def test_api_to_chart_api_uses_custom_format_in_features_section(
     assert "Track `api`" not in body
 
 
-def test_release_notes_renders_cascades_for_upcoming_bumps(
-    make_repo, commit, runner
-):
+def test_release_notes_renders_cascades_for_upcoming_bumps(make_repo, commit, runner):
     """`multicz release-notes <component>` must surface cascade lines for
     upcoming bumps - same content as the bump-time CHANGELOG, so notes
     piped into `gh release create` describe pure-cascade releases instead
     of rendering `_No notable changes._`.
     """
     make_repo(_seed())
-    commit({"charts/myapp-api/templates/foo.yaml": "kind: ConfigMap\n"},
-           "feat(chart-api): add cm")
+    commit({"charts/myapp-api/templates/foo.yaml": "kind: ConfigMap\n"}, "feat(chart-api): add cm")
 
     # The umbrella `chart` bumps purely from a cascade (chart-api's
     # mirror writes into charts/myapp/Chart.yaml).
@@ -134,9 +127,7 @@ def test_release_notes_renders_cascades_for_upcoming_bumps(
     assert "Bump `myapp-api` dependency to" in result.stdout
 
 
-def test_subchart_mirrors_share_custom_section_in_umbrella_changelog(
-    make_repo, commit, runner
-):
+def test_subchart_mirrors_share_custom_section_in_umbrella_changelog(make_repo, commit, runner):
     """Both chart-api and chart-web mirror writes into the umbrella
     ``charts/myapp/Chart.yaml`` cascade onto ``chart``. Their cascade
     lines must group under one shared ``Subchart updates`` H3 in the
@@ -144,10 +135,8 @@ def test_subchart_mirrors_share_custom_section_in_umbrella_changelog(
     repo = make_repo(_seed())
     # Touch both subcharts so chart-api and chart-web each bump,
     # and each cascades its mirror into chart.
-    commit({"charts/myapp-api/templates/foo.yaml": "kind: ConfigMap\n"},
-           "feat(chart-api): add cm")
-    commit({"charts/myapp-web/templates/bar.yaml": "kind: ConfigMap\n"},
-           "feat(chart-web): add cm")
+    commit({"charts/myapp-api/templates/foo.yaml": "kind: ConfigMap\n"}, "feat(chart-api): add cm")
+    commit({"charts/myapp-web/templates/bar.yaml": "kind: ConfigMap\n"}, "feat(chart-web): add cm")
 
     runner.invoke(app, ["bump", "--commit", "--tag"])
 

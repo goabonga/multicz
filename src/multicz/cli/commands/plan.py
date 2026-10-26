@@ -22,31 +22,36 @@ from .._shared import (
 def plan_cmd(
     output: str = typer.Option("text", "--output", "-o", help="text | json"),
     pre: str = typer.Option(
-        None, "--pre",
+        None,
+        "--pre",
         help="Plan as if invoked with `bump --pre <label>`.",
     ),
     finalize: bool = typer.Option(
-        False, "--finalize",
+        False,
+        "--finalize",
         help="Plan as if invoked with `bump --finalize`.",
     ),
     since: str = typer.Option(
-        None, "--since",
+        None,
+        "--since",
         help="Override the commit window: use this ref instead of each "
-             "component's last tag. Useful for PR previews "
-             "(--since origin/main) or migration scenarios "
-             "(--since HEAD~10).",
+        "component's last tag. Useful for PR previews "
+        "(--since origin/main) or migration scenarios "
+        "(--since HEAD~10).",
     ),
     force: list[str] = typer.Option(
-        None, "--force",
+        None,
+        "--force",
         help="Force-bump <name>:<kind>. Repeatable. Bypasses commit "
-             "detection - use for manual rebuilds (CVE base image refresh, "
-             "weekly artefact rebuild, …).",
+        "detection - use for manual rebuilds (CVE base image refresh, "
+        "weekly artefact rebuild, …).",
     ),
     summary: Path = typer.Option(
-        None, "--summary",
+        None,
+        "--summary",
         help="Append a markdown summary of the plan to this file. "
-             "Wire to $GITHUB_STEP_SUMMARY in CI to get a release "
-             "preview at the top of the workflow run page.",
+        "Wire to $GITHUB_STEP_SUMMARY in CI to get a release "
+        "preview at the top of the workflow run page.",
         dir_okay=False,
     ),
 ) -> None:

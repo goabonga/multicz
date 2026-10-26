@@ -71,9 +71,7 @@ class PythonHelmAppVersionRelation:
             py_name, _ = pythons[0]
             chart_name, _ = charts[0]
             chart_yaml_path = components[chart_name].bump_files[0].file
-            components[py_name].mirrors.append(
-                FileKey(file=chart_yaml_path, key="appVersion")
-            )
+            components[py_name].mirrors.append(FileKey(file=chart_yaml_path, key="appVersion"))
             return
 
         for py_name, py_result in pythons:
@@ -81,9 +79,7 @@ class PythonHelmAppVersionRelation:
             for chart_comp_name, chart_result in charts:
                 if chart_result.raw_name == py_result.raw_name:
                     chart_yaml_path = components[chart_comp_name].bump_files[0].file
-                    py.mirrors.append(
-                        FileKey(file=chart_yaml_path, key="appVersion")
-                    )
+                    py.mirrors.append(FileKey(file=chart_yaml_path, key="appVersion"))
 
 
 class NodeWorkspaceRelation:

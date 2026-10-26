@@ -32,9 +32,7 @@ from .python import PythonDiscovery
 class DiscoveryStrategy(Protocol):
     name: str
 
-    def discover(
-        self, repo: Path, context: DiscoveryContext
-    ) -> Iterable[DiscoveryResult]: ...
+    def discover(self, repo: Path, context: DiscoveryContext) -> Iterable[DiscoveryResult]: ...
 
 
 DISCOVERERS: list[DiscoveryStrategy] = [

@@ -194,7 +194,7 @@ def test_cascade_per_entry_section_merges_into_existing_bucket():
     # Both the commit line and the cascade line are under the same H3.
     features_idx = body.index("### Features")
     next_section_idx = body.find("### ", features_idx + 1)
-    block = body[features_idx:next_section_idx if next_section_idx != -1 else len(body)]
+    block = body[features_idx : next_section_idx if next_section_idx != -1 else len(body)]
     assert "ingress" in block
     assert "Ship api 0.1.1" in block
 
@@ -312,9 +312,7 @@ def test_update_changelog_file_creates_file(tmp_path: Path):
 
 def test_update_changelog_file_prepends_to_existing(tmp_path: Path):
     target = tmp_path / "CHANGELOG.md"
-    target.write_text(
-        "# Changelog\n\n## [1.0.0] - 2026-01-01\n\n### Features\n\n- old (`zzz`)\n"
-    )
+    target.write_text("# Changelog\n\n## [1.0.0] - 2026-01-01\n\n### Features\n\n- old (`zzz`)\n")
     update_changelog_file(
         target,
         "1.1.0",

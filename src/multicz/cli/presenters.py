@@ -69,11 +69,7 @@ def render_plan(plan_obj, config, *, output: str) -> None:
         return
 
     for bump in plan_obj:
-        header = (
-            f"[bold]{bump.component}[/]: "
-            f"{bump.current} → {bump.next} "
-            f"[cyan]({bump.kind})[/]"
-        )
+        header = f"[bold]{bump.component}[/]: {bump.current} → {bump.next} [cyan]({bump.kind})[/]"
         console.print(header)
         for reason in bump.reasons:
             console.print(f"  • {reason.summary()}")
@@ -88,21 +84,17 @@ def append_plan_summary(path: Path, plan_obj, *, header: str) -> None:
         _append_step_summary(path, lines)
         return
 
-    lines.extend([
-        "| component | current | next | kind |",
-        "|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "| component | current | next | kind |",
+            "|---|---|---|---|",
+        ]
+    )
     for bump in plan_obj:
-        lines.append(
-            f"| `{bump.component}` | `{bump.current}` | "
-            f"`{bump.next}` | {bump.kind} |"
-        )
+        lines.append(f"| `{bump.component}` | `{bump.current}` | `{bump.next}` | {bump.kind} |")
     lines.append("")
     for bump in plan_obj:
-        lines.append(
-            f"### `{bump.component}` - {bump.current} → {bump.next} "
-            f"({bump.kind})"
-        )
+        lines.append(f"### `{bump.component}` - {bump.current} → {bump.next} ({bump.kind})")
         lines.append("")
         for reason in bump.reasons:
             lines.append(f"- {reason.summary()}")
@@ -144,8 +136,7 @@ def render_bump_empty(*, output: str) -> None:
         console.print_json(data={"bumps": {}})
     else:
         console.print(
-            "[dim]no bumps pending - "
-            "use [bold]--force <name>:<kind>[/] for a manual bump[/]"
+            "[dim]no bumps pending - use [bold]--force <name>:<kind>[/] for a manual bump[/]"
         )
 
 
@@ -220,10 +211,7 @@ def render_plugins_list(plugins, plugins_config, *, output: str) -> None:
         # parser — escape them so they render literally in the table.
         section_label = f"\\[plugins.{row['name']}]"
         if row["status"] == "inactive":
-            cfg_cell = (
-                f"[dim](not in multicz.toml — add {section_label} "
-                "to activate)[/]"
-            )
+            cfg_cell = f"[dim](not in multicz.toml — add {section_label} to activate)[/]"
         elif cfg:
             keys = ", ".join(f"{k}={v!r}" for k, v in cfg.items())
             cfg_cell = f"{section_label} {keys}"
@@ -350,14 +338,10 @@ def render_bump_result(
     verb = "would bump" if result.dry_run else "bumped"
     for b in result.bumps:
         console.print(
-            f"[green]{verb}[/] [bold]{b.component}[/] "
-            f"{b.current} → {b.next} "
-            f"([cyan]{b.kind}[/])"
+            f"[green]{verb}[/] [bold]{b.component}[/] {b.current} → {b.next} ([cyan]{b.kind}[/])"
         )
     if result.changelogs:
-        console.print(
-            f"[green]updated changelog[/] {', '.join(result.changelogs)}"
-        )
+        console.print(f"[green]updated changelog[/] {', '.join(result.changelogs)}")
     if result.git.commit_sha:
         console.print(f"[green]committed[/] {result.git.commit_sha[:7]}")
     if result.git.tags:
@@ -379,32 +363,30 @@ def append_bump_summary(
         _append_step_summary(path, lines)
         return
 
-    lines.extend([
-        "| component | current | next | kind | tag |",
-        "|---|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "| component | current | next | kind | tag |",
+            "|---|---|---|---|---|",
+        ]
+    )
     tags = list(result.git.tags)
     tag_index = {t.split("-v", 1)[0] if "-v" in t else None: t for t in tags}
     # Fall back to format string lookup when tag_format isn't `<comp>-v<ver>`.
     for b in result.bumps:
         tag = tag_index.get(b.component) or "-"
         for t in tags:
-            if config.tag_format_for(b.component).format(
-                component=b.component, version=b.next
-            ) == t:
+            if (
+                config.tag_format_for(b.component).format(component=b.component, version=b.next)
+                == t
+            ):
                 tag = t
                 break
-        lines.append(
-            f"| `{b.component}` | `{b.current}` | `{b.next}` | "
-            f"{b.kind} | `{tag}` |"
-        )
+        lines.append(f"| `{b.component}` | `{b.current}` | `{b.next}` | {b.kind} | `{tag}` |")
     lines.append("")
     if result.git.commit_sha:
         lines.append(f"**Release commit:** `{result.git.commit_sha[:12]}`")
     if tags:
-        lines.append(
-            f"**Tags created:** {', '.join(f'`{t}`' for t in tags)}"
-        )
+        lines.append(f"**Tags created:** {', '.join(f'`{t}`' for t in tags)}")
     if result.git.pushed:
         lines.append("**Pushed:** yes")
     if result.git.signed_commit and result.git.commit_sha:
@@ -453,9 +435,7 @@ def render_explain(component: str, bump) -> None:
 
     console.print(f"[bold]Component:[/] {component}")
     console.print(f"  Current version: {bump.current}")
-    console.print(
-        f"  Next version:    {bump.next} [cyan]({bump.kind})[/]"
-    )
+    console.print(f"  Next version:    {bump.next} [cyan]({bump.kind})[/]")
     if bump.pre:
         console.print(f"  Pre-release:     {bump.pre}")
     if bump.finalize:
@@ -467,9 +447,7 @@ def render_explain(component: str, bump) -> None:
             console.print(f"  {index}. {reason.summary()}")
             console.print(f"      SHA:   {reason.sha}")
             scope = f"({reason.scope})" if reason.scope else ""
-            console.print(
-                f"      Type:  {reason.type}{scope} → {reason.bump_kind}"
-            )
+            console.print(f"      Type:  {reason.type}{scope} → {reason.bump_kind}")
             if reason.original_kind is not None:
                 console.print(
                     f"      [yellow]Demoted from {reason.original_kind} "
@@ -538,52 +516,47 @@ def render_release_notes(
 ) -> None:
     """Render the output of ``multicz release-notes``."""
     if output == "json":
-        console.print_json(data={
-            "sections": [
-                {
-                    "component": s.component,
-                    "from_version": s.from_version,
-                    "to_version": s.to_version,
-                    "commits": [
-                        {
-                            "sha": c.sha,
-                            "type": c.type,
-                            "scope": c.scope,
-                            "breaking": c.breaking,
-                            "subject": c.subject,
-                        }
-                        for c in s.commits
-                    ],
-                    "cascades": [
-                        {
-                            "upstream": e.upstream,
-                            "upstream_version": e.upstream_version,
-                            "section": e.section,
-                            "format": e.format,
-                        }
-                        for e in s.cascades
-                    ],
-                }
-                for s in sections
-            ]
-        })
+        console.print_json(
+            data={
+                "sections": [
+                    {
+                        "component": s.component,
+                        "from_version": s.from_version,
+                        "to_version": s.to_version,
+                        "commits": [
+                            {
+                                "sha": c.sha,
+                                "type": c.type,
+                                "scope": c.scope,
+                                "breaking": c.breaking,
+                                "subject": c.subject,
+                            }
+                            for c in s.commits
+                        ],
+                        "cascades": [
+                            {
+                                "upstream": e.upstream,
+                                "upstream_version": e.upstream_version,
+                                "section": e.section,
+                                "format": e.format,
+                            }
+                            for e in s.cascades
+                        ],
+                    }
+                    for s in sections
+                ]
+            }
+        )
         return
 
     if output == "text":
         for s in sections:
-            range_label = (
-                f"{s.from_version} → {s.to_version}"
-                if s.from_version
-                else s.to_version
-            )
+            range_label = f"{s.from_version} → {s.to_version}" if s.from_version else s.to_version
             console.print(f"[bold]{s.component}[/] {range_label}")
             for c in s.commits:
                 bang = "!" if c.breaking else ""
                 scope = f"({c.scope})" if c.scope else ""
-                console.print(
-                    f"  - {c.type}{scope}{bang}: {c.subject}  "
-                    f"[dim]({c.sha[:7]})[/]"
-                )
+                console.print(f"  - {c.type}{scope}{bang}: {c.subject}  [dim]({c.sha[:7]})[/]")
             console.print()
         return
 
@@ -602,14 +575,8 @@ def render_release_notes(
             plugin_sections=list(s.plugin_sections) if s.plugin_sections else None,
         )
         if multi:
-            range_label = (
-                f"{s.from_version} → {s.to_version}"
-                if s.from_version
-                else s.to_version
-            )
-            chunks.append(
-                f"## {s.component} {range_label}\n\n{body}".rstrip() + "\n"
-            )
+            range_label = f"{s.from_version} → {s.to_version}" if s.from_version else s.to_version
+            chunks.append(f"## {s.component} {range_label}\n\n{body}".rstrip() + "\n")
         else:
             chunks.append(body.rstrip() + "\n")
     print("\n".join(chunks).rstrip() + "\n")
@@ -641,9 +608,7 @@ def render_changelog(
                 other_title=config.project.other_section_title,
             )
             md_chunks.append(f"{heading}\n\n{body}")
-        print(
-            "\n".join(chunk.rstrip() + "\n" for chunk in md_chunks).rstrip() + "\n"
-        )
+        print("\n".join(chunk.rstrip() + "\n" for chunk in md_chunks).rstrip() + "\n")
         return
 
     # text
@@ -659,8 +624,7 @@ def render_changelog(
             scope = f"({commit.scope})" if commit.scope else ""
             bang = "!" if commit.breaking else ""
             console.print(
-                f"  - {commit.type}{scope}{bang}: {commit.subject}"
-                f"  [dim]({commit.sha[:7]})[/]"
+                f"  - {commit.type}{scope}{bang}: {commit.subject}  [dim]({commit.sha[:7]})[/]"
             )
 
 
@@ -674,14 +638,16 @@ def render_validate(report: ValidationReport, *, output: str) -> None:
     presenter only prints.
     """
     if output == "json":
-        console.print_json(data={
-            "findings": [f.to_dict() for f in report.findings],
-            "summary": {
-                "errors": len(report.errors),
-                "warnings": len(report.warnings),
-                "info": len(report.infos),
-            },
-        })
+        console.print_json(
+            data={
+                "findings": [f.to_dict() for f in report.findings],
+                "summary": {
+                    "errors": len(report.errors),
+                    "warnings": len(report.warnings),
+                    "info": len(report.infos),
+                },
+            }
+        )
         return
 
     if not report.findings:
@@ -693,26 +659,15 @@ def render_validate(report: ValidationReport, *, output: str) -> None:
     for finding in report.findings:
         color = colors[finding.level]
         tag = tags[finding.level]
-        comp = (
-            f"[bold]{finding.component}[/]: "
-            if finding.component
-            else ""
-        )
-        console.print(
-            f"[{color}]{tag}[/] {comp}{finding.message}  "
-            f"[dim]({finding.check})[/]"
-        )
+        comp = f"[bold]{finding.component}[/]: " if finding.component else ""
+        console.print(f"[{color}]{tag}[/] {comp}{finding.message}  [dim]({finding.check})[/]")
     console.print()
     counts: list[str] = []
     if report.errors:
-        counts.append(
-            f"[red]{len(report.errors)} "
-            f"error{'s' if len(report.errors) != 1 else ''}[/]"
-        )
+        counts.append(f"[red]{len(report.errors)} error{'s' if len(report.errors) != 1 else ''}[/]")
     if report.warnings:
         counts.append(
-            f"[yellow]{len(report.warnings)} "
-            f"warning{'s' if len(report.warnings) != 1 else ''}[/]"
+            f"[yellow]{len(report.warnings)} warning{'s' if len(report.warnings) != 1 else ''}[/]"
         )
     if report.infos:
         counts.append(f"[blue]{len(report.infos)} info[/]")
@@ -736,13 +691,8 @@ def render_state(state_obj, state_file: str, *, output: str) -> None:
         console.print_json(data=state_obj.to_dict())
         return
 
-    console.print(
-        f"[bold]state[/] {state_file} "
-        f"(schema v{state_obj.version})"
-    )
-    console.print(
-        f"  git_head:  {state_obj.git_head_short or state_obj.git_head}"
-    )
+    console.print(f"[bold]state[/] {state_file} (schema v{state_obj.version})")
+    console.print(f"  git_head:  {state_obj.git_head_short or state_obj.git_head}")
     console.print(f"  timestamp: {state_obj.timestamp}")
     for name, comp in state_obj.components.items():
         line = f"  [bold]{name}[/]: {comp.version}"
@@ -760,18 +710,9 @@ def render_init_detect(components: dict, *, output: str) -> None:
         payload = {
             name: {
                 "paths": list(c.paths),
-                "bump_files": [
-                    {"file": str(b.file), "key": b.key}
-                    for b in c.bump_files
-                ],
-                "mirrors": [
-                    {"file": str(m.file), "key": m.key}
-                    for m in c.mirrors
-                ],
-                "writers": [
-                    {"type": w.type, "file": str(w.file)}
-                    for w in c.writers
-                ],
+                "bump_files": [{"file": str(b.file), "key": b.key} for b in c.bump_files],
+                "mirrors": [{"file": str(m.file), "key": m.key} for m in c.mirrors],
+                "writers": [{"type": w.type, "file": str(w.file)} for w in c.writers],
                 "changelog": str(c.changelog) if c.changelog else None,
             }
             for name, c in components.items()
@@ -795,8 +736,7 @@ def render_init_detect(components: dict, *, output: str) -> None:
             line += f" [yellow]writers={kinds}[/]"
         if comp.mirrors:
             targets = ", ".join(
-                f"{m.file.as_posix()}:{m.key}" if m.key else m.file.as_posix()
-                for m in comp.mirrors
+                f"{m.file.as_posix()}:{m.key}" if m.key else m.file.as_posix() for m in comp.mirrors
             )
             line += f"\n      mirrors → {targets}"
         console.print(line)
@@ -804,9 +744,6 @@ def render_init_detect(components: dict, *, output: str) -> None:
 
 def render_init_wrote(target: Path, *, bare: bool, components: dict | None) -> None:
     """Render the post-write success message for ``multicz init``."""
-    console.print(
-        f"[green]wrote[/] {target}"
-        f"{' [dim](bare stub)[/]' if bare else ''}"
-    )
+    console.print(f"[green]wrote[/] {target}{' [dim](bare stub)[/]' if bare else ''}")
     if components is not None:
         console.print(f"[dim]detected:[/] {', '.join(components)}")

@@ -24,12 +24,7 @@ def test_read_navigates_dotted_path(tmp_path: Path):
 
 def test_write_preserves_detected_indent_2(tmp_path: Path):
     f = tmp_path / "package.json"
-    f.write_text(
-        '{\n'
-        '  "name": "myapp",\n'
-        '  "version": "1.0.0"\n'
-        '}\n'
-    )
+    f.write_text('{\n  "name": "myapp",\n  "version": "1.0.0"\n}\n')
     JsonFormat().write(f, "version", "2.0.0")
     text = f.read_text()
     assert '"version": "2.0.0"' in text
@@ -38,12 +33,7 @@ def test_write_preserves_detected_indent_2(tmp_path: Path):
 
 def test_write_preserves_detected_indent_4(tmp_path: Path):
     f = tmp_path / "package.json"
-    f.write_text(
-        '{\n'
-        '    "name": "myapp",\n'
-        '    "version": "1.0.0"\n'
-        '}\n'
-    )
+    f.write_text('{\n    "name": "myapp",\n    "version": "1.0.0"\n}\n')
     JsonFormat().write(f, "version", "2.0.0")
     text = f.read_text()
     assert '    "version": "2.0.0"' in text  # 4-space indent preserved

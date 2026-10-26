@@ -25,11 +25,13 @@ depends_on = ["a"]
 
 
 def test_validate_detects_trigger_cycle(make_repo, runner):
-    make_repo({
-        "multicz.toml": CYCLIC_CONFIG,
-        "a/.keep": "",
-        "b/.keep": "",
-    })
+    make_repo(
+        {
+            "multicz.toml": CYCLIC_CONFIG,
+            "a/.keep": "",
+            "b/.keep": "",
+        }
+    )
 
     result = runner.invoke(app, ["validate"])
     assert result.exit_code == 1
@@ -40,8 +42,9 @@ def test_validate_detects_trigger_cycle(make_repo, runner):
 
 def test_mirror_cycle_is_also_detected(make_repo, runner):
     """Mirror cascades cycles are caught the same way (separate check)."""
-    make_repo({
-        "multicz.toml": """
+    make_repo(
+        {
+            "multicz.toml": """
 [components.a]
 paths = ["a.yaml"]
 bump_files = [{ file = "a.yaml", key = "v" }]
@@ -52,9 +55,10 @@ paths = ["b.yaml"]
 bump_files = [{ file = "b.yaml", key = "v" }]
 mirrors = [{ file = "a.yaml", key = "v" }]
 """,
-        "a.yaml": "v: 1\n",
-        "b.yaml": "v: 1\n",
-    })
+            "a.yaml": "v: 1\n",
+            "b.yaml": "v: 1\n",
+        }
+    )
 
     result = runner.invoke(app, ["validate"])
     assert result.exit_code == 1

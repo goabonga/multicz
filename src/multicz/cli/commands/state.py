@@ -26,17 +26,14 @@ def state(
     repo, config = _load()
     if config.project.state_file is None:
         err.print(
-            "[red]no state_file configured[/] - set "
-            "[bold][project].state_file[/] in multicz.toml"
+            "[red]no state_file configured[/] - set [bold][project].state_file[/] in multicz.toml"
         )
         raise typer.Exit(code=1)
 
     path = repo / config.project.state_file
     state_obj = load_state(path)
     if state_obj is None:
-        presenters.render_state_missing(
-            str(config.project.state_file), output=output
-        )
+        presenters.render_state_missing(str(config.project.state_file), output=output)
         return
 
     presenters.render_state(state_obj, str(config.project.state_file), output=output)

@@ -86,7 +86,9 @@ def test_bucket_collects_unmatched_types_into_leftovers_when_other_title_set():
         parse_commit("c", "ci: bump runner", ()),
     ]
     b = bucket_commits(
-        commits, sections=DEFAULT_SECTIONS, other_title="Misc",
+        commits,
+        sections=DEFAULT_SECTIONS,
+        other_title="Misc",
     )
     assert [c.subject for c in b.leftovers] == ["tidy", "bump runner"]
 
@@ -101,11 +103,7 @@ def test_bucket_skips_non_conventional_commits():
     # Non-conventional commit is gone from every bucket.
     assert "Features" in b.by_section
     assert "Fixes" in b.by_section
-    assert all(
-        "WIP" not in c.subject
-        for s in b.by_section.values()
-        for c in s
-    )
+    assert all("WIP" not in c.subject for s in b.by_section.values() for c in s)
     assert all("WIP" not in c.subject for c in b.breaking + b.leftovers)
 
 
@@ -159,7 +157,9 @@ def test_filter_keeps_leftovers_when_other_title_set():
         parse_commit("b", "chore: y", ()),
     ]
     out = filter_commits(
-        commits, sections=DEFAULT_SECTIONS, other_title="Misc",
+        commits,
+        sections=DEFAULT_SECTIONS,
+        other_title="Misc",
     )
     assert [c.subject for c in out] == ["x", "y"]
 

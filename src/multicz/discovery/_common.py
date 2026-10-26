@@ -14,13 +14,27 @@ from __future__ import annotations
 from pathlib import Path
 
 # Directories never recursed into when scanning for manifests.
-_NOISE_DIRS = frozenset({
-    ".git", ".hg", ".svn",
-    "node_modules", ".venv", "venv", ".tox", ".nox",
-    "vendor", "third_party",
-    "target", "build", "dist",
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-})
+_NOISE_DIRS = frozenset(
+    {
+        ".git",
+        ".hg",
+        ".svn",
+        "node_modules",
+        ".venv",
+        "venv",
+        ".tox",
+        ".nox",
+        "vendor",
+        "third_party",
+        "target",
+        "build",
+        "dist",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+    }
+)
 
 
 def _find_manifests(repo: Path, filename: str) -> list[Path]:

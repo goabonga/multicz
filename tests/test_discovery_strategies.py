@@ -33,9 +33,7 @@ def _ctx(repo: Path) -> DiscoveryContext:
 
 
 def test_python_strategy_yields_root_component(tmp_path: Path) -> None:
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "myapp"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "myapp"\nversion = "1.0.0"\n')
     (tmp_path / "src").mkdir()
     results = list(PythonDiscovery().discover(tmp_path, _ctx(tmp_path)))
     assert len(results) == 1
@@ -48,15 +46,11 @@ def test_python_strategy_yields_root_component(tmp_path: Path) -> None:
 
 
 def test_python_strategy_yields_each_workspace_member(tmp_path: Path) -> None:
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.uv.workspace]\nmembers = ["packages/*"]\n')
     for name in ("api", "cli"):
         member = tmp_path / "packages" / name
         member.mkdir(parents=True)
-        (member / "pyproject.toml").write_text(
-            f'[project]\nname = "{name}"\nversion = "0.1.0"\n'
-        )
+        (member / "pyproject.toml").write_text(f'[project]\nname = "{name}"\nversion = "0.1.0"\n')
     results = list(PythonDiscovery().discover(tmp_path, _ctx(tmp_path)))
     names = {r.raw_name for r in results}
     assert names == {"api", "cli"}
@@ -65,9 +59,7 @@ def test_python_strategy_yields_each_workspace_member(tmp_path: Path) -> None:
 def test_python_strategy_skips_pyproject_without_project_table(tmp_path: Path) -> None:
     """A workspace orchestrator with no `[project]` table is not a
     component itself."""
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.uv.workspace]\nmembers = ["packages/*"]\n')
     results = list(PythonDiscovery().discover(tmp_path, _ctx(tmp_path)))
     assert results == []
 
@@ -76,9 +68,7 @@ def test_python_strategy_skips_pyproject_without_project_table(tmp_path: Path) -
 
 
 def test_cargo_strategy_yields_single_crate(tmp_path: Path) -> None:
-    (tmp_path / "Cargo.toml").write_text(
-        '[package]\nname = "mycrate"\nversion = "0.1.0"\n'
-    )
+    (tmp_path / "Cargo.toml").write_text('[package]\nname = "mycrate"\nversion = "0.1.0"\n')
     results = list(CargoDiscovery().discover(tmp_path, _ctx(tmp_path)))
     assert len(results) == 1
     assert results[0].raw_name == "mycrate"
@@ -94,9 +84,7 @@ def test_helm_strategy_yields_one_per_chart(tmp_path: Path) -> None:
     for dirname in ("api", "worker"):
         chart = tmp_path / "charts" / dirname
         chart.mkdir(parents=True)
-        (chart / "Chart.yaml").write_text(
-            f"apiVersion: v2\nname: {dirname}\nversion: 0.1.0\n"
-        )
+        (chart / "Chart.yaml").write_text(f"apiVersion: v2\nname: {dirname}\nversion: 0.1.0\n")
     results = list(HelmDiscovery().discover(tmp_path, _ctx(tmp_path)))
     assert {r.raw_name for r in results} == {"api", "worker"}
     assert all(r.kind == "helm" for r in results)

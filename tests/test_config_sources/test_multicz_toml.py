@@ -21,11 +21,7 @@ def test_metadata():
 
 def test_extract_returns_full_document(tmp_path: Path):
     f = tmp_path / "multicz.toml"
-    f.write_text(
-        '[project]\n'
-        'commit_convention = "conventional"\n'
-        'tag_format = "v{version}"\n'
-    )
+    f.write_text('[project]\ncommit_convention = "conventional"\ntag_format = "v{version}"\n')
     raw = MulticzTomlSource().extract(f)
     assert raw is not None
     assert raw["project"]["tag_format"] == "v{version}"
@@ -54,7 +50,7 @@ def test_extract_returns_none_on_malformed_toml(tmp_path: Path):
 def test_extract_preserves_nested_structures(tmp_path: Path):
     f = tmp_path / "multicz.toml"
     f.write_text(
-        '[components.api]\n'
+        "[components.api]\n"
         'paths = ["src/**", "pyproject.toml"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )

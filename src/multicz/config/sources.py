@@ -153,6 +153,6 @@ def find_config(start: Path | None = None) -> Path:
                 return candidate
     raise FileNotFoundError(
         "no multicz config found (looked for multicz.toml, "
-        "pyproject.toml [tool.multicz], or package.json \"multicz\" key) "
+        'pyproject.toml [tool.multicz], or package.json "multicz" key) '
         f"in {here} or any parent directory"
     )

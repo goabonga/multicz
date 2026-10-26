@@ -10,12 +10,7 @@ from multicz.formats import FormatError, read_value, write_value
 
 def test_toml_preserves_comments_and_keys(tmp_path: Path):
     p = tmp_path / "pyproject.toml"
-    p.write_text(
-        '# top comment\n'
-        '[project]\n'
-        'name = "x"  # inline\n'
-        'version = "0.1.0"\n'
-    )
+    p.write_text('# top comment\n[project]\nname = "x"  # inline\nversion = "0.1.0"\n')
     write_value(p, "project.version", "1.2.3")
     text = p.read_text()
     assert "# top comment" in text
@@ -25,13 +20,7 @@ def test_toml_preserves_comments_and_keys(tmp_path: Path):
 
 def test_yaml_preserves_quotes(tmp_path: Path):
     p = tmp_path / "Chart.yaml"
-    p.write_text(
-        "# Helm chart\n"
-        "apiVersion: v2\n"
-        "name: myapp\n"
-        "version: 0.1.0\n"
-        'appVersion: "1.0.0"\n'
-    )
+    p.write_text('# Helm chart\napiVersion: v2\nname: myapp\nversion: 0.1.0\nappVersion: "1.0.0"\n')
     write_value(p, "appVersion", "2.0.0")
     write_value(p, "version", "0.2.0")
     text = p.read_text()
@@ -43,13 +32,13 @@ def test_yaml_preserves_quotes(tmp_path: Path):
 def test_json_preserves_indent_and_order(tmp_path: Path):
     p = tmp_path / "package.json"
     p.write_text(
-        '{\n'
+        "{\n"
         '    "name": "myapp",\n'
         '    "version": "0.1.0",\n'
         '    "scripts": {\n'
         '        "build": "vite build"\n'
-        '    }\n'
-        '}\n'
+        "    }\n"
+        "}\n"
     )
     write_value(p, "version", "1.2.3")
     text = p.read_text()
@@ -72,12 +61,7 @@ def test_json_nested_key(tmp_path: Path):
 
 def test_properties_round_trip(tmp_path: Path):
     p = tmp_path / "gradle.properties"
-    p.write_text(
-        "# build settings\n"
-        "version=1.0.0\n"
-        "group=com.example\n"
-        "# trailing comment\n"
-    )
+    p.write_text("# build settings\nversion=1.0.0\ngroup=com.example\n# trailing comment\n")
     write_value(p, "version", "2.0.0")
     text = p.read_text()
     assert "version=2.0.0" in text
@@ -113,7 +97,7 @@ def test_plain_file_round_trip(tmp_path: Path):
 
 def test_missing_key_raises(tmp_path: Path):
     p = tmp_path / "pyproject.toml"
-    p.write_text("[project]\nname = \"x\"\n")
+    p.write_text('[project]\nname = "x"\n')
     with pytest.raises(FormatError):
         read_value(p, "project.version")
 
@@ -129,10 +113,10 @@ def test_regex_key_python_dunder_version(tmp_path: Path):
     p = tmp_path / "__init__.py"
     p.write_text(
         '"""api package."""\n'
-        '\n'
+        "\n"
         '__version__ = "0.1.0"\n'
-        '\n'
-        'def hello() -> str:\n'
+        "\n"
+        "def hello() -> str:\n"
         '    return f"hi {__version__}"\n'
     )
     key = r'regex:^__version__\s*=\s*"([^"]+)"'

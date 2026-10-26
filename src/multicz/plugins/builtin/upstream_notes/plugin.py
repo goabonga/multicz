@@ -67,9 +67,7 @@ if TYPE_CHECKING:
 
 
 def _git(args: list[str], cwd: Path) -> str:
-    out = subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=False
-    )
+    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
     return out.stdout if out.returncode == 0 else ""
 
 
@@ -82,7 +80,7 @@ def _highest_tag_merged(repo: Path, prefix: str, ref: str) -> str | None:
         if not name.startswith(prefix):
             continue
         try:
-            v = Version(name[len(prefix):])
+            v = Version(name[len(prefix) :])
         except InvalidVersion:
             continue
         if best is None or v > best[0]:
@@ -123,9 +121,7 @@ class UpstreamNotesPlugin(BasePlugin):
     # ------------------------------------------------------------------
     # hooks
     # ------------------------------------------------------------------
-    def enrich_changelog(
-        self, ctx: PluginContext, component: str
-    ) -> list[ChangelogEntry]:
+    def enrich_changelog(self, ctx: PluginContext, component: str) -> list[ChangelogEntry]:
         bump = ctx.plan.bumps.get(component)
         if bump is None:
             return []
@@ -157,11 +153,7 @@ class UpstreamNotesPlugin(BasePlugin):
             if head_tag is None:
                 continue
 
-            prev_tag = (
-                _highest_tag_merged(ctx.repo, up_prefix, baseline)
-                if baseline
-                else None
-            )
+            prev_tag = _highest_tag_merged(ctx.repo, up_prefix, baseline) if baseline else None
             if prev_tag == head_tag:
                 continue  # upstream unchanged since last release of `component`
 
@@ -172,8 +164,7 @@ class UpstreamNotesPlugin(BasePlugin):
                 if c.is_conventional
                 and c.type.lower() not in ignored
                 and not release_re.match(
-                    f"{c.type}({c.scope}): {c.subject}" if c.scope
-                    else f"{c.type}: {c.subject}"
+                    f"{c.type}({c.scope}): {c.subject}" if c.scope else f"{c.type}: {c.subject}"
                 )
                 and any(matcher.match(f) == upstream for f in c.files)
             ]
@@ -188,8 +179,8 @@ class UpstreamNotesPlugin(BasePlugin):
             if len(commits) > max_commits:
                 lines.append(f"- … and {len(commits) - max_commits} more")
 
-            prev_label = prev_tag[len(up_prefix):] if prev_tag else "∅"
-            head_label = head_tag[len(up_prefix):]
+            prev_label = prev_tag[len(up_prefix) :] if prev_tag else "∅"
+            head_label = head_tag[len(up_prefix) :]
             entries.append(
                 ChangelogEntry(
                     section=f"Upstream: {upstream} (v{prev_label} → v{head_label})",
@@ -207,7 +198,6 @@ class UpstreamNotesPlugin(BasePlugin):
         for component in ctx.plan.bumps:
             for entry in self.enrich_changelog(ctx, component):
                 lines.append(
-                    f"{component}: ships {len(entry.lines)} upstream change(s) "
-                    f"\\[{entry.section}]"
+                    f"{component}: ships {len(entry.lines)} upstream change(s) \\[{entry.section}]"
                 )
         return lines

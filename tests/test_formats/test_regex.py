@@ -51,9 +51,9 @@ def test_write_replaces_only_first_match(tmp_path: Path):
 def test_write_preserves_surrounding_bytes(tmp_path: Path):
     """Quotes, indentation, trailing comments — all preserved verbatim."""
     f = tmp_path / "Makefile"
-    f.write_text('VERSION := 1.0.0  # set by hand\n')
-    RegexFormat().write(f, r'regex:^VERSION\s*:=\s*(\S+)', "2.0.0")
-    assert f.read_text() == 'VERSION := 2.0.0  # set by hand\n'
+    f.write_text("VERSION := 1.0.0  # set by hand\n")
+    RegexFormat().write(f, r"regex:^VERSION\s*:=\s*(\S+)", "2.0.0")
+    assert f.read_text() == "VERSION := 2.0.0  # set by hand\n"
 
 
 def test_empty_pattern_raises(tmp_path: Path):

@@ -37,13 +37,10 @@ from ..results import AppliedBump, BumpResult, GitSummary
 
 
 def _git(repo: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True
-    )
+    result = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True)
     if result.returncode != 0:
         err.print(
-            f"[red]git {' '.join(args)} failed ({result.returncode}):[/] "
-            f"{result.stderr.strip()}"
+            f"[red]git {' '.join(args)} failed ({result.returncode}):[/] {result.stderr.strip()}"
         )
         raise typer.Exit(code=1)
     return result.stdout
@@ -60,7 +57,9 @@ def _porcelain_paths(repo: Path) -> set[str]:
     """
     out = subprocess.run(
         ["git", "status", "--porcelain"],
-        cwd=repo, capture_output=True, text=True,
+        cwd=repo,
+        capture_output=True,
+        text=True,
     )
     if out.returncode != 0:
         return set()
@@ -90,14 +89,9 @@ def _run_post_bump_hook(repo: Path, command: str) -> None:
         return
     # stderr, so `multicz bump --output json | jq` stays parseable.
     err.print(f"  [dim]post_bump:[/] {command}")
-    result = subprocess.run(
-        args, cwd=repo, capture_output=True, text=True
-    )
+    result = subprocess.run(args, cwd=repo, capture_output=True, text=True)
     if result.returncode != 0:
-        err.print(
-            f"[red]post_bump hook failed[/] (exit {result.returncode}): "
-            f"{command}"
-        )
+        err.print(f"[red]post_bump hook failed[/] (exit {result.returncode}): {command}")
         if result.stderr.strip():
             err.print(result.stderr.strip())
         raise typer.Exit(code=1)
@@ -125,13 +119,9 @@ def _release_commit_message(
 
     Literal ``{`` and ``}`` in a template should be escaped as ``{{`` / ``}}``.
     """
-    summary = ", ".join(
-        f"{b.component} {b.current} -> {b.next}" for b in bumps
-    )
+    summary = ", ".join(f"{b.component} {b.current} -> {b.next}" for b in bumps)
     components = ", ".join(f"{b.component} v{b.next}" for b in bumps)
-    body = "\n".join(
-        f"- {b.component}: {b.current} -> {b.next} ({b.kind})" for b in bumps
-    )
+    body = "\n".join(f"- {b.component}: {b.current} -> {b.next} ({b.kind})" for b in bumps)
     rendered = template.format(
         summary=summary,
         components=components,
@@ -147,67 +137,84 @@ def _release_commit_message(
 def bump(
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Plan only, do not write."),
     component: list[str] = typer.Option(
-        None, "--component", "-c", help="Restrict to these components (repeatable).",
+        None,
+        "--component",
+        "-c",
+        help="Restrict to these components (repeatable).",
     ),
     output: str = typer.Option("text", "--output", "-o", help="text | json"),
     commit: bool = typer.Option(
-        False, "--commit", "-C",
+        False,
+        "--commit",
+        "-C",
         help="Stage written files and create a chore(release) commit.",
     ),
     tag: bool = typer.Option(
-        False, "--tag", "-t",
+        False,
+        "--tag",
+        "-t",
         help="Create one annotated git tag per bumped component.",
     ),
     push: bool = typer.Option(
-        False, "--push",
+        False,
+        "--push",
         help="Push the release commit and tags to origin (--follow-tags).",
     ),
     no_changelog: bool = typer.Option(
-        False, "--no-changelog",
+        False,
+        "--no-changelog",
         help="Skip CHANGELOG.md updates even if components declare one.",
     ),
     pre: str = typer.Option(
-        None, "--pre",
+        None,
+        "--pre",
         help="Enter or continue a pre-release cycle with this label "
-             "(e.g. 'rc', 'alpha', 'beta'). Increments the counter when "
-             "the current version is already in the same cycle.",
+        "(e.g. 'rc', 'alpha', 'beta'). Increments the counter when "
+        "the current version is already in the same cycle.",
     ),
     finalize: bool = typer.Option(
-        False, "--finalize",
+        False,
+        "--finalize",
         help="Drop a pre-release suffix and ship the final version. Works "
-             "even when there are no new commits since the rc tag.",
+        "even when there are no new commits since the rc tag.",
     ),
     commit_message: str = typer.Option(
-        None, "--commit-message", "-m",
+        None,
+        "--commit-message",
+        "-m",
         help="Verbatim release commit message (overrides the project's "
-             "release_commit_message template). Like 'git commit -m', no "
-             "placeholders are expanded - the string is used as-is.",
+        "release_commit_message template). Like 'git commit -m', no "
+        "placeholders are expanded - the string is used as-is.",
     ),
     force: list[str] = typer.Option(
-        None, "--force",
+        None,
+        "--force",
         help="Force-bump <name>:<kind>. Repeatable. Bypasses commit "
-             "detection - use for manual rebuilds (e.g. weekly base "
-             "image refresh: `--force api:patch`).",
+        "detection - use for manual rebuilds (e.g. weekly base "
+        "image refresh: `--force api:patch`).",
     ),
     sign: bool = typer.Option(
-        False, "--sign",
+        False,
+        "--sign",
         help="GPG-sign the release commit AND tags. Equivalent to setting "
-             "[project].sign_commits=true and [project].sign_tags=true. "
-             "Either source enables signing; the CLI flag never disables.",
+        "[project].sign_commits=true and [project].sign_tags=true. "
+        "Either source enables signing; the CLI flag never disables.",
     ),
     summary: Path = typer.Option(
-        None, "--summary",
+        None,
+        "--summary",
         help="Append a markdown summary of what was released to this file. "
-             "Wire to $GITHUB_STEP_SUMMARY in CI to surface the release on "
-             "the workflow run page.",
+        "Wire to $GITHUB_STEP_SUMMARY in CI to surface the release on "
+        "the workflow run page.",
         dir_okay=False,
     ),
     no_post_bump: bool = typer.Option(
-        False, "--no-post-bump",
+        False,
+        "--no-post-bump",
         help="Skip post_bump shell hooks for this run, even when "
-             "[project].post_bump_policy = \"allow\". Hooks are also skipped "
-             "(loudly) when the policy is \"deny\" - this flag silences the "
-             "warning in that case.",
+        '[project].post_bump_policy = "allow". Hooks are also skipped '
+        '(loudly) when the policy is "deny" - this flag silences the '
+        "warning in that case.",
     ),
 ) -> None:
     """Compute and apply the bump plan to all configured files."""
@@ -220,9 +227,7 @@ def bump(
 
     repo, config = _load()
     forced = _parse_force_specs(force, config) if force else {}
-    plan = _build_plan_or_exit(
-        repo, config, pre=pre, finalize=finalize, force=forced or None
-    )
+    plan = _build_plan_or_exit(repo, config, pre=pre, finalize=finalize, force=forced or None)
 
     if component:
         plan.bumps = {n: b for n, b in plan.bumps.items() if n in set(component)}
@@ -269,7 +274,10 @@ def bump(
         # 2. Markdown changelog (keep-a-changelog).
         if comp.changelog and not no_changelog and not dry_run:
             relevant = _component_relevant_commits(
-                planned.component, config, repo, matcher,
+                planned.component,
+                config,
+                repo,
+                matcher,
                 since_stable=use_stable_since,
             )
             # Surface mirror/trigger cascades as a Dependencies
@@ -280,9 +288,7 @@ def bump(
             cascade_entries = _cascade_entries_for(planned, plan, config)
             # Let plugins (e.g. deprecation) contribute custom sections
             # — Deprecated / Removed / SECURITY / etc.
-            plugin_entries = run_enrich_changelog(
-                config, repo, plan, planned.component
-            )
+            plugin_entries = run_enrich_changelog(config, repo, plan, planned.component)
             changelog_path = repo / comp.changelog
             update_changelog_file(
                 changelog_path,
@@ -308,7 +314,10 @@ def bump(
         #    via _current_version, and we just append the new stanza.
         if comp.writers and not dry_run:
             relevant = _component_relevant_commits(
-                planned.component, config, repo, matcher,
+                planned.component,
+                config,
+                repo,
+                matcher,
                 since_stable=use_stable_since,
             )
             for writer in comp.writers:
@@ -331,12 +340,14 @@ def bump(
                     rel = path.relative_to(repo) if path.is_relative_to(repo) else path
                     changelogs_updated.append(str(rel))
 
-        applied.append(AppliedBump(
-            component=planned.component,
-            current=str(planned.current),
-            next=new_version,
-            kind=planned.kind,
-        ))
+        applied.append(
+            AppliedBump(
+                component=planned.component,
+                current=str(planned.current),
+                next=new_version,
+                kind=planned.kind,
+            )
+        )
 
     # 4. Root CHANGELOG.md (aggregated cross-component view). Opt-in
     # via `[project] root_changelog = "<path>"`. Built from the same
@@ -352,12 +363,18 @@ def bump(
             comp = config.components[planned.component]
             is_final_d = _is_finalize(planned)
             use_stable_d = is_final_d and config.project.finalize_strategy in {
-                "consolidate", "promote",
+                "consolidate",
+                "promote",
             }
-            commits = tuple(_component_relevant_commits(
-                planned.component, config, repo, matcher,
-                since_stable=use_stable_d,
-            ))
+            commits = tuple(
+                _component_relevant_commits(
+                    planned.component,
+                    config,
+                    repo,
+                    matcher,
+                    since_stable=use_stable_d,
+                )
+            )
             cascade_from: str | None = None
             for reason in planned.reasons:
                 if isinstance(reason, (MirrorReason, TriggerReason)):
@@ -371,14 +388,16 @@ def bump(
                         else reason.upstream
                     )
                     break
-            digests.append(ComponentBumpDigest(
-                component=planned.component,
-                current=str(planned.current),
-                next_version=str(planned.next),
-                kind=planned.kind,
-                cascade_from=cascade_from,
-                commits=commits,
-            ))
+            digests.append(
+                ComponentBumpDigest(
+                    component=planned.component,
+                    current=str(planned.current),
+                    next_version=str(planned.next),
+                    kind=planned.kind,
+                    cascade_from=cascade_from,
+                    commits=commits,
+                )
+            )
         root_path = repo / root_changelog_setting
         update_root_changelog_file(
             root_path,
@@ -443,9 +462,7 @@ def bump(
     # rewrite the post_bump hook performs against the new pyproject. The
     # hash comparison catches it.
     if not dry_run and applied:
-        hook_components = [
-            b.component for b in applied if config.components[b.component].post_bump
-        ]
+        hook_components = [b.component for b in applied if config.components[b.component].post_bump]
         policy_allows = config.project.post_bump_policy == "allow"
         if hook_components and not policy_allows and not no_post_bump:
             # Configured hooks but policy denies them: warn loudly.
@@ -453,15 +470,14 @@ def bump(
             err.print(
                 f"[yellow]post_bump hooks skipped[/] for "
                 f"{', '.join(hook_components)}: "
-                f"set [cyan]project.post_bump_policy = \"allow\"[/] in "
+                f'set [cyan]project.post_bump_policy = "allow"[/] in '
                 f"multicz.toml to enable, or pass [cyan]--no-post-bump[/] to "
                 f"silence this warning."
             )
         elif hook_components and policy_allows and not no_post_bump:
             before_dirty = _porcelain_paths(repo)
             before_hashes: dict[str, str | None] = {
-                relpath: _hash_file(repo / relpath)
-                for relpath in before_dirty
+                relpath: _hash_file(repo / relpath) for relpath in before_dirty
             }
             for name in hook_components:
                 for command in config.components[name].post_bump:
@@ -484,9 +500,7 @@ def bump(
         if commit_message is not None:
             msg = commit_message  # CLI override is verbatim, no placeholders
         else:
-            msg = _release_commit_message(
-                applied, config.project.release_commit_message
-            )
+            msg = _release_commit_message(applied, config.project.release_commit_message)
         commit_args = ["commit", "-m", msg]
         if sign_commits_flag:
             commit_args.insert(1, "-S")  # before -m so git accepts it

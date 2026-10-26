@@ -38,11 +38,13 @@ def changelog(
             for c in commits_since(repo, since)
             if c.is_conventional and owned_files(config, repo, matcher, name, c.files)
         ]
-        entries.append(ChangelogEntry(
-            component=name,
-            since=since,
-            relevant=tuple(relevant),
-            planned=plan.bumps.get(name),
-        ))
+        entries.append(
+            ChangelogEntry(
+                component=name,
+                since=since,
+                relevant=tuple(relevant),
+                planned=plan.bumps.get(name),
+            )
+        )
 
     presenters.render_changelog(entries, config, output=output)

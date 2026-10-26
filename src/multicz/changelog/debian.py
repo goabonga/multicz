@@ -104,9 +104,7 @@ def upstream_version(debian_version: str) -> str:
 _SEMVER_PRE_RE = re.compile(r"^(?P<base>\d+(?:\.\d+){0,2})-(?P<label>[A-Za-z]+)\.(?P<num>\d+)$")
 
 
-_DEBIAN_PRE_RE = re.compile(
-    r"^(?P<base>\d+(?:\.\d+){0,2})~(?P<label>[A-Za-z]+)(?P<num>\d+)$"
-)
+_DEBIAN_PRE_RE = re.compile(r"^(?P<base>\d+(?:\.\d+){0,2})~(?P<label>[A-Za-z]+)(?P<num>\d+)$")
 
 
 def to_debian_pre(upstream: str) -> str:
@@ -227,11 +225,7 @@ def render_stanza(
         breaking_title=breaking_title,
         other_title=other_title,
     )
-    body = (
-        "\n".join(_bullet(c) for c in filtered)
-        if filtered
-        else "  * No notable changes."
-    )
+    body = "\n".join(_bullet(c) for c in filtered) if filtered else "  * No notable changes."
 
     date = format_datetime(when)
     return (

@@ -18,11 +18,7 @@ from multicz.formats import FORMATS, FormatError, read_value, write_value
 def test_regex_handler_overrides_extension_dispatch(tmp_path: Path):
     """A `regex:` key on a `.toml` file uses regex, not toml-dotted lookup."""
     f = tmp_path / "pyproject.toml"
-    f.write_text(
-        '[project]\n'
-        'name = "myapp"\n'
-        'version = "1.2.3"\n'
-    )
+    f.write_text('[project]\nname = "myapp"\nversion = "1.2.3"\n')
     # Same file, regex key against the `version` literal — bypasses
     # tomlkit and edits the bytes directly via the regex handler.
     assert read_value(f, r'regex:version = "([^"]+)"') == "1.2.3"

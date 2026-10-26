@@ -145,15 +145,11 @@ class Plugin(Protocol):
 
     def post_plan(self, ctx: PluginContext) -> list[Violation]: ...
 
-    def enrich_changelog(
-        self, ctx: PluginContext, component: str
-    ) -> list[ChangelogEntry]: ...
+    def enrich_changelog(self, ctx: PluginContext, component: str) -> list[ChangelogEntry]: ...
 
     def status_lines(self, ctx: PluginContext) -> list[str]: ...
 
-    def affects(
-        self, ctx: OwnershipContext, component: str, paths: list[str]
-    ) -> bool: ...
+    def affects(self, ctx: OwnershipContext, component: str, paths: list[str]) -> bool: ...
 
     def validate(self, ctx: OwnershipContext) -> list[Violation]: ...
 
@@ -175,17 +171,13 @@ class BasePlugin:
     def post_plan(self, ctx: PluginContext) -> list[Violation]:
         return []
 
-    def enrich_changelog(
-        self, ctx: PluginContext, component: str
-    ) -> list[ChangelogEntry]:
+    def enrich_changelog(self, ctx: PluginContext, component: str) -> list[ChangelogEntry]:
         return []
 
     def status_lines(self, ctx: PluginContext) -> list[str]:
         return []
 
-    def affects(
-        self, ctx: OwnershipContext, component: str, paths: list[str]
-    ) -> bool:
+    def affects(self, ctx: OwnershipContext, component: str, paths: list[str]) -> bool:
         return False
 
     def validate(self, ctx: OwnershipContext) -> list[Violation]:

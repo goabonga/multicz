@@ -94,9 +94,7 @@ def test_format_debian_version():
     assert format_debian_version("1.2.3") == "1.2.3-1"
     assert format_debian_version("1.2.3", debian_revision=3) == "1.2.3-3"
     assert format_debian_version("1.2.3", epoch=2) == "2:1.2.3-1"
-    assert (
-        format_debian_version("1.2.3", debian_revision=4, epoch=1) == "1:1.2.3-4"
-    )
+    assert format_debian_version("1.2.3", debian_revision=4, epoch=1) == "1:1.2.3-4"
 
 
 def test_render_stanza_with_commits():
@@ -151,8 +149,11 @@ def test_render_stanza_filters_chore_test_ci_by_default():
         parse_commit("f", "docs: clarify readme", ()),
     ]
     text = render_stanza(
-        package="myapp", version="1.0.0-1",
-        commits=commits, maintainer="x <x@y>", when=when,
+        package="myapp",
+        version="1.0.0-1",
+        commits=commits,
+        maintainer="x <x@y>",
+        when=when,
     )
     assert "* feat: Add login" in text
     assert "* fix: Null pointer" in text
@@ -172,8 +173,11 @@ def test_render_stanza_other_title_keeps_leftovers():
         parse_commit("b", "chore: y", ()),
     ]
     text = render_stanza(
-        package="myapp", version="1.0.0-1",
-        commits=commits, maintainer="x <x@y>", when=when,
+        package="myapp",
+        version="1.0.0-1",
+        commits=commits,
+        maintainer="x <x@y>",
+        when=when,
         other_title="Misc",
     )
     assert "* feat: X" in text
@@ -189,8 +193,11 @@ def test_render_stanza_breaking_kept_even_when_type_unknown():
         parse_commit("a", "chore!: rip out legacy api", ()),
     ]
     text = render_stanza(
-        package="myapp", version="2.0.0-1",
-        commits=commits, maintainer="x <x@y>", when=when,
+        package="myapp",
+        version="2.0.0-1",
+        commits=commits,
+        maintainer="x <x@y>",
+        when=when,
     )
     assert "* chore!: Rip out legacy api" in text
 
@@ -204,8 +211,11 @@ def test_render_stanza_no_relevant_commits_says_no_notable():
         parse_commit("b", "test: y", ()),
     ]
     text = render_stanza(
-        package="myapp", version="1.0.0-1",
-        commits=commits, maintainer="x <x@y>", when=when,
+        package="myapp",
+        version="1.0.0-1",
+        commits=commits,
+        maintainer="x <x@y>",
+        when=when,
     )
     assert "* No notable changes." in text
 

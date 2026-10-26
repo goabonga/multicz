@@ -115,9 +115,7 @@ def test_array_form_rejects_duplicate_name(tmp_path: Path):
 def test_array_form_rejects_non_string_name(tmp_path: Path):
     # not directly expressible in TOML but model can be invoked from python
     with pytest.raises(ValidationError):
-        Config.model_validate(
-            {"components": [{"name": 42, "paths": ["src/**"]}]}
-        )
+        Config.model_validate({"components": [{"name": 42, "paths": ["src/**"]}]})
 
 
 def test_array_form_empty_list_rejected(tmp_path: Path):
@@ -145,16 +143,20 @@ def test_array_form_with_depends_on_resolves(tmp_path: Path):
 
 
 def test_dict_and_array_produce_identical_models():
-    dict_form = Config.model_validate({
-        "components": {
-            "api": {"paths": ["src/**"]},
+    dict_form = Config.model_validate(
+        {
+            "components": {
+                "api": {"paths": ["src/**"]},
+            }
         }
-    })
-    array_form = Config.model_validate({
-        "components": [
-            {"name": "api", "paths": ["src/**"]},
-        ]
-    })
+    )
+    array_form = Config.model_validate(
+        {
+            "components": [
+                {"name": "api", "paths": ["src/**"]},
+            ]
+        }
+    )
     assert dict_form.model_dump() == array_form.model_dump()
 
 
@@ -200,6 +202,7 @@ def test_debian_writer_allows_bump_files(tmp_path: Path):
     assert len(api.writers) == 1
     writer = api.writers[0]
     from multicz.config import DebianChangelogWriter
+
     assert isinstance(writer, DebianChangelogWriter)
     assert str(api.bump_files[0].file) == "pyproject.toml"
 
@@ -303,12 +306,12 @@ def test_debian_writer_with_overrides(tmp_path: Path):
 def test_load_from_pyproject_tool_multicz(tmp_path: Path):
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
-        '[project]\n'
+        "[project]\n"
         'name = "myapp"\n'
         'version = "1.0.0"\n'
-        '\n'
-        '[tool.multicz]\n'
-        '[tool.multicz.components.api]\n'
+        "\n"
+        "[tool.multicz]\n"
+        "[tool.multicz.components.api]\n"
         'paths = ["src/**", "pyproject.toml"]\n'
         'bump_files = [{ file = "pyproject.toml", key = "project.version" }]\n'
     )
@@ -320,17 +323,17 @@ def test_load_from_pyproject_tool_multicz(tmp_path: Path):
 def test_load_from_pyproject_with_array_of_tables(tmp_path: Path):
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
-        '[project]\n'
+        "[project]\n"
         'name = "myapp"\n'
         'version = "1.0.0"\n'
-        '\n'
-        '[tool.multicz]\n'
-        '\n'
-        '[[tool.multicz.components]]\n'
+        "\n"
+        "[tool.multicz]\n"
+        "\n"
+        "[[tool.multicz.components]]\n"
         'name = "api"\n'
         'paths = ["src/**"]\n'
-        '\n'
-        '[[tool.multicz.components]]\n'
+        "\n"
+        "[[tool.multicz.components]]\n"
         'name = "web"\n'
         'paths = ["frontend/**"]\n'
     )
@@ -340,41 +343,48 @@ def test_load_from_pyproject_with_array_of_tables(tmp_path: Path):
 
 def test_load_from_package_json(tmp_path: Path):
     pkg = tmp_path / "package.json"
-    pkg.write_text(json.dumps({
-        "name": "monorepo",
-        "version": "1.0.0",
-        "multicz": {
-            "components": {
-                "web": {
-                    "paths": ["src/**", "package.json"],
-                    "bump_files": [{"file": "package.json", "key": "version"}],
-                }
-            }
-        }
-    }, indent=2))
+    pkg.write_text(
+        json.dumps(
+            {
+                "name": "monorepo",
+                "version": "1.0.0",
+                "multicz": {
+                    "components": {
+                        "web": {
+                            "paths": ["src/**", "package.json"],
+                            "bump_files": [{"file": "package.json", "key": "version"}],
+                        }
+                    }
+                },
+            },
+            indent=2,
+        )
+    )
     config = load_config(pkg)
     assert "web" in config.components
 
 
 def test_load_from_package_json_with_array_form(tmp_path: Path):
     pkg = tmp_path / "package.json"
-    pkg.write_text(json.dumps({
-        "name": "monorepo",
-        "multicz": {
-            "components": [
-                {"name": "web", "paths": ["frontend/**"]},
-                {"name": "mobile", "paths": ["mobile/**"]},
-            ]
-        }
-    }))
+    pkg.write_text(
+        json.dumps(
+            {
+                "name": "monorepo",
+                "multicz": {
+                    "components": [
+                        {"name": "web", "paths": ["frontend/**"]},
+                        {"name": "mobile", "paths": ["mobile/**"]},
+                    ]
+                },
+            }
+        )
+    )
     config = load_config(pkg)
     assert list(config.components) == ["web", "mobile"]
 
 
 def test_pyproject_without_tool_multicz_is_skipped(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "1.0.0"\n')
     with pytest.raises(FileNotFoundError):
         find_config(tmp_path)
 
@@ -410,9 +420,7 @@ def test_find_config_prefers_pyproject_over_package_json(tmp_path: Path):
 
 def test_find_config_walks_up(tmp_path: Path):
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(
-        '[tool.multicz.components.api]\npaths = ["src/**"]\n'
-    )
+    pyproject.write_text('[tool.multicz.components.api]\npaths = ["src/**"]\n')
     nested = tmp_path / "deep" / "nested" / "dir"
     nested.mkdir(parents=True)
     found = find_config(nested)
@@ -507,13 +515,13 @@ def test_valid_component_names(tmp_path: Path):
     nested tables), but the *resolved* component name still passes.
     """
     cases = [
-        ("a", '[components.a]'),
-        ("api", '[components.api]'),
-        ("api-v1", '[components.api-v1]'),
+        ("a", "[components.a]"),
+        ("api", "[components.api]"),
+        ("api-v1", "[components.api-v1]"),
         ("api.v1", '[components."api.v1"]'),
-        ("api_v1", '[components.api_v1]'),
-        ("myapp-chart", '[components.myapp-chart]'),
-        ("API", '[components.API]'),
+        ("api_v1", "[components.api_v1]"),
+        ("myapp-chart", "[components.myapp-chart]"),
+        ("API", "[components.API]"),
     ]
     for resolved_name, header in cases:
         target = _write(tmp_path, f'{header}\npaths = ["src/**"]\n')

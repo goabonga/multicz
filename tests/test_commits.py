@@ -96,7 +96,7 @@ def test_validate_rejects_unknown_type():
 def test_validate_skips_merge_and_fixup():
     assert validate_message("Merge branch 'main' into dev") is None
     assert validate_message("fixup! feat: x") is None
-    assert validate_message("Revert \"feat: x\"") is None
+    assert validate_message('Revert "feat: x"') is None
 
 
 def test_validate_custom_types():

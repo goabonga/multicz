@@ -44,9 +44,7 @@ def _read_package_json_version(path: Path) -> str | None:
     return data.get("version") if isinstance(data, dict) else None
 
 
-def _read_workspace_globs(
-    package_json: Path, pnpm_workspace: Path
-) -> list[str]:
+def _read_workspace_globs(package_json: Path, pnpm_workspace: Path) -> list[str]:
     """Return workspace member globs from npm/yarn (package.json) or pnpm.
 
     Recognised shapes:
@@ -71,9 +69,7 @@ def _read_workspace_globs(
                     globs = [str(g) for g in packages if isinstance(g, str)]
     if not globs and pnpm_workspace.is_file():
         try:
-            data = YAML(typ="safe").load(
-                pnpm_workspace.read_text(encoding="utf-8")
-            ) or {}
+            data = YAML(typ="safe").load(pnpm_workspace.read_text(encoding="utf-8")) or {}
         except Exception:
             data = {}
         packages = data.get("packages") if isinstance(data, dict) else None
@@ -115,9 +111,7 @@ def _detect_node(
                 excluded_paths.add(member.resolve())
         for pattern in include_globs:
             for member in sorted(repo.glob(f"{pattern}/package.json")):
-                if any(
-                    part in _NOISE_DIRS for part in member.relative_to(repo).parts
-                ):
+                if any(part in _NOISE_DIRS for part in member.relative_to(repo).parts):
                     continue
                 if member.resolve() in excluded_paths:
                     continue
@@ -140,14 +134,13 @@ def _detect_node(
         if not python_taken and (repo / "src").is_dir():
             root_paths.insert(0, "src/**")
         paths, _changelog = default_component_paths(
-            rel_dir, paths_when_root=root_paths,
+            rel_dir,
+            paths_when_root=root_paths,
         )
         # When a Python component already owns the root CHANGELOG.md,
         # the JS root component leaves changelog unset to avoid a
         # second component clobbering the same file.
-        changelog: Path | None = (
-            None if rel_dir == Path(".") and python_taken else _changelog
-        )
+        changelog: Path | None = None if rel_dir == Path(".") and python_taken else _changelog
         components[comp_name] = Component(
             paths=paths,
             bump_files=[FileKey(file=path.relative_to(repo), key="version")],

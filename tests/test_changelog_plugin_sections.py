@@ -52,9 +52,7 @@ def test_plugin_section_alone_suppresses_no_notable_changes():
     render `_No notable changes._` — the plugin output IS the content."""
     out = render_body(
         [],
-        plugin_sections=[
-            ChangelogEntry(section="Removed", component="api", lines=("dropped X",))
-        ],
+        plugin_sections=[ChangelogEntry(section="Removed", component="api", lines=("dropped X",))],
     )
     assert "_No notable changes._" not in out
     assert "### Removed" in out
@@ -76,9 +74,7 @@ def test_render_section_passes_plugin_sections_through():
     out = render_section(
         version="1.0.0",
         commits=[parse_commit("a", "feat: x", ())],
-        plugin_sections=[
-            ChangelogEntry(section="Removed", component="api", lines=("OldAPI",))
-        ],
+        plugin_sections=[ChangelogEntry(section="Removed", component="api", lines=("OldAPI",))],
     )
     assert "## [1.0.0]" in out
     assert "### Removed" in out

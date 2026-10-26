@@ -31,10 +31,12 @@ def _allowed_types_from_config() -> tuple[str, ...]:
 @app.command()
 def check(
     file: str = typer.Argument(
-        ..., help="Commit message file (use '-' to read from stdin).",
+        ...,
+        help="Commit message file (use '-' to read from stdin).",
     ),
     types: list[str] = typer.Option(
-        None, "--type",
+        None,
+        "--type",
         help="Restrict allowed commit types (repeatable). Defaults to the full set.",
     ),
 ) -> None:

@@ -23,13 +23,9 @@ def _read_go_module(path: Path) -> str | None:
         stripped = line.strip()
         if not stripped.startswith("module "):
             continue
-        module = stripped[len("module "):].strip().strip('"')
+        module = stripped[len("module ") :].strip().strip('"')
         parts = [p for p in module.split("/") if p]
-        if (
-            len(parts) >= 2
-            and parts[-1].startswith("v")
-            and parts[-1][1:].isdigit()
-        ):
+        if len(parts) >= 2 and parts[-1].startswith("v") and parts[-1][1:].isdigit():
             parts = parts[:-1]
         return parts[-1] if parts else None
     return None
@@ -40,9 +36,7 @@ class GoDiscovery:
 
     name = "go"
 
-    def discover(
-        self, repo: Path, context: DiscoveryContext
-    ) -> Iterable[DiscoveryResult]:
+    def discover(self, repo: Path, context: DiscoveryContext) -> Iterable[DiscoveryResult]:
         for gomod_path in _find_manifests(repo, "go.mod"):
             raw_name = _read_go_module(gomod_path)
             if not raw_name:
@@ -54,7 +48,8 @@ class GoDiscovery:
             if (repo / "Dockerfile").is_file():
                 root_paths.append("Dockerfile")
             paths, changelog = default_component_paths(
-                rel_dir, paths_when_root=root_paths,
+                rel_dir,
+                paths_when_root=root_paths,
             )
             component = Component(
                 paths=paths,

@@ -15,7 +15,8 @@ from .._shared import _build_plan_or_exit, _load
 def explain(
     component: str = typer.Argument(..., help="Component to explain."),
     since: str = typer.Option(
-        None, "--since",
+        None,
+        "--since",
         help="Override the commit window for this explanation.",
     ),
 ) -> None:

@@ -24,19 +24,16 @@ from ._base import REGEX_KEY_PREFIX, FormatError
 
 
 def _compile(key: str) -> re.Pattern[str]:
-    pattern = key[len(REGEX_KEY_PREFIX):]
+    pattern = key[len(REGEX_KEY_PREFIX) :]
     if not pattern:
         raise FormatError(f"empty regex pattern in key: {key!r}")
     try:
         compiled = re.compile(pattern, re.MULTILINE)
     except re.error as exc:
-        raise FormatError(
-            f"invalid regex {pattern!r} in key {key!r}: {exc}"
-        ) from exc
+        raise FormatError(f"invalid regex {pattern!r} in key {key!r}: {exc}") from exc
     if compiled.groups < 1:
         raise FormatError(
-            f"regex {pattern!r} must contain exactly one capture "
-            "group locating the version literal"
+            f"regex {pattern!r} must contain exactly one capture group locating the version literal"
         )
     return compiled
 
@@ -62,6 +59,4 @@ class RegexFormat:
         if not match:
             raise FormatError(f"regex {key!r} matched nothing in {file}")
         g_start, g_end = match.span(1)
-        file.write_text(
-            text[:g_start] + value + text[g_end:], encoding="utf-8"
-        )
+        file.write_text(text[:g_start] + value + text[g_end:], encoding="utf-8")

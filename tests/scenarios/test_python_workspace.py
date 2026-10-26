@@ -33,18 +33,16 @@ bump_files = [{ file = "services/worker/pyproject.toml", key = "project.version"
 
 
 def test_feat_on_api_member_does_not_touch_worker(make_repo, commit, runner):
-    make_repo({
-        "multicz.toml": CONFIG,
-        "pyproject.toml": ROOT_PYPROJECT,
-        "services/api/pyproject.toml": (
-            '[project]\nname = "api"\nversion = "1.0.0"\n'
-        ),
-        "services/api/src/main.py": "x = 1\n",
-        "services/worker/pyproject.toml": (
-            '[project]\nname = "worker"\nversion = "0.5.0"\n'
-        ),
-        "services/worker/src/main.py": "x = 1\n",
-    })
+    make_repo(
+        {
+            "multicz.toml": CONFIG,
+            "pyproject.toml": ROOT_PYPROJECT,
+            "services/api/pyproject.toml": ('[project]\nname = "api"\nversion = "1.0.0"\n'),
+            "services/api/src/main.py": "x = 1\n",
+            "services/worker/pyproject.toml": ('[project]\nname = "worker"\nversion = "0.5.0"\n'),
+            "services/worker/src/main.py": "x = 1\n",
+        }
+    )
     commit({"services/api/src/main.py": "x = 2\n"}, "feat(api): new endpoint")
 
     result = runner.invoke(app, ["plan", "--output", "json"])
@@ -57,18 +55,16 @@ def test_feat_on_api_member_does_not_touch_worker(make_repo, commit, runner):
 
 def test_independent_members_bump_independently(make_repo, commit, runner):
     """Two members can bump simultaneously when both are touched."""
-    make_repo({
-        "multicz.toml": CONFIG,
-        "pyproject.toml": ROOT_PYPROJECT,
-        "services/api/pyproject.toml": (
-            '[project]\nname = "api"\nversion = "1.0.0"\n'
-        ),
-        "services/api/src/main.py": "x = 1\n",
-        "services/worker/pyproject.toml": (
-            '[project]\nname = "worker"\nversion = "0.5.0"\n'
-        ),
-        "services/worker/src/main.py": "x = 1\n",
-    })
+    make_repo(
+        {
+            "multicz.toml": CONFIG,
+            "pyproject.toml": ROOT_PYPROJECT,
+            "services/api/pyproject.toml": ('[project]\nname = "api"\nversion = "1.0.0"\n'),
+            "services/api/src/main.py": "x = 1\n",
+            "services/worker/pyproject.toml": ('[project]\nname = "worker"\nversion = "0.5.0"\n'),
+            "services/worker/src/main.py": "x = 1\n",
+        }
+    )
     commit({"services/api/src/main.py": "x = 2\n"}, "feat: api change")
     commit({"services/worker/src/main.py": "x = 2\n"}, "fix: worker bug")
 

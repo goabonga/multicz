@@ -25,8 +25,7 @@ class ChangelogPathCheck:
                     check="changelog_not_a_file",
                     component=name,
                     message=(
-                        f"changelog path {str(comp.changelog)!r} exists but is "
-                        "not a regular file"
+                        f"changelog path {str(comp.changelog)!r} exists but is not a regular file"
                     ),
                 )
 

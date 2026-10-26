@@ -8,9 +8,7 @@ from multicz.discovery import discover_components, render_config
 
 
 def _python_project(repo: Path, name: str = "myapp") -> None:
-    (repo / "pyproject.toml").write_text(
-        f'[project]\nname = "{name}"\nversion = "1.0.0"\n'
-    )
+    (repo / "pyproject.toml").write_text(f'[project]\nname = "{name}"\nversion = "1.0.0"\n')
     (repo / "src").mkdir()
 
 
@@ -110,8 +108,8 @@ def test_multiple_charts_independent(tmp_path: Path):
 
 def test_multiple_charts_with_python_only_mirrors_matching_name(tmp_path: Path):
     _python_project(tmp_path, name="api")
-    _chart(tmp_path, dirname="api")        # chart name matches -> mirror
-    _chart(tmp_path, dirname="worker")     # different name -> no mirror
+    _chart(tmp_path, dirname="api")  # chart name matches -> mirror
+    _chart(tmp_path, dirname="worker")  # different name -> no mirror
 
     comps = discover_components(tmp_path)
     api_mirrors = comps["api"].mirrors
@@ -132,9 +130,7 @@ def test_single_python_single_chart_mirrors_even_with_different_names(tmp_path: 
 def test_chart_under_helm_dir(tmp_path: Path):
     helm_dir = tmp_path / "helm" / "myapp"
     helm_dir.mkdir(parents=True)
-    (helm_dir / "Chart.yaml").write_text(
-        "apiVersion: v2\nname: myapp\nversion: 0.1.0\n"
-    )
+    (helm_dir / "Chart.yaml").write_text("apiVersion: v2\nname: myapp\nversion: 0.1.0\n")
     comps = discover_components(tmp_path)
     assert "myapp" in comps
     assert comps["myapp"].paths == ["helm/myapp/**"]
@@ -143,9 +139,7 @@ def test_chart_under_helm_dir(tmp_path: Path):
 def test_chart_under_deploy_dir(tmp_path: Path):
     deploy = tmp_path / "deploy" / "k8s" / "service-a"
     deploy.mkdir(parents=True)
-    (deploy / "Chart.yaml").write_text(
-        "apiVersion: v2\nname: service-a\nversion: 0.1.0\n"
-    )
+    (deploy / "Chart.yaml").write_text("apiVersion: v2\nname: service-a\nversion: 0.1.0\n")
     comps = discover_components(tmp_path)
     assert "service-a" in comps
 
@@ -161,9 +155,7 @@ def test_chart_in_node_modules_is_skipped(tmp_path: Path):
 
 
 def test_cargo_plain_crate_at_root(tmp_path: Path):
-    (tmp_path / "Cargo.toml").write_text(
-        '[package]\nname = "myapp"\nversion = "0.1.0"\n'
-    )
+    (tmp_path / "Cargo.toml").write_text('[package]\nname = "myapp"\nversion = "0.1.0"\n')
     (tmp_path / "src").mkdir()
     comps = discover_components(tmp_path)
     assert "myapp" in comps
@@ -180,14 +172,10 @@ def test_cargo_workspace_with_shared_version(tmp_path: Path):
     )
     foo = tmp_path / "crates" / "foo"
     foo.mkdir(parents=True)
-    (foo / "Cargo.toml").write_text(
-        '[package]\nname = "foo"\nversion.workspace = true\n'
-    )
+    (foo / "Cargo.toml").write_text('[package]\nname = "foo"\nversion.workspace = true\n')
     bar = tmp_path / "crates" / "bar"
     bar.mkdir(parents=True)
-    (bar / "Cargo.toml").write_text(
-        '[package]\nname = "bar"\nversion.workspace = true\n'
-    )
+    (bar / "Cargo.toml").write_text('[package]\nname = "bar"\nversion.workspace = true\n')
 
     comps = discover_components(tmp_path)
     # only the root workspace component is added; members inherit
@@ -205,9 +193,7 @@ def test_cargo_workspace_with_shared_version_and_root_package(tmp_path: Path):
     )
     foo = tmp_path / "crates" / "foo"
     foo.mkdir(parents=True)
-    (foo / "Cargo.toml").write_text(
-        '[package]\nname = "foo"\nversion.workspace = true\n'
-    )
+    (foo / "Cargo.toml").write_text('[package]\nname = "foo"\nversion.workspace = true\n')
     comps = discover_components(tmp_path)
     assert "rootkit" in comps
     assert comps["rootkit"].bump_files[0].key == "workspace.package.version"
@@ -215,19 +201,13 @@ def test_cargo_workspace_with_shared_version_and_root_package(tmp_path: Path):
 
 
 def test_cargo_independent_member_crates(tmp_path: Path):
-    (tmp_path / "Cargo.toml").write_text(
-        '[workspace]\nmembers = ["crates/foo", "crates/bar"]\n'
-    )
+    (tmp_path / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/foo", "crates/bar"]\n')
     foo = tmp_path / "crates" / "foo"
     foo.mkdir(parents=True)
-    (foo / "Cargo.toml").write_text(
-        '[package]\nname = "foo"\nversion = "1.0.0"\n'
-    )
+    (foo / "Cargo.toml").write_text('[package]\nname = "foo"\nversion = "1.0.0"\n')
     bar = tmp_path / "crates" / "bar"
     bar.mkdir(parents=True)
-    (bar / "Cargo.toml").write_text(
-        '[package]\nname = "bar"\nversion = "2.0.0"\n'
-    )
+    (bar / "Cargo.toml").write_text('[package]\nname = "bar"\nversion = "2.0.0"\n')
     comps = discover_components(tmp_path)
     assert {"foo", "bar"}.issubset(comps)
     assert comps["foo"].paths == ["crates/foo/**"]
@@ -240,14 +220,10 @@ def test_cargo_workspace_exclude_is_honored(tmp_path: Path):
     )
     keep = tmp_path / "crates" / "keep"
     keep.mkdir(parents=True)
-    (keep / "Cargo.toml").write_text(
-        '[package]\nname = "keep"\nversion = "1.0.0"\n'
-    )
+    (keep / "Cargo.toml").write_text('[package]\nname = "keep"\nversion = "1.0.0"\n')
     legacy = tmp_path / "crates" / "legacy"
     legacy.mkdir(parents=True)
-    (legacy / "Cargo.toml").write_text(
-        '[package]\nname = "legacy"\nversion = "0.1.0"\n'
-    )
+    (legacy / "Cargo.toml").write_text('[package]\nname = "legacy"\nversion = "0.1.0"\n')
     comps = discover_components(tmp_path)
     assert "keep" in comps
     assert "legacy" not in comps
@@ -256,17 +232,13 @@ def test_cargo_workspace_exclude_is_honored(tmp_path: Path):
 def test_cargo_in_target_dir_skipped(tmp_path: Path):
     target_cargo = tmp_path / "target" / "package" / "Cargo.toml"
     target_cargo.parent.mkdir(parents=True)
-    target_cargo.write_text(
-        '[package]\nname = "leaked"\nversion = "0.1.0"\n'
-    )
+    target_cargo.write_text('[package]\nname = "leaked"\nversion = "0.1.0"\n')
     comps = discover_components(tmp_path)
     assert "leaked" not in comps
 
 
 def test_go_module_at_root(tmp_path: Path):
-    (tmp_path / "go.mod").write_text(
-        "module github.com/foo/bar\n\ngo 1.21\n"
-    )
+    (tmp_path / "go.mod").write_text("module github.com/foo/bar\n\ngo 1.21\n")
     (tmp_path / "main.go").write_text("package main\n")
     comps = discover_components(tmp_path)
     assert "bar" in comps
@@ -276,9 +248,7 @@ def test_go_module_at_root(tmp_path: Path):
 
 
 def test_go_module_strips_major_version_suffix(tmp_path: Path):
-    (tmp_path / "go.mod").write_text(
-        "module github.com/foo/bar/v3\n\ngo 1.21\n"
-    )
+    (tmp_path / "go.mod").write_text("module github.com/foo/bar/v3\n\ngo 1.21\n")
     comps = discover_components(tmp_path)
     assert "bar" in comps
     assert "v3" not in comps
@@ -315,9 +285,7 @@ def test_gradle_with_settings_groovy(tmp_path: Path):
     (tmp_path / "gradle.properties").write_text(
         "# build settings\nversion=1.2.3\ngroup=com.example\n"
     )
-    (tmp_path / "settings.gradle").write_text(
-        "rootProject.name = 'myapp'\n"
-    )
+    (tmp_path / "settings.gradle").write_text("rootProject.name = 'myapp'\n")
     (tmp_path / "build.gradle").write_text("// noop\n")
     (tmp_path / "src").mkdir()
     comps = discover_components(tmp_path)
@@ -331,9 +299,7 @@ def test_gradle_with_settings_groovy(tmp_path: Path):
 
 def test_gradle_with_settings_kotlin(tmp_path: Path):
     (tmp_path / "gradle.properties").write_text("version=2.0.0\n")
-    (tmp_path / "settings.gradle.kts").write_text(
-        'rootProject.name = "kotlin-app"\n'
-    )
+    (tmp_path / "settings.gradle.kts").write_text('rootProject.name = "kotlin-app"\n')
     comps = discover_components(tmp_path)
     assert "kotlin-app" in comps
 
@@ -348,9 +314,7 @@ def test_gradle_without_settings_falls_back_to_dirname(tmp_path: Path):
 
 def test_gradle_without_version_in_properties_skipped(tmp_path: Path):
     (tmp_path / "gradle.properties").write_text("group=com.example\n")
-    (tmp_path / "settings.gradle").write_text(
-        "rootProject.name = 'noversion'\n"
-    )
+    (tmp_path / "settings.gradle").write_text("rootProject.name = 'noversion'\n")
     comps = discover_components(tmp_path)
     assert "noversion" not in comps
 
@@ -370,19 +334,13 @@ def test_no_components(tmp_path: Path):
 
 
 def test_uv_workspace_with_members(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.uv.workspace]\nmembers = ["packages/*"]\n')
     foo = tmp_path / "packages" / "foo"
     foo.mkdir(parents=True)
-    (foo / "pyproject.toml").write_text(
-        '[project]\nname = "foo"\nversion = "0.1.0"\n'
-    )
+    (foo / "pyproject.toml").write_text('[project]\nname = "foo"\nversion = "0.1.0"\n')
     bar = tmp_path / "packages" / "bar"
     bar.mkdir(parents=True)
-    (bar / "pyproject.toml").write_text(
-        '[project]\nname = "bar"\nversion = "0.2.0"\n'
-    )
+    (bar / "pyproject.toml").write_text('[project]\nname = "bar"\nversion = "0.2.0"\n')
 
     comps = discover_components(tmp_path)
     # root has no [project]/[tool.poetry] -> not a component
@@ -399,9 +357,7 @@ def test_uv_workspace_with_root_package(tmp_path: Path):
     (tmp_path / "src").mkdir()
     pkg = tmp_path / "packages" / "extra"
     pkg.mkdir(parents=True)
-    (pkg / "pyproject.toml").write_text(
-        '[project]\nname = "extra"\nversion = "0.1.0"\n'
-    )
+    (pkg / "pyproject.toml").write_text('[project]\nname = "extra"\nversion = "0.1.0"\n')
     comps = discover_components(tmp_path)
     assert "rootlib" in comps
     assert "extra" in comps
@@ -411,19 +367,14 @@ def test_uv_workspace_with_root_package(tmp_path: Path):
 
 def test_uv_workspace_excludes_skip_member(tmp_path: Path):
     (tmp_path / "pyproject.toml").write_text(
-        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
-        'exclude = ["packages/legacy"]\n'
+        '[tool.uv.workspace]\nmembers = ["packages/*"]\nexclude = ["packages/legacy"]\n'
     )
     keep = tmp_path / "packages" / "keep"
     keep.mkdir(parents=True)
-    (keep / "pyproject.toml").write_text(
-        '[project]\nname = "keep"\nversion = "0.1.0"\n'
-    )
+    (keep / "pyproject.toml").write_text('[project]\nname = "keep"\nversion = "0.1.0"\n')
     legacy = tmp_path / "packages" / "legacy"
     legacy.mkdir(parents=True)
-    (legacy / "pyproject.toml").write_text(
-        '[project]\nname = "legacy"\nversion = "0.1.0"\n'
-    )
+    (legacy / "pyproject.toml").write_text('[project]\nname = "legacy"\nversion = "0.1.0"\n')
 
     comps = discover_components(tmp_path)
     assert "keep" in comps
@@ -431,9 +382,7 @@ def test_uv_workspace_excludes_skip_member(tmp_path: Path):
 
 
 def test_poetry_legacy_layout(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.poetry]\nname = "old-app"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.poetry]\nname = "old-app"\nversion = "1.0.0"\n')
     (tmp_path / "src").mkdir()
     comps = discover_components(tmp_path)
     assert "old-app" in comps
@@ -446,14 +395,10 @@ def test_poetry_monorepo_multiple_pyproject(tmp_path: Path):
     # No uv workspace, but several pyproject.toml files in subdirs (Poetry monorepo)
     api = tmp_path / "services" / "api"
     api.mkdir(parents=True)
-    (api / "pyproject.toml").write_text(
-        '[tool.poetry]\nname = "api"\nversion = "1.0.0"\n'
-    )
+    (api / "pyproject.toml").write_text('[tool.poetry]\nname = "api"\nversion = "1.0.0"\n')
     worker = tmp_path / "services" / "worker"
     worker.mkdir(parents=True)
-    (worker / "pyproject.toml").write_text(
-        '[project]\nname = "worker"\nversion = "0.5.0"\n'
-    )
+    (worker / "pyproject.toml").write_text('[project]\nname = "worker"\nversion = "0.5.0"\n')
     comps = discover_components(tmp_path)
     assert "api" in comps and "worker" in comps
     assert comps["api"].bump_files[0].key == "tool.poetry.version"
@@ -461,19 +406,13 @@ def test_poetry_monorepo_multiple_pyproject(tmp_path: Path):
 
 
 def test_python_workspace_helm_mirrors_by_name(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.uv.workspace]\nmembers = ["packages/*"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[tool.uv.workspace]\nmembers = ["packages/*"]\n')
     api = tmp_path / "packages" / "api"
     api.mkdir(parents=True)
-    (api / "pyproject.toml").write_text(
-        '[project]\nname = "api"\nversion = "1.0.0"\n'
-    )
+    (api / "pyproject.toml").write_text('[project]\nname = "api"\nversion = "1.0.0"\n')
     worker = tmp_path / "packages" / "worker"
     worker.mkdir(parents=True)
-    (worker / "pyproject.toml").write_text(
-        '[project]\nname = "worker"\nversion = "0.5.0"\n'
-    )
+    (worker / "pyproject.toml").write_text('[project]\nname = "worker"\nversion = "0.5.0"\n')
     _chart(tmp_path, dirname="api")
     _chart(tmp_path, dirname="worker")
 
@@ -510,9 +449,7 @@ def test_debian_changelog_with_python_alongside(tmp_path: Path):
     Each is its own component with its own version source."""
     from multicz.config import DebianChangelogWriter
 
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "mypkg"\nversion = "1.2.3"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "mypkg"\nversion = "1.2.3"\n')
     (tmp_path / "src").mkdir()
     debian = tmp_path / "debian"
     debian.mkdir()
@@ -530,9 +467,7 @@ def test_debian_changelog_with_python_alongside(tmp_path: Path):
     assert comps["mypkg"].writers == []
     # The debian component has a single debian-changelog writer.
     assert len(comps["mypkg-deb"].writers) == 1
-    assert isinstance(
-        comps["mypkg-deb"].writers[0], DebianChangelogWriter
-    )
+    assert isinstance(comps["mypkg-deb"].writers[0], DebianChangelogWriter)
 
 
 def test_debian_changelog_garbage_skipped(tmp_path: Path):
@@ -570,6 +505,7 @@ def test_render_round_trips_through_config(tmp_path: Path):
     target.write_text(text)
 
     import tomlkit
+
     parsed = tomlkit.parse(target.read_text()).unwrap()
     config = Config.model_validate(parsed)
     config.validate_references()
@@ -591,19 +527,14 @@ def test_package_json_creates_component(tmp_path: Path):
 
 def test_npm_workspaces_array_expands(tmp_path: Path):
     (tmp_path / "package.json").write_text(
-        '{"name": "monorepo", "private": true, '
-        '"workspaces": ["packages/*"]}\n'
+        '{"name": "monorepo", "private": true, "workspaces": ["packages/*"]}\n'
     )
     web = tmp_path / "packages" / "web"
     web.mkdir(parents=True)
-    (web / "package.json").write_text(
-        '{"name": "web", "version": "1.0.0"}\n'
-    )
+    (web / "package.json").write_text('{"name": "web", "version": "1.0.0"}\n')
     api = tmp_path / "packages" / "api"
     api.mkdir(parents=True)
-    (api / "package.json").write_text(
-        '{"name": "api-js", "version": "0.5.0"}\n'
-    )
+    (api / "package.json").write_text('{"name": "api-js", "version": "0.5.0"}\n')
     comps = discover_components(tmp_path)
 
     assert "web" in comps
@@ -625,17 +556,11 @@ def test_yarn_berry_workspaces_object(tmp_path: Path):
 
 
 def test_pnpm_workspace_yaml(tmp_path: Path):
-    (tmp_path / "package.json").write_text(
-        '{"name": "monorepo", "private": true}\n'
-    )
-    (tmp_path / "pnpm-workspace.yaml").write_text(
-        "packages:\n  - 'packages/*'\n"
-    )
+    (tmp_path / "package.json").write_text('{"name": "monorepo", "private": true}\n')
+    (tmp_path / "pnpm-workspace.yaml").write_text("packages:\n  - 'packages/*'\n")
     web = tmp_path / "packages" / "web"
     web.mkdir(parents=True)
-    (web / "package.json").write_text(
-        '{"name": "@acme/web", "version": "1.0.0"}\n'
-    )
+    (web / "package.json").write_text('{"name": "@acme/web", "version": "1.0.0"}\n')
     comps = discover_components(tmp_path)
     assert "web" in comps  # npm scope stripped
     assert "monorepo" not in comps
@@ -645,15 +570,11 @@ def test_fastapi_plus_react_in_subdir_both_detected(tmp_path: Path):
     """The standard FastAPI + React monorepo: pyproject at root, SPA in
     frontend/, no npm workspace declared. Both components must be picked
     up so they get independent tags and CHANGELOG.md files."""
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "api"\nversion = "1.0.0"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "api"\nversion = "1.0.0"\n')
     (tmp_path / "src").mkdir()
     frontend = tmp_path / "frontend"
     frontend.mkdir()
-    (frontend / "package.json").write_text(
-        '{"name": "web", "version": "0.5.0"}\n'
-    )
+    (frontend / "package.json").write_text('{"name": "web", "version": "0.5.0"}\n')
 
     comps = discover_components(tmp_path)
     assert "api" in comps
@@ -671,22 +592,16 @@ def test_multiple_subdir_packages_without_workspace(tmp_path: Path):
     for sub, version in (("web", "1.0.0"), ("mobile", "2.0.0"), ("admin", "0.1.0")):
         d = tmp_path / sub
         d.mkdir()
-        (d / "package.json").write_text(
-            f'{{"name": "{sub}", "version": "{version}"}}\n'
-        )
+        (d / "package.json").write_text(f'{{"name": "{sub}", "version": "{version}"}}\n')
     comps = discover_components(tmp_path)
     assert {"web", "mobile", "admin"}.issubset(comps)
 
 
 def test_subdir_package_json_in_node_modules_still_skipped(tmp_path: Path):
-    (tmp_path / "package.json").write_text(
-        '{"name": "root", "version": "1.0.0"}\n'
-    )
+    (tmp_path / "package.json").write_text('{"name": "root", "version": "1.0.0"}\n')
     nm = tmp_path / "node_modules" / "leaked"
     nm.mkdir(parents=True)
-    (nm / "package.json").write_text(
-        '{"name": "leaked", "version": "9.9.9"}\n'
-    )
+    (nm / "package.json").write_text('{"name": "leaked", "version": "9.9.9"}\n')
     comps = discover_components(tmp_path)
     assert "root" in comps
     assert "leaked" not in comps
@@ -695,19 +610,13 @@ def test_subdir_package_json_in_node_modules_still_skipped(tmp_path: Path):
 def test_workspace_declaration_keeps_strict_member_list(tmp_path: Path):
     """When workspaces are declared, packages outside the listed globs
     are NOT added - the user has been explicit about what is in scope."""
-    (tmp_path / "package.json").write_text(
-        '{"name": "monorepo", "workspaces": ["packages/*"]}\n'
-    )
+    (tmp_path / "package.json").write_text('{"name": "monorepo", "workspaces": ["packages/*"]}\n')
     keep = tmp_path / "packages" / "keep"
     keep.mkdir(parents=True)
-    (keep / "package.json").write_text(
-        '{"name": "keep", "version": "1.0.0"}\n'
-    )
+    (keep / "package.json").write_text('{"name": "keep", "version": "1.0.0"}\n')
     extra = tmp_path / "extras" / "extra"
     extra.mkdir(parents=True)
-    (extra / "package.json").write_text(
-        '{"name": "extra", "version": "1.0.0"}\n'
-    )
+    (extra / "package.json").write_text('{"name": "extra", "version": "1.0.0"}\n')
 
     comps = discover_components(tmp_path)
     assert "keep" in comps
@@ -717,28 +626,21 @@ def test_workspace_declaration_keeps_strict_member_list(tmp_path: Path):
 
 def test_npm_workspaces_bang_pattern_excludes_member(tmp_path: Path):
     (tmp_path / "package.json").write_text(
-        '{"name": "monorepo", '
-        '"workspaces": ["packages/*", "!packages/legacy"]}\n'
+        '{"name": "monorepo", "workspaces": ["packages/*", "!packages/legacy"]}\n'
     )
     keep = tmp_path / "packages" / "keep"
     keep.mkdir(parents=True)
-    (keep / "package.json").write_text(
-        '{"name": "keep", "version": "1.0.0"}\n'
-    )
+    (keep / "package.json").write_text('{"name": "keep", "version": "1.0.0"}\n')
     legacy = tmp_path / "packages" / "legacy"
     legacy.mkdir(parents=True)
-    (legacy / "package.json").write_text(
-        '{"name": "legacy", "version": "0.1.0"}\n'
-    )
+    (legacy / "package.json").write_text('{"name": "legacy", "version": "0.1.0"}\n')
     comps = discover_components(tmp_path)
     assert "keep" in comps
     assert "legacy" not in comps
 
 
 def test_pnpm_workspace_bang_pattern_excludes_member(tmp_path: Path):
-    (tmp_path / "package.json").write_text(
-        '{"name": "monorepo", "private": true}\n'
-    )
+    (tmp_path / "package.json").write_text('{"name": "monorepo", "private": true}\n')
     (tmp_path / "pnpm-workspace.yaml").write_text(
         "packages:\n  - 'packages/*'\n  - '!packages/legacy'\n"
     )
@@ -747,9 +649,7 @@ def test_pnpm_workspace_bang_pattern_excludes_member(tmp_path: Path):
     (keep / "package.json").write_text('{"name": "keep", "version": "1.0.0"}\n')
     legacy = tmp_path / "packages" / "legacy"
     legacy.mkdir(parents=True)
-    (legacy / "package.json").write_text(
-        '{"name": "legacy", "version": "0.1.0"}\n'
-    )
+    (legacy / "package.json").write_text('{"name": "legacy", "version": "0.1.0"}\n')
     comps = discover_components(tmp_path)
     assert "keep" in comps
     assert "legacy" not in comps
@@ -771,19 +671,13 @@ def test_full_polyglot_workspace_layout(tmp_path: Path):
     )
     api = tmp_path / "services" / "api"
     api.mkdir(parents=True)
-    (api / "pyproject.toml").write_text(
-        '[project]\nname = "api"\nversion = "1.0.0"\n'
-    )
+    (api / "pyproject.toml").write_text('[project]\nname = "api"\nversion = "1.0.0"\n')
     worker = tmp_path / "services" / "worker"
     worker.mkdir(parents=True)
-    (worker / "pyproject.toml").write_text(
-        '[project]\nname = "worker"\nversion = "0.5.0"\n'
-    )
+    (worker / "pyproject.toml").write_text('[project]\nname = "worker"\nversion = "0.5.0"\n')
     client = tmp_path / "packages" / "client"
     client.mkdir(parents=True)
-    (client / "package.json").write_text(
-        '{"name": "client", "version": "0.5.0"}\n'
-    )
+    (client / "package.json").write_text('{"name": "client", "version": "0.5.0"}\n')
     chart = tmp_path / "charts" / "api"
     chart.mkdir(parents=True)
     (chart / "Chart.yaml").write_text(
@@ -808,9 +702,7 @@ def test_full_polyglot_workspace_layout(tmp_path: Path):
 
 
 def test_workspace_member_without_version_skipped(tmp_path: Path):
-    (tmp_path / "package.json").write_text(
-        '{"name": "monorepo", "workspaces": ["packages/*"]}\n'
-    )
+    (tmp_path / "package.json").write_text('{"name": "monorepo", "workspaces": ["packages/*"]}\n')
     private_pkg = tmp_path / "packages" / "private"
     private_pkg.mkdir(parents=True)
     (private_pkg / "package.json").write_text(
@@ -821,8 +713,6 @@ def test_workspace_member_without_version_skipped(tmp_path: Path):
 
 
 def test_package_json_scope_is_stripped(tmp_path: Path):
-    (tmp_path / "package.json").write_text(
-        '{"name": "@acme/widget", "version": "0.1.0"}\n'
-    )
+    (tmp_path / "package.json").write_text('{"name": "@acme/widget", "version": "0.1.0"}\n')
     comps = discover_components(tmp_path)
     assert "widget" in comps
