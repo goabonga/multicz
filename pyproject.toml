@@ -110,3 +110,10 @@ pythonVersion = "3.12"
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "standard"
+
+# multicz drives git through argument lists, never a shell, so the
+# subprocess findings (B404, B603, B607) describe how the tool works.
+# The asserts (B101) only narrow optional values for the type checkers.
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B404", "B603", "B607"]

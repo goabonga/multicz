@@ -39,7 +39,7 @@ def _read_gradle_root_name(repo: Path) -> str | None:
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except Exception:
+        except Exception:  # nosec B112 - an unreadable settings file is skipped
             continue
         match = _GRADLE_NAME_RE.search(text)
         if match:
