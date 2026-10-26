@@ -23,7 +23,7 @@ def has_license(lines: list[str]) -> bool:
 
 
 def add_license_header(file_path: str) -> bool:
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         lines = f.readlines()
 
     if has_license(lines):
@@ -44,20 +44,40 @@ def add_license_header(file_path: str) -> bool:
     with open(file_path, "w", encoding="utf-8") as f:
         f.write("\n".join(new_lines) + "\n")
 
-    print(f"📝 License header added to: {file_path}")
+    print(f"License header added to: {file_path}")
     return True
 
 
 def check_license(file_path: str) -> bool:
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         lines = f.readlines()
     return has_license(lines)
+
+
+# Directories that never carry project sources: virtualenvs, VCS
+# metadata, build output and tool caches. Pruned from the walk so a
+# scan rooted at "." does not flag third-party files (e.g. a wheel's
+# bundled Cargo.toml under .venv).
+PRUNE_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+    "site",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "node_modules",
+}
 
 
 def process_directory(root: str, extensions: list[str], check_only: bool) -> int:
     missing_files = []
 
-    for dirpath, _, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in PRUNE_DIRS]
         for filename in filenames:
             path = os.path.join(dirpath, filename)
             ext = os.path.splitext(filename)[1]
@@ -78,15 +98,15 @@ def process_directory(root: str, extensions: list[str], check_only: bool) -> int
 
     if check_only:
         if missing_files:
-            print("❌ Missing license headers in:")
+            print("Missing license headers in:")
             for f in missing_files:
                 print(f" - {f}")
             return 1
-        print("✅ All files have license headers.")
+        print("All files have license headers.")
     return 0
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Add or check SPDX license headers.")
     parser.add_argument(
         "--path", type=str, default=".", help="Root directory to process"
@@ -104,7 +124,10 @@ def main():
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Only check for missing license headers without modifying files. Exits 1 if any are missing.",
+        help=(
+            "Only check for missing license headers without modifying files. "
+            "Exits 1 if any are missing."
+        ),
     )
     args = parser.parse_args()
 
