@@ -171,6 +171,36 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/format_summary.py pip-audit audit.json
 
+  # Multi-source vulnerability scan with OSV-Scanner, which reads uv.lock.
+  # The binary is pinned to a release and verified against its published
+  # checksum instead of downloading whatever `latest` points to.
+  osv-scanner:
+    runs-on: ubuntu-24.04
+    env:
+      OSV_SCANNER_VERSION: v2.7.0
+      OSV_SCANNER_SHA256: 160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install OSV-Scanner
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" \
+            -o "$HOME/.local/bin/osv-scanner"
+          echo "${OSV_SCANNER_SHA256}  $HOME/.local/bin/osv-scanner" | sha256sum --check
+          chmod +x "$HOME/.local/bin/osv-scanner"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run OSV-Scanner
+        run: osv-scanner scan source --lockfile=uv.lock 2>&1 | tee osv-scanner.txt
+
+      - name: Summarize osv-scanner
+        if: ${{ !cancelled() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: python3 scripts/format_summary.py text osv-scanner osv-scanner.txt
+
   test:
     needs: [license-headers, lint, type-check, pyright, validate]
     runs-on: ubuntu-24.04

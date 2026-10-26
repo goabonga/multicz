@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Chris <goabonga@pm.me>
+
+# OSV-Scanner ignore list. Entries here are reviewed advisories that
+# cannot be acted on yet; each carries a justification and an
+# `ignoreUntil` review date so the suppression is revisited, not
+# forgotten.
+#
+# Currently empty: the list is the exception, not the norm. Prefer
+# upgrading the dependency; add an `[[IgnoredVulns]]` block only when
+# there is genuinely nothing to upgrade to.
