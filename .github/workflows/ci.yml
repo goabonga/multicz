@@ -131,6 +131,24 @@ jobs:
       - name: Validate multicz.toml
         run: uv run multicz validate --strict
 
+  # Static security analysis of the source (Bandit); the skipped tests
+  # are explained in `[tool.bandit]` of pyproject.toml.
+  bandit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Run Bandit
+        run: uvx "bandit[toml]" -c pyproject.toml --recursive src --format json --output bandit.json
+
+      - name: Summarize bandit
+        if: ${{ !cancelled() }}
+        run: python3 scripts/format_summary.py bandit bandit.json
+
   test:
     needs: [license-headers, lint, type-check, pyright, validate]
     runs-on: ubuntu-24.04
