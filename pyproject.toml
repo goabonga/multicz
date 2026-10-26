@@ -84,6 +84,9 @@ select = ["E", "F", "I", "B", "UP", "SIM", "N", "RUF"]
 # directly in argument defaults. B008 forbids that across the board, so we
 # disable it for the entire CLI package (one file per command).
 "src/multicz/cli/**.py" = ["B008"]
+# The CI helper scripts build markdown and HTML summaries from long
+# literals; the formatter already wraps everything it can.
+"scripts/**.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
