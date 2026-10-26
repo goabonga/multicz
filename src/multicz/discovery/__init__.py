@@ -39,6 +39,7 @@ behind their own protocol.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import tomlkit
@@ -155,7 +156,7 @@ def _inline_filekey(fk: FileKey):
     return inline
 
 
-def _filekey_array(items: list[FileKey]):
+def _filekey_array(items: Sequence[FileKey]):
     array = tomlkit.array()
     array.multiline(True)
     for fk in items:
