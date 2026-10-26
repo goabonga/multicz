@@ -38,6 +38,8 @@ jobs:
           uv run python scripts/add_license_header.py --path src --types py --check
           uv run python scripts/add_license_header.py --path tests --types py --check
 
+  # `ruff check` plus a separate `ruff format --check`, so formatting
+  # drift is caught for contributors who skipped the pre-commit hooks.
   lint:
     runs-on: ubuntu-24.04
     steps:
@@ -50,7 +52,19 @@ jobs:
         run: uv sync --frozen
 
       - name: Lint
-        run: uv run ruff check src tests
+        run: uv run ruff check --output-format=json --output-file=ruff.json src tests scripts
+
+      - name: Summarize ruff check
+        if: ${{ !cancelled() }}
+        run: python3 scripts/format_summary.py ruff-check ruff.json
+
+      - name: Format check
+        if: ${{ !cancelled() }}
+        run: uv run ruff format --check src tests scripts 2>&1 | tee ruff-format.txt
+
+      - name: Summarize ruff format
+        if: ${{ !cancelled() }}
+        run: python3 scripts/format_summary.py ruff-format ruff-format.txt
 
   validate:
     runs-on: ubuntu-24.04
