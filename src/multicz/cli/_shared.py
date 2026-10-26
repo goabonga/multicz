@@ -17,7 +17,7 @@ from ..commits import (
     latest_tag,
     tag_prefix,
 )
-from ..config import ComponentMatcher, find_config, load_config
+from ..config import ComponentMatcher, Config, find_config, load_config
 from ..planner import (
     MirrorReason,
     NonConventionalCommitsError,
@@ -28,7 +28,7 @@ from ..planner import (
 from . import err
 
 
-def _load() -> tuple[Path, object]:
+def _load() -> tuple[Path, Config]:
     from pydantic import ValidationError
 
     try:
