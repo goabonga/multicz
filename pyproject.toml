@@ -87,6 +87,9 @@ select = ["E", "F", "I", "B", "UP", "SIM", "N", "RUF"]
 # The CI helper scripts build markdown and HTML summaries from long
 # literals; the formatter already wraps everything it can.
 "scripts/**.py" = ["E501"]
+# Inline XML and TOML fixtures for the summary and dependabot scripts.
+"tests/test_format_summary.py" = ["E501"]
+"tests/test_rewrite_dependabot_commit.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
