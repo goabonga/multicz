@@ -46,7 +46,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # `pypi` matches the GitHub-side environment registered with the
     # PyPI Trusted Publisher. Without this, the OIDC token claim
     # `environment` is `MISSING` and PyPI returns `invalid-publisher`.
