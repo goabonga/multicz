@@ -62,7 +62,7 @@ jobs:
       ${{ github.event.workflow_run.conclusion == 'success' &&
           !startsWith(github.event.workflow_run.head_commit.message, 'chore(release)') }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # workflow_run runs in the context of the default branch, but
           # we want the exact ref that just passed CI. `head_branch` is
@@ -71,7 +71,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           python-version: "3.12"
 
@@ -173,8 +173,7 @@ jobs:
 
       - name: Publish to PyPI (Trusted Publishing via OIDC)
         if: steps.plan.outputs.package == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
-
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
       - name: Create GitHub Release
         # Package tags only. `docs` declares no `github-release`
         # artifact - its release is the Pages deploy below - so a
