@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.8.1] - 2026-10-26
+
+### Fixes
+
+- **deps**: bump pydantic from 2.13.3 to 2.14.1 (`459c70c`)
+
 ## [1.8.0] - 2026-10-07
 
 ### Features
