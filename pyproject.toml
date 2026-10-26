@@ -53,6 +53,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.18",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.6",
@@ -85,3 +86,10 @@ select = ["E", "F", "I", "B", "UP", "SIM", "N", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+extra_checks = true
+exclude = ["build/", "dist/", "site/", ".venv/"]
