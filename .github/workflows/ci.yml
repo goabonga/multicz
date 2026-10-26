@@ -150,4 +150,14 @@ jobs:
         run: uv sync --frozen
 
       - name: Run pytest
-        run: uv run pytest -q
+        run: |
+          uv run pytest -q \
+            --cov=multicz \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --junitxml=junit.xml \
+            -o junit_family=legacy
+
+      - name: Summarize tests and coverage
+        if: ${{ !cancelled() }}
+        run: python3 scripts/format_summary.py pytest --junit junit.xml --coverage coverage.xml
