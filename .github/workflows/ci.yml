@@ -262,6 +262,25 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/format_summary.py pytest --junit junit.xml --coverage coverage.xml
 
+      # Forks and Dependabot get no secret, hence no upload and no failure.
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          disable_search: true
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: junit.xml
+          report_type: test_results
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          disable_search: true
+
   # Release on main only: bump the version, write the changelog, create
   # the release commit + tag and push them back. Gated on every quality
   # job; `needs` blocks on any upstream failure and skips the release
