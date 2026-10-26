@@ -145,6 +145,10 @@ Minor and patch updates are queued for the same merge once CI passed; a
 major update only gets a notice and waits for a maintainer to add the
 label.
 
+Each Dependabot pull request also gets an issue, assigned to the repository
+owner, which the pull request closes when it is merged. If the pull request
+is closed without a merge, the issue is closed as not planned.
+
 The automation needs the `AUTO_MERGE_PAT`, `GPG_PRIVATE_KEY` and
 `GPG_PASSPHRASE` secrets and the `GIT_USER_NAME`, `GIT_USER_EMAIL` and
 `GIT_SIGNING_KEY` variables of the repository. The release job pushes its
