@@ -84,9 +84,10 @@ jobs:
         # "Bob authored chore(release): bump X -> Y" is preserved on the
         # timeline. Falls back to the github-actions[bot] noreply
         # identity when the upstream payload doesn't carry an author.
+        env:
+          NAME: ${{ github.event.workflow_run.head_commit.author.name }}
+          EMAIL: ${{ github.event.workflow_run.head_commit.author.email }}
         run: |
-          NAME="${{ github.event.workflow_run.head_commit.author.name }}"
-          EMAIL="${{ github.event.workflow_run.head_commit.author.email }}"
           git config user.name  "${NAME:-github-actions[bot]}"
           git config user.email "${EMAIL:-41898282+github-actions[bot]@users.noreply.github.com}"
 
