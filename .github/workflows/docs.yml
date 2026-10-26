@@ -103,14 +103,19 @@ jobs:
 
       - name: Write step summary
         if: always()
+        env:
+          REF: ${{ inputs.ref }}
+          BUMPED: ${{ inputs.bumped }}
+          JOB_STATUS: ${{ job.status }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           {
             echo "## Docs deploy"
             echo ""
             echo "| Field | Value |"
             echo "| --- | --- |"
-            echo "| Ref | \`${{ inputs.ref }}\` |"
-            echo "| Bumped by the caller | \`${{ inputs.bumped }}\` |"
-            echo "| Status | \`${{ job.status }}\` |"
-            echo "| URL | ${{ steps.deployment.outputs.page_url }} |"
+            echo "| Ref | \`$REF\` |"
+            echo "| Bumped by the caller | \`$BUMPED\` |"
+            echo "| Status | \`$JOB_STATUS\` |"
+            echo "| URL | $PAGE_URL |"
           } >> "$GITHUB_STEP_SUMMARY"
