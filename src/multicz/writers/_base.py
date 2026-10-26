@@ -60,15 +60,19 @@ class WriterImpl(Protocol):
 
     def matches(self, writer: Writer) -> bool:
         """Return ``True`` when ``writer`` is the kind this impl handles."""
+        ...
 
     def read_version(self, writer: Writer, repo: Path) -> str | None:
         """Read the upstream version this writer claims, or ``None`` if
         the writer isn't a version source for this kind."""
+        ...
 
     def write(self, ctx: WriteContext) -> list[Path]:
         """Render and write the sink. Return absolute paths the writer
         touched (so the bump pipeline can stage them)."""
+        ...
 
     def validate(self, writer: Writer, repo: Path) -> Iterator[Finding]:
         """Validation findings for ``writer`` against the on-disk repo
         state. May yield zero or more :class:`Finding` items."""
+        ...
