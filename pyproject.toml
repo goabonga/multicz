@@ -54,6 +54,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "mypy>=1.18",
+    "pyright>=1.1.414",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.6",
@@ -93,3 +94,12 @@ warn_return_any = true
 warn_unused_configs = true
 extra_checks = true
 exclude = ["build/", "dist/", "site/", ".venv/"]
+
+# pyright checks src as a second opinion next to mypy: the two checkers
+# disagree on inference and narrowing.
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
