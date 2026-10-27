@@ -199,9 +199,6 @@ def render_body(
         else:
             ordered.append((title, list(lines)))
 
-    if not ordered:
-        return "_No notable changes._\n"
-
     out: list[str] = []
     for title, items in ordered:
         out.append(f"### {title}")
