@@ -22,9 +22,15 @@ flat :class:`~multicz.config.Config` with repo-relative paths. Names and
 ``depends_on`` stay global: a component can depend on one declared in
 another file.
 
-Two things are deliberately not rebased: ``post_bump`` commands (opaque
-shell, always run from the repository root) and the project-wide
-settings, which only the root may declare.
+A component file may also carry ``[plugins.<name>]`` tables, merged into
+the root's: a plugin option that belongs to one component can then live
+next to it. Tables merge key by key, and a value set twice, in two files
+or in a file and the root, is an error naming both.
+
+Things deliberately not rebased: ``post_bump`` commands (opaque shell,
+always run from the repository root), plugin options (opaque to multicz,
+so any path in them stays relative to the repository root) and the
+project-wide settings, which only the root may declare.
 """
 
 from __future__ import annotations
@@ -71,18 +77,27 @@ def resolve_includes(raw: dict[str, Any], root: Path) -> tuple[dict[str, Any], l
     components = dict(components)
     origin = dict.fromkeys(components, "the root config")
 
+    plugins = _plain_copy(raw.get("plugins") or {})
+    plugin_origin: dict[tuple[str, ...], str] = {}
+    _record_leaves(plugins, (), "the root config", plugin_origin)
+
     files = find_component_files(patterns, root)
     for file in files:
         rel = file.relative_to(root).as_posix()
         base = PurePosixPath(rel).parent.as_posix()
         base = "" if base == "." else base
-        for name, body in _read_components(file, rel).items():
+        declared, file_plugins = _read_component_file(file, rel)
+        _merge_plugins(plugins, file_plugins, (), rel, plugin_origin)
+        for name, body in declared.items():
             if name in origin:
                 raise ValueError(f"component {name!r} is declared in both {origin[name]} and {rel}")
             origin[name] = rel
             components[name] = _rebase_component(body, base, rel)
             _check_component(name, components[name], rel)
-    return {**raw, "components": components}, files
+    merged = {**raw, "components": components}
+    if plugins:
+        merged["plugins"] = plugins
+    return merged, files
 
 
 def find_component_files(patterns: list[str], root: Path) -> list[Path]:
@@ -117,23 +132,66 @@ def _literal(root: Path, text: str, pattern: str) -> Path:
     return target
 
 
-def _read_components(file: Path, rel: str) -> dict[str, dict[str, Any]]:
+def _read_component_file(file: Path, rel: str) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """The components and the plugin tables a component file declares."""
     try:
         data = tomlkit.parse(file.read_text(encoding="utf-8")).unwrap()
     except Exception as exc:
         raise ValueError(f"{rel}: cannot be read as TOML: {exc}") from exc
-    extra = sorted(set(data) - {"components"})
+    extra = sorted(set(data) - {"components", "plugins"})
     if extra:
         raise ValueError(
-            f"{rel}: only [components] may be declared in a component file, found: "
-            f"{', '.join(extra)}"
+            f"{rel}: only [components] and [plugins] may be declared in a component file, "
+            f"found: {', '.join(extra)}"
         )
     table = data.get("components") or {}
     if isinstance(table, list):
         table = components_table(table)
     if not table:
         raise ValueError(f"{rel}: declares no component")
-    return table
+    plugins = data.get("plugins") or {}
+    if not isinstance(plugins, dict) or not all(isinstance(v, dict) for v in plugins.values()):
+        raise ValueError(f"{rel}: [plugins] must hold one table per plugin")
+    return table, plugins
+
+
+def _plain_copy(value: Any) -> Any:
+    """A copy made of plain dicts and lists, safe to merge into."""
+    if isinstance(value, dict):
+        return {key: _plain_copy(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_plain_copy(item) for item in value]
+    return value
+
+
+def _record_leaves(
+    table: dict[str, Any], prefix: tuple[str, ...], origin: str, seen: dict[tuple[str, ...], str]
+) -> None:
+    for key, value in table.items():
+        if isinstance(value, dict):
+            _record_leaves(value, (*prefix, key), origin, seen)
+        else:
+            seen[(*prefix, key)] = origin
+
+
+def _merge_plugins(
+    target: dict[str, Any],
+    incoming: dict[str, Any],
+    prefix: tuple[str, ...],
+    rel: str,
+    origin: dict[tuple[str, ...], str],
+) -> None:
+    """Merge ``incoming`` into ``target`` key by key; a value set twice is an error."""
+    for key, value in incoming.items():
+        where = (*prefix, key)
+        if isinstance(value, dict) and isinstance(target.get(key, {}), dict):
+            _merge_plugins(target.setdefault(key, {}), value, where, rel, origin)
+        elif key in target:
+            first = origin.get(where, "the root config")
+            raise ValueError(f"plugins.{'.'.join(where)} is declared in both {first} and {rel}")
+        else:
+            target[key] = _plain_copy(value)
+            origin[where] = rel
 
 
 def _check_component(name: str, body: dict[str, Any], rel: str) -> None:
