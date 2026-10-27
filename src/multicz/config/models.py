@@ -15,7 +15,16 @@ import shlex
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from ..commits import DEFAULT_BUMP_RULES, BumpRule
 
@@ -313,6 +322,22 @@ class ProjectSettings(BaseModel):
         return merged
 
 
+class ComponentPath(BaseModel):
+    """One ``[[component.path]]`` entry: where to look for component files."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+
+
+class ComponentSources(BaseModel):
+    """The ``[component]`` table: ``[[component.path]]`` entries, in order."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: list[ComponentPath] = Field(default_factory=list)
+
+
 def components_table(raw: list[Any]) -> dict[str, dict[str, Any]]:
     """Convert the ``[[components]]`` array form into the dict-of-tables form."""
     converted: dict[str, dict[str, Any]] = {}
@@ -332,6 +357,11 @@ class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     project: ProjectSettings = Field(default_factory=ProjectSettings)
+    # ``[[component.path]]`` entries selecting component files to merge
+    # into ``components`` (see ``includes.py``). Already resolved by the
+    # time the model is built; kept so the effective config still shows
+    # where its components came from.
+    component: ComponentSources = Field(default_factory=ComponentSources)
     components: dict[str, Component]
     # Free-form sub-tables consumed by installed plugins. multicz itself
     # never validates the inner shape — each plugin is responsible for
@@ -339,6 +369,22 @@ class Config(BaseModel):
     # ``[plugins.deprecation]`` in multicz.toml without the core needing
     # to know what fields the deprecation plugin uses.
     plugins: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+    # Files the config was assembled from: the root first, then every
+    # included component file. Set by ``load_config``.
+    _source_files: list[Path] = PrivateAttr(default_factory=list)
+
+    @property
+    def source_files(self) -> list[Path]:
+        return list(self._source_files)
+
+    @model_serializer(mode="wrap")
+    def _omit_unused_component_table(self, handler: SerializerFunctionWrapHandler) -> Any:
+        """Keep the dump of a config without ``[[component.path]]`` unchanged."""
+        data = handler(self)
+        if not self.component.path:
+            data.pop("component", None)
+        return data
 
     @model_validator(mode="before")
     @classmethod

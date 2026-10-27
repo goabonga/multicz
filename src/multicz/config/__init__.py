@@ -7,6 +7,7 @@ path-to-component matching (components.py)."""
 from __future__ import annotations
 
 from .components import ComponentMatcher
+from .includes import COMPONENT_FILENAME, resolve_includes
 from .models import (
     Artifact,
     ChangelogSection,
@@ -31,6 +32,7 @@ from .sources import (
 )
 
 __all__ = [
+    "COMPONENT_FILENAME",
     "CONFIG_FILENAME",
     "CONFIG_SOURCES",
     "Artifact",
@@ -50,4 +52,5 @@ __all__ = [
     "_default_changelog_sections",
     "find_config",
     "load_config",
+    "resolve_includes",
 ]

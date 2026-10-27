@@ -18,6 +18,7 @@ from typing import Any, Protocol
 
 import tomlkit
 
+from .includes import resolve_includes
 from .models import Config
 
 CONFIG_FILENAME = "multicz.toml"
@@ -120,14 +121,17 @@ def load_config(path: Path) -> Config:
     """Load and validate a multicz config from ``path``.
 
     Accepts ``multicz.toml`` (whole-file), ``pyproject.toml``
-    (``[tool.multicz]``), or ``package.json`` (``"multicz"`` key).
+    (``[tool.multicz]``), or ``package.json`` (``"multicz"`` key). Any of
+    them may carry ``[[component.path]]`` entries pulling in component files.
     """
     src = _source_for(path)
     raw = src.extract(path) if src is not None else None
     if raw is None:
         raise FileNotFoundError(f"no multicz config found in {path}")
-    config = Config.model_validate(raw)
+    merged, included = resolve_includes(raw, path.parent)
+    config = Config.model_validate(merged)
     config.validate_references()
+    config._source_files = [path, *included]
     return config
 
 
