@@ -467,7 +467,21 @@ What the merge does:
   `bump_policy`, `version_scheme`, `writers`, `artifacts` and the rest of
   [Component settings](#component-settings) are set per file.
   `[project]` settings are root-only: a component file may declare nothing
-  but `[components]`, and one that declares anything else is rejected.
+  but `[components]` and `[plugins]`, and one that declares anything else
+  is rejected.
+- **Plugin options can sit next to their component.** A component file may
+  carry `[plugins.<name>]` tables, merged into the root's key by key. A
+  value set twice, in two files or in a file and the root, is an error
+  naming both. They are opaque to multicz, so a path inside them is not
+  rebased and stays relative to the repository root:
+
+  ```toml
+  # cmd/hello/multicz.component.toml
+  [components.hello]
+
+  [plugins.go-deps.packages]
+  hello = "./cmd/hello"
+  ```
 - **`post_bump` is not rebased.** Its commands are opaque shell and always
   run from the repository root.
 
