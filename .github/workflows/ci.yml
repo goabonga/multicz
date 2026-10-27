@@ -467,8 +467,10 @@ jobs:
         # Package tags only: `docs` declares no `github-release` artifact,
         # so a `docs-v*` tag at the same commit opens no entry on a
         # Releases page people read for package changes.
+        # The maintainer token, like the release job: the release is
+        # published under the maintainer account, not the bot.
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_PAT || github.token }}
         run: |
           for tag in $(git tag --points-at HEAD --list 'multicz-v*'); do
             uv run multicz release-notes --tag "$tag" \
