@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.10.0] - 2026-10-27
+
+### Features
+
+- **config**: accept plugin tables in component files (`c5e174e`)
+
 ## [1.9.0] - 2026-10-27
 
 ### Features
