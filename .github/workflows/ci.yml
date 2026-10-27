@@ -27,6 +27,23 @@ defaults:
     shell: bash
 
 jobs:
+  # The signed merge replays the commits through sign_commit.py, which
+  # refuses an invalid subject; fail here, before the label is added.
+  commit-subjects:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the commit subjects
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/check_commit_subject.py --range "$BASE_SHA..$HEAD_SHA"
+
   # Verify the two-line SPDX header on the Python sources and the
   # workflows. The script needs no dependency, so nothing is synced.
   license-headers:
