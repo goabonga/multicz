@@ -153,7 +153,8 @@ The automation needs the `AUTO_MERGE_PAT`, `GPG_PRIVATE_KEY` and
 `GPG_PASSPHRASE` secrets and the `GIT_USER_NAME`, `GIT_USER_EMAIL` and
 `GIT_SIGNING_KEY` variables of the repository. The release job pushes its
 commit and tags with the same token, because the `main` ruleset does not
-let the workflow token do it.
+let the workflow token do it, and the publish job creates the GitHub release
+with it, so the release appears under the maintainer account.
 
 ## Commit messages
 
