@@ -15,13 +15,11 @@ wrote in ``multicz.toml``); JSON is also available for piping.
 
 from __future__ import annotations
 
-import contextlib
 from typing import Any
 
 import tomlkit
 import typer
 
-from ...config import find_config
 from .. import app, console, err
 from .._shared import _load
 
@@ -58,7 +56,7 @@ def config_cmd(
     source: bool = typer.Option(
         False,
         "--source",
-        help="Also print which file the config was loaded from (stderr).",
+        help="Also print which files the config was loaded from (stderr).",
     ),
 ) -> None:
     """Print the effective multicz configuration.
@@ -80,11 +78,11 @@ def config_cmd(
         err.print(f"[red]unknown --output:[/] {output} (use 'toml' or 'json')")
         raise typer.Exit(code=1)
 
-    repo, config = _load()
+    _, config = _load()
 
     if source:
-        with contextlib.suppress(FileNotFoundError):
-            err.print(f"[dim]config:[/] {find_config(repo)}")
+        for file in config.source_files:
+            err.print(f"[dim]config:[/] {file}")
 
     data = config.model_dump(mode="json")
 
