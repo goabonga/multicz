@@ -313,6 +313,21 @@ class ProjectSettings(BaseModel):
         return merged
 
 
+def components_table(raw: list[Any]) -> dict[str, dict[str, Any]]:
+    """Convert the ``[[components]]`` array form into the dict-of-tables form."""
+    converted: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ValueError(f"components[{index}] must be a table, got {type(item).__name__}")
+        name = item.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError(f"components[{index}] is missing a string 'name' field")
+        if name in converted:
+            raise ValueError(f"duplicate component name: {name!r}")
+        converted[name] = {k: v for k, v in item.items() if k != "name"}
+    return converted
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -345,19 +360,7 @@ class Config(BaseModel):
         raw = data.get("components")
         if not isinstance(raw, list):
             return data
-
-        converted: dict[str, dict[str, Any]] = {}
-        for index, item in enumerate(raw):
-            if not isinstance(item, dict):
-                raise ValueError(f"components[{index}] must be a table, got {type(item).__name__}")
-            name = item.get("name")
-            if not isinstance(name, str) or not name:
-                raise ValueError(f"components[{index}] is missing a string 'name' field")
-            if name in converted:
-                raise ValueError(f"duplicate component name: {name!r}")
-            converted[name] = {k: v for k, v in item.items() if k != "name"}
-
-        return {**data, "components": converted}
+        return {**data, "components": components_table(raw)}
 
     @field_validator("components")
     @classmethod
