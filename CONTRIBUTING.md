@@ -194,7 +194,10 @@ Guidelines:
   bisects far more useful.
 - **Imperative mood** in the summary: "add", "fix", "remove" - not
   "added", "fixes", "removing".
-- **No trailing period** on the summary.
+- **No trailing period** on the summary, at most 72 characters, and a
+  lowercase first word after the colon. The signed merge refuses any other
+  subject, so the `commit-subject` pre-commit hook and the `commit-subjects`
+  CI job check it first.
 - **No `Co-Authored-By` footers** unless the work was actually
   pair-authored.
 - **Reference issues in the body**, not the title: `Closes #42`.
