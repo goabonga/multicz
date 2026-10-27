@@ -226,10 +226,8 @@ def release_notes_cmd(
         for name in targets:
             bump = plan_obj.bumps.get(name)
             if bump is None:
-                if not all_:
-                    presenters.render_release_notes_no_pending(name)
-                    return
-                continue
+                presenters.render_release_notes_no_pending(name)
+                return
             commits = _component_relevant_commits(name, config, repo, matcher)
             sections.append(
                 ReleaseNotesSection(
