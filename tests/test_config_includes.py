@@ -270,6 +270,57 @@ def test_component_file_cannot_carry_project_settings(tmp_path: Path):
         load_config(root)
 
 
+def test_component_file_may_carry_plugin_options(tmp_path: Path):
+    root = _root(tmp_path, _paths("packages/*") + "[plugins.go-deps]\nstrict = true\n")
+    _component(
+        tmp_path,
+        "packages/a",
+        '[components.a]\n[plugins.go-deps.packages]\na = "./packages/a"\n',
+    )
+    _component(
+        tmp_path,
+        "packages/b",
+        '[components.b]\n[plugins.go-deps.packages]\nb = ["./packages/b"]\n',
+    )
+    assert load_config(root).plugins == {
+        "go-deps": {"strict": True, "packages": {"a": "./packages/a", "b": ["./packages/b"]}}
+    }
+
+
+def test_plugin_options_are_not_rebased(tmp_path: Path):
+    root = _root(tmp_path, _paths("packages/a"))
+    _component(tmp_path, "packages/a", '[components.a]\n[plugins.x]\npath = "packages/a"\n')
+    assert load_config(root).plugins == {"x": {"path": "packages/a"}}
+
+
+def test_a_plugin_option_set_twice_names_both_files(tmp_path: Path):
+    root = _root(tmp_path, _paths("packages/*"))
+    _component(tmp_path, "packages/a", "[components.a]\n[plugins.x]\nk = 1\n")
+    _component(tmp_path, "packages/b", "[components.b]\n[plugins.x]\nk = 2\n")
+    with pytest.raises(ValueError, match=r"plugins\.x\.k.*packages/a/.*packages/b/"):
+        load_config(root)
+
+
+def test_a_plugin_option_set_in_the_root_and_a_file_is_rejected(tmp_path: Path):
+    root = _root(tmp_path, _paths("packages/a") + "[plugins.x]\nk = 1\n")
+    _component(tmp_path, "packages/a", "[components.a]\n[plugins.x]\nk = 2\n")
+    with pytest.raises(ValueError, match=r"plugins\.x\.k.*root config"):
+        load_config(root)
+
+
+def test_a_plugin_table_must_hold_one_table_per_plugin(tmp_path: Path):
+    root = _root(tmp_path, _paths("packages/a"))
+    _component(tmp_path, "packages/a", "[components.a]\n[plugins]\nx = 1\n")
+    with pytest.raises(ValueError, match=r"one table per plugin"):
+        load_config(root)
+
+
+def test_a_config_without_plugins_gets_none_added(tmp_path: Path):
+    root = _root(tmp_path, _paths("packages/a"))
+    _component(tmp_path, "packages/a", "[components.a]\n")
+    assert load_config(root).plugins == {}
+
+
 def test_component_file_cannot_declare_further_paths(tmp_path: Path):
     root = _root(tmp_path, _paths("packages/a"))
     _component(tmp_path, "packages/a", _paths("x") + "[components.a]\n")
