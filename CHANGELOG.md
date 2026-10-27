@@ -2,6 +2,13 @@
 
 All notable changes to this component are documented here.
 
+## [1.9.0] - 2026-10-27
+
+### Features
+
+- **config**: merge component files selected by [[component.path]] (`7081e59`)
+- **cli**: list every merged file with config --source (`e47c5bc`)
+
 ## [1.8.1] - 2026-10-26
 
 ### Fixes
