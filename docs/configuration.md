@@ -409,6 +409,75 @@ Per-writer fields for `debian-changelog`:
 Requires `version_scheme = "semver"` (default) - the renderer's `~rc1`
 pre-release notation depends on the canonical semver form.
 
+## Splitting components across files
+
+A repository with dozens of components does not have to declare them all
+in the root. List where the component files live with one
+`[[component.path]]` entry per location, in the root config:
+
+```toml
+# multicz.toml
+[project]
+tag_format = "{component}-v{version}"
+
+[[component.path]]
+path = "packages/*"
+
+[[component.path]]
+path = "apps/**/*"
+```
+
+Each entry selects files named `multicz.component.toml`. A `path` that
+names a directory, or a wildcard that matches one, selects the file inside
+it. A wildcard over files only selects that filename, and dot-directories
+(`.git`, `.venv`, ...) are never walked. A `path` without wildcards must
+exist. Paths are relative to the directory holding the root config and
+cannot leave the repository.
+
+A component file declares `[components.<name>]` tables, exactly as the
+root does, in either the table or the `[[components]]` array form:
+
+```toml
+# packages/api/multicz.component.toml
+[components.api]
+changelog = "CHANGELOG.md"
+bump_files = [{ file = "pyproject.toml", key = "project.version" }]
+depends_on = ["core"]
+bump_rules = { docs = "patch" }
+```
+
+What the merge does:
+
+- **Paths are relative to the component file.** `paths`, `exclude_paths`,
+  `changelog`, and the `file` of `bump_files`, `mirrors` and `writers` are
+  rebased onto the repository root, so the example above bumps
+  `packages/api/pyproject.toml`. A `..` may climb out of the directory as
+  long as it stays inside the repository (`file = "../shared/VERSION"`);
+  globs in `paths` and `exclude_paths` may not.
+- **`paths` defaults to `["**"]`**, the whole directory.
+- **Globs keep their gitignore meaning.** `src/**` is anchored to the
+  component directory; `*.py` still matches at any depth below it.
+- **Names stay global.** `depends_on` can name a component declared in
+  another file, and a name declared twice, in two files or in a file and
+  the root, is an error naming both.
+- **Order is deterministic.** Components of the root come first, then the
+  files sorted by path. It matters for the first-match ownership of
+  [`overlap_policy`](#overlap_policy).
+- **Every component keeps its own rules.** `bump_rules`, `tag_format`,
+  `bump_policy`, `version_scheme`, `writers`, `artifacts` and the rest of
+  [Component settings](#component-settings) are set per file.
+  `[project]` settings are root-only: a component file may declare nothing
+  but `[components]`, and one that declares anything else is rejected.
+- **`post_bump` is not rebased.** Its commands are opaque shell and always
+  run from the repository root.
+
+Everything downstream sees one flat configuration, so `plan`, `bump`,
+`changed`, `graph`, `validate` and the plugins behave as if the components
+were all in the root. `multicz config` prints the merged result and
+`multicz config --source` lists the files it came from. The component
+filename differs from `multicz.toml` on purpose: running multicz from
+inside a package still finds the root config instead of a component file.
+
 ## Full example
 
 ```toml

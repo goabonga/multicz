@@ -209,7 +209,7 @@ actually parsed, not what you typed.
 multicz config                    # full config in TOML
 multicz config -c api             # just one component (project still shown)
 multicz config --output json      # machine-readable, pipe to jq
-multicz config --source           # also print the loaded file path on stderr
+multicz config --source           # also print the loaded files on stderr
 ```
 
 What you see vs. what you wrote:
@@ -251,8 +251,10 @@ Notable flags:
 - `-c <name>` keeps the `[project]` table in the output (defaults are
   the most useful debugging context) and exactly one component.
 - `--source` - writes the path of the loaded `multicz.toml` /
-  `pyproject.toml` / `package.json` to **stderr**, so it doesn't
-  pollute the JSON/TOML on stdout.
+  `pyproject.toml` / `package.json` to **stderr**, followed by every
+  component file merged through
+  [`[[component.path]]`](configuration.md#splitting-components-across-files),
+  so it doesn't pollute the JSON/TOML on stdout.
 
 Common debugging checks:
 
