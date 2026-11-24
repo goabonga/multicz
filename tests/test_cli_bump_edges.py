@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from click.exceptions import Exit
+import typer
 from typer.testing import CliRunner
 
 from multicz.cli import app
@@ -107,7 +107,7 @@ def test_head_lookup_failure_does_not_block_state_file(repo: Path, monkeypatch: 
 
     def fake_git(repo_arg: Path, *args: str) -> str:
         if args[:2] == ("rev-parse", "HEAD"):
-            raise Exit(code=1)
+            raise typer.Exit(code=1)
         return bump_git(repo_arg, *args)
 
     monkeypatch.setattr(bump_module, "_git", fake_git)
@@ -147,7 +147,7 @@ def test_run_post_bump_hook_ignores_blank_command(tmp_path: Path):
 
 
 def test_run_post_bump_hook_failure_prints_stderr(tmp_path: Path, capsys: pytest.CaptureFixture):
-    with pytest.raises(Exit):
+    with pytest.raises(typer.Exit):
         _run_post_bump_hook(tmp_path, "sh -c 'echo oops >&2; exit 3'")
     assert "oops" in capsys.readouterr().err
 
