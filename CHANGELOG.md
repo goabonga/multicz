@@ -2,6 +2,12 @@
 
 All notable changes to this component are documented here.
 
+## [1.10.4] - 2026-11-24
+
+### Fixes
+
+- **deps**: bump typer from 0.25.1 to 0.29.2 (`2a95020`)
+
 ## [1.10.3] - 2026-11-24
 
 ### Fixes
